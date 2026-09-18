@@ -17,6 +17,7 @@ export const PWAInstallBanner: React.FC<PWAInstallBannerProps> = () => {
     updateAvailable,
     isUpdating,
     isOnline,
+    isMounted,
     installApp,
     applyUpdate,
   } = usePWA();
@@ -53,6 +54,10 @@ export const PWAInstallBanner: React.FC<PWAInstallBannerProps> = () => {
       setShowIOSModal(true);
     }
   };
+
+  if (!isMounted) {
+    return null;
+  }
 
   return (
     <>

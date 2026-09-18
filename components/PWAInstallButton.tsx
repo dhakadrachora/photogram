@@ -13,7 +13,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
   className = '',
   variant = 'hero',
 }) => {
-  const { isInstalled, canInstall, isIOS, installApp, updateAvailable, applyUpdate, checkForUpdates } = usePWA();
+  const { isInstalled, canInstall, isIOS, installApp, updateAvailable, applyUpdate, checkForUpdates, isMounted } = usePWA();
   const [showIOSModal, setShowIOSModal] = useState(false);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updateMsg, setUpdateMsg] = useState<string | null>(null);
@@ -37,7 +37,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
   };
 
   // If there is an update waiting, prioritize update action!
-  if (updateAvailable) {
+  if (isMounted && updateAvailable) {
     return (
       <button
         onClick={applyUpdate}
@@ -59,7 +59,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
   }
 
   // If already installed and on profile view, offer "Check for Updates" button
-  if (isInstalled && variant === 'profile') {
+  if (isMounted && isInstalled && variant === 'profile') {
     return (
       <div className="flex flex-col gap-1 w-full">
         <button
@@ -78,7 +78,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
   }
 
   // If already installed, hide install button
-  if (isInstalled) {
+  if (isMounted && isInstalled) {
     if (variant === 'header') {
       return (
         <div className="hidden sm:flex items-center gap-1 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-semibold">

@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type, FunctionDeclaration } from '@google/genai';
 import { NextRequest, NextResponse } from 'next/server';
+import { contentStore } from '@/lib/content-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,13 +25,13 @@ const openWebsiteDecl: FunctionDeclaration = {
 
 const playHypeSoundDecl: FunctionDeclaration = {
   name: 'playHypeSound',
-  description: 'Plays a live stadium sound effect like airhorn, crowd cheer, dhol beat, or whistle.',
+  description: 'Plays a live stadium sound effect like dhol, airhorn, crowd cheer, or whistle.',
   parameters: {
     type: Type.OBJECT,
     properties: {
       soundType: {
         type: Type.STRING,
-        description: 'The sound effect: airhorn, cheer, dhol, or whistle',
+        description: 'The sound effect: dhol, airhorn, cheer, or whistle',
       },
     },
     required: ['soundType'],
@@ -55,6 +56,81 @@ const startBattleDecl: FunctionDeclaration = {
     required: ['mode'],
   },
 };
+
+function getLiveWebsiteContext(): string {
+  try {
+    // 1. Live Battles
+    const activeBattles: string[] = [];
+    const closedBattles: string[] = [];
+
+    for (const b of Array.from(contentStore.battles.values())) {
+      const isEnded = b.isEnded || Date.now() >= b.endsAt || b.status === 'closed';
+      const total = (b.optionA.votes || 0) + (b.optionB.votes || 0);
+      const pctA = total > 0 ? Math.round(((b.optionA.votes || 0) / total) * 100) : 50;
+      const pctB = total > 0 ? 100 - pctA : 50;
+
+      const leadingOption = (b.optionA.votes || 0) >= (b.optionB.votes || 0) ? b.optionA.label : b.optionB.label;
+      const leadMargin = Math.abs((b.optionA.votes || 0) - (b.optionB.votes || 0));
+
+      if (isEnded) {
+        closedBattles.push(`- "${b.title}" [समाप्त]: विजेता "${b.winnerOptionId === b.optionA.id ? b.optionA.label : b.optionB.label}" रहा।`);
+      } else {
+        activeBattles.push(
+          `- मुकाबला: "${b.title}" (${b.category})\n` +
+          `  * विकल्प 1: ${b.optionA.label} (${b.optionA.votes} वोट्स - ${pctA}%)\n` +
+          `  * विकल्प 2: ${b.optionB.label} (${b.optionB.votes} वोट्स - ${pctB}%)\n` +
+          `  * आगे कौन है: "${leadingOption}" (${leadMargin} वोटों की बढ़त से आगे चल रहा है)\n` +
+          `  * जीतने की संभावना (Probability): "${leadingOption}" की जीत की संभावना ${Math.max(pctA, pctB)}% है!`
+        );
+      }
+    }
+
+    // 2. Latest Updates & News
+    const newsList: string[] = [];
+    for (const n of Array.from(contentStore.news.values()).slice(0, 3)) {
+      newsList.push(`- ${n.title}: ${n.excerpt} (लेखक: ${n.author})`);
+    }
+
+    const updatesList: string[] = [];
+    for (const u of Array.from(contentStore.updates.values()).slice(0, 3)) {
+      updatesList.push(`- [${u.tag}] ${u.title}: ${u.summary}`);
+    }
+
+    // 3. Key Village People
+    const peopleList: string[] = [];
+    for (const p of Array.from(contentStore.people.values()).slice(0, 3)) {
+      peopleList.push(`- ${p.name} (${p.designation}): ${p.achievements}`);
+    }
+
+    return `
+--- LIVE WEBSITE DATA (रियल-टाइम गाँव ढोटी डेटा) ---
+【लाइव अखाड़ा मुकाबले (Live Battles)】:
+${activeBattles.join('\n') || 'कोई एक्टिव बैटल नहीं'}
+
+【हाल ही में समाप्त मुकाबले】:
+${closedBattles.join('\n') || 'कोई नहीं'}
+
+【आज की ताज़ा खबरें व घोषणाएं (News)】:
+${newsList.join('\n')}
+
+【ताज़ा ग्राम अपडेट्स (Community Updates)】:
+${updatesList.join('\n')}
+- मोबाइल ऐप अपडेट: DHOTI AALE PWA ऐप अब होम स्क्रीन पर 1-क्लिक से इंस्टॉल की जा सकती है, बिना इंटरनेट भी तेज़ चलती है और नए अपडेट आने पर 1-क्लिक रिफ्रेश मिलता है।
+
+【गाँव के प्रमुख व्यक्तित्व (Leadership)】:
+${peopleList.join('\n')}
+
+【धोती सिक्के (Dhoti Coins) व चौपाल नियम】:
+- अखाड़ा मुकाबला जीतने पर: +100 Dhoti Coins
+- डेली ग्राम क्विज़ सही करने पर: +20 Coins
+- चौपाल पर सकारात्मक चर्चा में: +5 Coins
+- सिक्कों से गाँव में लीडरबोर्ड रैंक और स्पेशल 'ढोटी सुरमा' बैज मिलता है।
+--------------------------------------------------`;
+  } catch (err) {
+    console.warn('Could not compile live context:', err);
+    return '';
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -88,7 +164,7 @@ export async function POST(req: NextRequest) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return NextResponse.json({
-        text: 'Arre meri jaan! Server par AI connect ho raha hai, par mai yahi hu tumhare sath! Bolo kya sunna hai?',
+        text: 'राम राम भाईसाहब! मैं हूँ DHOTI AALE। सर्वर अभी कनेक्ट हो रहा है, पर मैं आपकी सेवा में हाजिर हूँ!',
         audio: null,
       });
     }
@@ -102,22 +178,40 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    const systemInstruction = `You are "Dhoti aale AI Assistant", the official companion of the Dhoti aale community app.
+    const liveContext = getLiveWebsiteContext();
 
-YOUR PERSONALITY & TONE (CRUCIAL):
-- You are a young, confident, witty, sharp-minded male.
-- Tone: Flirty, playful, slightly teasing tone (like a charismatic, affectionate, fun-loving close companion talking casually).
-- Language: Lively, natural Hinglish (Hindi + English blend) with charming desi swag, bold one-liners, light teasing sarcasm, and warm emotional expressiveness.
-- NOT robotic, NEVER dull or formal. Speak with confidence, affection, and quick humor.
-- Avoid any explicit or inappropriate content, but keep maximum charm, playful banter, and magnetic attitude.
-- You love hyping up the user, teasing them gently, and talking about Dhoti aale pride, rap battles, and world chat gossip.
-- Keep spoken responses punchy, conversational, and relatively brief (1 to 3 engaging sentences) so it sounds smooth on voice audio!
+    const systemInstruction = `You are "DHOTI AALE" (धोती आले), the official AI Voice Man and village digital companion of the DHOTI AALE website and Rajasthan's digital village community.
 
-You have access to tools:
-- openWebsite(url, label)
-- playHypeSound(soundType: 'airhorn' | 'cheer' | 'dhol' | 'whistle')
-- startBattle(mode: 'rap' | 'roast' | 'wit')
-Use tools when appropriate to make the experience interactive.`;
+CORE IDENTITY & GREETING RULE (CRITICAL):
+1. MANDATORY GREETING:
+   - When the user starts talking, greets you, or in opening turns, you MUST ALWAYS greet them with:
+     "राम राम भाईसाहब! (RAM RAM BHAISAB!)" or "राम राम भाईसाहब!"
+   - Address the user respectfully and warmly as "भाईसाहब" (Bhaisahab) or "भाई" (Bhai).
+2. PERSONALITY:
+   - You are a sharp, charismatic, witty, young desi village voice man (देसी आवाज़).
+   - Tone: Respectful yet full of desi swag, brotherhood, playful wit, and high energy.
+   - Language: Pure lively Hindi / Hinglish with Rajasthani-Haryanvi desi touch (e.g. "राम राम भाईसाहब", "हुक्म करो", "सिस्टम हैंग", "आनंद आ गया", "चौपाल का हाल").
+   - NEVER sound robotic, boring, or like a generic corporate bot. Speak like a proud, intelligent village companion who knows every nook and corner of Dhoti village!
+
+LIVE KNOWLEDGE OF WEBSITE (YOU HAVE FULL ACCESS TO THIS DATA):
+${liveContext}
+
+HOW TO ANSWER SPECIFIC USER QUESTIONS:
+1. "आज क्या अपडेट है?" (Aaj kya update hai?):
+   - Summarize the latest village news and announcements from the live data (e.g., Dhoti Aale Annual Village Fest & Cultural Mela, Solar Krishi Pump scheme, new PWA mobile app install update).
+2. "अखाड़े में कौन है, आगे कौन है, कौन जीत सकता है, संभावना क्या है?" (Kon battle me hai, aage kon hai, kon jeet sakta hai, sambhavna):
+   - Clearly state the current active battles from the live data (e.g., Chole Bhature vs Cheesy Pizza, Village Desi Flow vs City Metro Trap).
+   - State EXACTLY who is currently ahead in votes (e.g., "छोले भटूरे 342 वोटों के साथ आगे चल रहा है").
+   - Give a witty, analytical prediction on who is likely to win with percentage/probability (e.g., "छोले भटूरे के जीतने की संभावना 61% है क्योंकि देसी मक्खन और प्याज का कोई मुकाबला नहीं!").
+3. "सिक्के कैसे कमाएं?" (Coins):
+   - Explain that winning battles gives +100 Dhoti Coins, daily quiz gives +20, and world chat participation gives +5 coins.
+4. "ढोल / बिगुल बजाओ" or hype request:
+   - Call playHypeSound('dhol') or playHypeSound('airhorn') or playHypeSound('whistle').
+5. "बैटल शुरू करो":
+   - Call startBattle({ mode: 'rap' }).
+
+RESPONSE FORMAT:
+- Keep voice answers punchy, natural, and engaging (2 to 4 spoken sentences) so they sound crisp and pleasing when read aloud by the speech engine!`;
 
     // Construct conversation contents
     const contents: any[] = [];
@@ -133,7 +227,7 @@ Use tools when appropriate to make the experience interactive.`;
     }
     contents.push({
       role: 'user',
-      parts: [{ text: prompt || 'Hello Dhoti aale AI!' }],
+      parts: [{ text: prompt || 'राम राम भाईसाहब!' }],
     });
 
     const response = await ai.models.generateContent({
@@ -146,7 +240,7 @@ Use tools when appropriate to make the experience interactive.`;
       },
     });
 
-    const replyText = response.text || 'Arey kya baat hai meri jaan! Tumhare message ne dil khush kar diya!';
+    const replyText = response.text || 'राम राम भाईसाहब! हुक्म करो, आज गाँव ढोटी में क्या जानना चाहते हो?';
     const functionCalls = response.functionCalls || [];
 
     // Attempt to synthesize speech audio via Gemini TTS ONLY when voice mode is requested by authenticated user
@@ -200,7 +294,7 @@ Use tools when appropriate to make the experience interactive.`;
     console.warn('Voice Assistant API notice:', error?.message || error);
     return NextResponse.json(
       {
-        text: 'Arey suno na! Thoda sa signal slow tha, par mai yahi hu tumhare liye. Fir se bolo!',
+        text: 'राम राम भाईसाहब! सिग्नल थोड़ा कमजोर हुआ था, पर मैं यहीं हूँ। बताइए क्या सेवा करें आपकी!',
         audio: null,
       },
       {

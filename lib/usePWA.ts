@@ -29,16 +29,20 @@ function getIsOnline(): boolean {
 
 export function usePWA() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [isInstalled, setIsInstalled] = useState<boolean>(getIsStandalone);
-  const [isIOS, setIsIOS] = useState<boolean>(getIsIOS);
+  const [isInstalled, setIsInstalled] = useState<boolean>(false);
+  const [isIOS, setIsIOS] = useState<boolean>(false);
   const [canInstall, setCanInstall] = useState<boolean>(false);
   const [updateAvailable, setUpdateAvailable] = useState<boolean>(false);
   const [isUpdating, setIsUpdating] = useState<boolean>(false);
-  const [isOnline, setIsOnline] = useState<boolean>(getIsOnline);
+  const [isOnline, setIsOnline] = useState<boolean>(true);
   const [swRegistration, setSwRegistration] = useState<ServiceWorkerRegistration | null>(null);
+  const [isMounted, setIsMounted] = useState<boolean>(false);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    setIsMounted(true);
+    setIsInstalled(getIsStandalone());
+    setIsIOS(getIsIOS());
+    setIsOnline(getIsOnline());
 
     // Check online status listeners
     const handleOnline = () => setIsOnline(true);
@@ -167,6 +171,7 @@ export function usePWA() {
     updateAvailable,
     isUpdating,
     isOnline,
+    isMounted,
     installApp,
     applyUpdate,
     checkForUpdates,

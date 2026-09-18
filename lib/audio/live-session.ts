@@ -61,9 +61,9 @@ export class LiveSession {
       this.initSpeechRecognition();
       this.setState('listening');
 
-      // Initial friendly witty voice greeting
+      // Initial friendly witty voice greeting with mandatory RAM RAM BHAISAB
       SoundEffects.playBell();
-      this.sendVoiceMessage('Arey Dhoti aale, swagat hai! Batao kya haal chaal hai tumhare?');
+      this.sendVoiceMessage('राम राम भाईसाहब! मैं हूँ DHOTI AALE। कहो भाईसाहब, आज गाँव ढोटी में क्या नया अपडेट है या अखाड़े में कौन बाज़ी मारेगा — क्या जानना चाहते हो?');
     } catch (err) {
       console.error('Failed to connect live session:', err);
       this.setState('disconnected');
@@ -237,8 +237,8 @@ export class LiveSession {
     } catch (err: any) {
       console.warn('Query handling notice:', err?.message || err);
       const fallbackReply = isVoice
-        ? 'Arre Dhoti aale, network thoda dheema hai! Par mai sun raha hu, bolo kya keh rahe the?'
-        : 'Arre meri jaan! Thoda signal weak hai, par mai yahi hu! Ek baar fir likho na!';
+        ? 'राम राम भाईसाहब! सिग्नल थोड़ा कमजोर है, पर मैं आपकी बात सुन रहा हूँ। फिर से बताइए क्या जानना चाहते हैं?'
+        : 'राम राम भाईसाहब! थोड़ा सा नेटवर्क धीमा है, पर मैं यहीं हूँ। एक बार फिर पूछिए!';
       this.callbacks.onTranscript(userPrompt, fallbackReply);
       if (isVoice) {
         await this.speakFallback(fallbackReply);
@@ -286,12 +286,19 @@ export class LiveSession {
       const utterance = new SpeechSynthesisUtterance(text);
 
       const voices = window.speechSynthesis.getVoices();
-      const hindiVoice = voices.find((v) => v.lang.includes('hi') || v.lang.includes('IN'));
+      // Try to find a Hindi voice, or Indian English voice, or default
+      const hindiVoice = voices.find(
+        (v) =>
+          v.lang.toLowerCase().includes('hi-in') ||
+          v.lang.toLowerCase().includes('hi') ||
+          v.name.toLowerCase().includes('hindi') ||
+          v.lang.toLowerCase().includes('en-in')
+      );
       if (hindiVoice) {
         utterance.voice = hindiVoice;
       }
-
-      utterance.pitch = 1.05;
+      utterance.lang = hindiVoice?.lang || 'hi-IN';
+      utterance.pitch = 1.0;
       utterance.rate = 1.0;
 
       utterance.onend = () => resolve();

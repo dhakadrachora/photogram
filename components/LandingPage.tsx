@@ -333,28 +333,31 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
             </div>
           </article>
 
-          {/* CARD 4: AI Assistant / गाँव मित्र एआई */}
+          {/* CARD 4: AI Assistant / DHOTI AALE AI वॉइस मैन */}
           <article
             id="feature-card-ai"
             onClick={() => {
               SoundEffects.playTap();
               onNavigateTab('assistant');
             }}
-            className="card-glass border border-stone-200/90 rounded-2xl p-3.5 shadow-sm hover:shadow-md active:scale-[0.98] cursor-pointer transition-all duration-150 flex flex-col justify-between"
+            className="card-glass border border-amber-300/80 bg-gradient-to-b from-amber-50/60 to-orange-50/40 rounded-2xl p-3.5 shadow-sm hover:shadow-md active:scale-[0.98] cursor-pointer transition-all duration-150 flex flex-col justify-between"
             data-purpose="feature-ai"
           >
             <div>
-              <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 mb-2.5">
-                <Bot className="h-5 w-5 text-blue-600" />
+              <div className="w-10 h-10 rounded-xl bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-800 mb-2.5">
+                <Bot className="h-5 w-5 text-amber-700" />
               </div>
-              <h2 className="font-bold text-stone-900 text-sm">AI Assistant</h2>
-              <p className="text-[11px] text-stone-500 mt-1 leading-tight">
-                सरकारी योजनाएं व कृषि सलाह
+              <div className="flex items-center justify-between">
+                <h2 className="font-bold text-stone-900 text-sm">DHOTI AALE (AI)</h2>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-200/80 text-amber-900 font-bold">वॉइस</span>
+              </div>
+              <p className="text-[11px] text-stone-600 mt-1 leading-tight">
+                &ldquo;राम राम भाईसाहब!&rdquo; अखाड़े में कौन आगे है, कौन जीतेगा व ताज़ा अपडेट्स
               </p>
             </div>
-            <div className="mt-3 pt-2 border-t border-stone-100 flex items-center justify-between">
-              <span className="text-[10px] text-blue-700 font-medium">24/7 मददगार</span>
-              <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+            <div className="mt-3 pt-2 border-t border-amber-200/60 flex items-center justify-between">
+              <span className="text-[10px] text-amber-800 font-bold">🎙️ देसी AI वॉइस मैन</span>
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
             </div>
           </article>
 

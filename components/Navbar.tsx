@@ -142,14 +142,14 @@ export function Navbar({
             onClick={() => handleTabClick('assistant')}
             className={`relative flex items-center gap-2 px-3.5 py-2 text-xs sm:text-sm font-semibold transition-all ${
               activeTab === 'assistant'
-                ? 'text-sky-400'
+                ? 'text-amber-400'
                 : 'text-slate-300 hover:text-white'
             }`}
           >
-            <Bot className="h-4 w-4" />
-            <span>AI Assistant</span>
+            <Bot className="h-4 w-4 text-amber-400" />
+            <span>DHOTI AALE (AI)</span>
             {activeTab === 'assistant' && (
-              <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-sky-400 rounded-full shadow-[0_0_8px_rgba(56,189,248,0.8)]" />
+              <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-amber-400 rounded-full shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
             )}
           </button>
 
@@ -307,11 +307,11 @@ export function Navbar({
           <button
             onClick={() => handleTabClick('assistant')}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold ${
-              activeTab === 'assistant' ? 'bg-sky-500/20 text-sky-400' : 'text-slate-300'
+              activeTab === 'assistant' ? 'bg-amber-500/20 text-amber-400' : 'text-slate-300'
             }`}
           >
-            <Bot className="h-4 w-4" />
-            <span>AI Assistant</span>
+            <Bot className="h-4 w-4 text-amber-400" />
+            <span>DHOTI AALE (AI वॉइस)</span>
           </button>
           <button
             onClick={() => handleTabClick('profile')}

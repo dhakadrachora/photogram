@@ -11,6 +11,7 @@ import { AdminDashboard } from '@/components/AdminDashboard';
 import { GoogleAuthModal } from '@/components/GoogleAuthModal';
 import { PWAInstallBanner } from '@/components/PWAInstallBanner';
 import { isSiteAdmin } from '@/lib/admin-auth';
+import { useIsMounted } from '@/lib/useIsMounted';
 import {
   Home as HomeIcon,
   Compass,
@@ -64,17 +65,18 @@ export default function Home() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [selectedOpponent, setSelectedOpponent] = useState<string | undefined>(undefined);
   const [onlineCount, setOnlineCount] = useState(48);
+  const isMounted = useIsMounted();
 
   const rawUserStr = useSyncExternalStore(subscribeUser, getUserSnapshot, getServerUserSnapshot);
 
   const currentUser = useMemo<User | null>(() => {
-    if (!rawUserStr) return null;
+    if (!isMounted || !rawUserStr) return null;
     try {
       return JSON.parse(rawUserStr);
     } catch {
       return null;
     }
-  }, [rawUserStr]);
+  }, [isMounted, rawUserStr]);
 
   const isAdmin = isSiteAdmin(currentUser?.email);
 

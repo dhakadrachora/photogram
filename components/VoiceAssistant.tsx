@@ -31,14 +31,14 @@ export function VoiceAssistant({ currentUser, onNavigateTab, onOpenAuth }: Voice
   const [audioLevel, setAudioLevel] = useState<number>(0);
   const [userTranscript, setUserTranscript] = useState<string>('');
   const [assistantTranscript, setAssistantTranscript] = useState<string>(
-    'Haan ji! Mai hu Dhoti aale AI Assistant. Yaha text chat sabke liye 100% free & public hai, aur continuous voice chat ke liye Google login required hai. Kaho kya seva kare aapki?'
+    'राम राम भाईसाहब! (RAM RAM BHAISAB!) मैं हूँ DHOTI AALE — आपका अपना देसी AI वॉइस मैन। आज गाँव ढोटी में क्या नया अपडेट है, अखाड़े में कौन आगे है और किसकी जीत की संभावना है — सब पूछो!'
   );
   const [recentTool, setRecentTool] = useState<ToolCall | null>(null);
   const [manualInput, setManualInput] = useState<string>('');
   const [chatHistory, setChatHistory] = useState<{ sender: 'user' | 'assistant'; text: string; time: string }[]>([
     {
       sender: 'assistant',
-      text: 'Haan ji! Kaun yaad kar raha tha Dhoti aale ko? Bolo na, mai sun raha hu pure dhyan se.',
+      text: 'राम राम भाईसाहब! (RAM RAM BHAISAB!) मैं हूँ DHOTI AALE। गाँव ढोटी की हर ताज़ा खबर, चौपाल का हाल और अखाड़े में कौन आगे है और कौन जीतेगा — पूरी जानकारी मेरे पास है। हुक्म करो भाईसाहब!',
       time: 'Just now',
     },
   ]);
@@ -46,6 +46,20 @@ export function VoiceAssistant({ currentUser, onNavigateTab, onOpenAuth }: Voice
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const liveSessionRef = useRef<LiveSession | null>(null);
+
+  const playGreetingAudio = () => {
+    const greetingText = 'राम राम भाईसाहब! (RAM RAM BHAISAB!) मैं हूँ DHOTI AALE — आपका अपना देसी AI साथी। ढोटी गाँव की हर ताज़ा खबर, चौपाल का हाल और अखाड़े में कौन आगे है — सब कुछ है मेरे पास! कहो भाईसाहब क्या सेवा करें आपकी?';
+    setAssistantTranscript(greetingText);
+    if (liveSessionRef.current) {
+      liveSessionRef.current.sendVoiceMessage(greetingText);
+    } else if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(greetingText);
+      utterance.lang = 'hi-IN';
+      utterance.rate = 0.95;
+      window.speechSynthesis.speak(utterance);
+    }
+  };
 
   useEffect(() => {
     const session = new LiveSession(
@@ -147,11 +161,13 @@ export function VoiceAssistant({ currentUser, onNavigateTab, onOpenAuth }: Voice
   };
 
   const quickPrompts = [
-    { label: '😘 Flirt karo thoda!', prompt: 'Arey Dhoti aale, mujhse thoda flirt karo na charming and witty style me!' },
-    { label: '🔥 Roast me with swag!', prompt: 'Mujhe ek witty aur funny desi roast sunao bina bura lage!' },
-    { label: '📯 Play Stadium Airhorn', prompt: 'Stadium me hype bana do aur airhorn bajao!' },
-    { label: '⚔️ Start Rap Battle', prompt: 'Aao rap battle shuru karte hain arena me!' },
-    { label: '👑 Dhoti aale ki tareef', prompt: 'Dhoti aale community ki swag aur dosti ke bare me batao!' },
+    { label: '📢 आज क्या अपडेट है?', prompt: 'राम राम भाईसाहब! आज गाँव ढोटी में क्या-क्या नया अपडेट और ताज़ा खबर है?' },
+    { label: '⚔️ अखाड़े में कौन आगे है और कौन जीतेगा?', prompt: 'अखाड़े में कौन-कौन बैटल में है, अभी वोटों में आगे कौन चल रहा है और किसकी जीतने की संभावना है?' },
+    { label: '🍕 Chole Bhature vs Pizza में कौन जीतेगा?', prompt: 'Chole Bhature vs Pizza मुकाबले में अभी कौन आगे है और वोटों के हिसाब से किसकी जीत की संभावना है?' },
+    { label: '🚜 Village Flow vs City Trap?', prompt: 'Village Desi Flow vs City Trap रैप बैटल में कौन आगे चल रहा है और कौन बाज़ी मारेगा?' },
+    { label: '🪙 धोती सिक्के (Coins) कैसे कमाएं?', prompt: 'धोती सिक्के (Dhoti Coins) कैसे कमाएं और गाँव में इसका क्या फायदा है?' },
+    { label: '📯 अखाड़े का ढोल बजाओ!', prompt: 'अखाड़े में जश्न का ढोल बजाओ और बिगुल फूँको!' },
+    { label: '🔥 कड़क देसी रोस्ट या शायरी!', prompt: 'भाईसाहब मुझे एक जोरदार चौपाल की देसी शायरी या हल्का रोस्ट सुनाओ!' },
   ];
 
   return (
@@ -165,7 +181,7 @@ export function VoiceAssistant({ currentUser, onNavigateTab, onOpenAuth }: Voice
           {/* Public Text Chat Indicator */}
           <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 border border-emerald-500/30 text-emerald-300 text-[11px] font-bold shadow-sm">
             <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Text Chat: Public & Free (No Login)</span>
+            <span>टेक्स्ट चैट: 100% फ्री व पब्लिक (No Login)</span>
           </div>
 
           {/* Voice Mode Indicator */}
@@ -173,22 +189,23 @@ export function VoiceAssistant({ currentUser, onNavigateTab, onOpenAuth }: Voice
             {currentUser ? (
               <>
                 <ShieldCheck className="h-3.5 w-3.5 text-amber-400" />
-                <span className="text-amber-300">Voice Mode: Unlocked</span>
+                <span className="text-amber-300">वॉइस मोड: अनलॉक्ड 🎙️</span>
               </>
             ) : (
               <>
                 <Lock className="h-3.5 w-3.5 text-slate-400" />
-                <span>Voice Mode: Google Login Required</span>
+                <span>टू-वे वॉइस मोड: गूगल लॉगिन आवश्यक</span>
               </>
             )}
           </div>
         </div>
 
-        <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white">
-          Young • Witty • Confident • Flirty
+        <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white flex items-center gap-2">
+          <span>DHOTI AALE</span>
+          <span className="text-amber-400 text-base sm:text-2xl font-bold font-sans">देसी AI वॉइस मैन</span>
         </h1>
-        <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-md">
-          Chat freely with Dhoti AI or sign in with Google for two-way continuous voice talk
+        <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-lg">
+          &ldquo;राम राम भाईसाहब!&rdquo; गाँव ढोटी की हर ताज़ा खबर, अखाड़े के मुकाबले, आगे कौन है और कौन जीतेगा — पूरी जानकारी उपलब्ध है
         </p>
 
         {/* Live tool execution feedback banner */}
@@ -311,6 +328,21 @@ export function VoiceAssistant({ currentUser, onNavigateTab, onOpenAuth }: Voice
 
         {/* Real-time Subtitles / Spoken Response Card */}
         <div className="mt-6 w-full max-w-xl rounded-2xl bg-slate-900/80 border border-slate-800 p-4 sm:p-5 shadow-xl backdrop-blur-md">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <span className="flex h-2 w-2 rounded-full bg-amber-400 animate-ping" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-300">DHOTI AALE (AI वॉइस मैन)</span>
+            </div>
+            <button
+              onClick={playGreetingAudio}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 text-[11px] font-bold border border-amber-500/30 transition-all hover:scale-105 active:scale-95"
+              title="DHOTI AALE की आवाज़ सुनें"
+            >
+              <Volume2 className="h-3.5 w-3.5" />
+              <span>🔊 राम राम भाईसाहब सुनो</span>
+            </button>
+          </div>
+
           {userTranscript && (
             <div className="mb-2 text-xs text-amber-400/80 font-medium">
               You said: <span className="text-slate-200">&ldquo;{userTranscript}&rdquo;</span>
