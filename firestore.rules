@@ -1,0 +1,99 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: Checks if the authenticated user is the designated Site Owner & Admin
+    function isSiteAdmin() {
+      return request.auth != null &&
+        request.auth.token.email.lower() == 'rohitkumarnagar50@gmail.com';
+    }
+
+    // Helper: Checks if the user is authenticated with Google
+    function isAuthenticated() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    // Helper: Validates user owns document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Public community content: Anyone can read published content, only Admin can write
+    match /news/{newsId} {
+      allow read: if resource.data.published == true || isSiteAdmin();
+      allow write: if isSiteAdmin();
+    }
+
+    match /people/{personId} {
+      allow read: if resource.data.published == true || isSiteAdmin();
+      allow write: if isSiteAdmin();
+    }
+
+    match /business/{businessId} {
+      allow read: if resource.data.published == true || isSiteAdmin();
+      allow write: if isSiteAdmin();
+    }
+
+    match /gallery/{imageId} {
+      allow read: if resource.data.published == true || isSiteAdmin();
+      allow write: if isSiteAdmin();
+    }
+
+    match /videos/{videoId} {
+      allow read: if resource.data.published == true || isSiteAdmin();
+      allow write: if isSiteAdmin();
+    }
+
+    match /updates/{updateId} {
+      allow read: if resource.data.published == true || isSiteAdmin();
+      allow write: if isSiteAdmin();
+    }
+
+    // Battle management:
+    // Only Admin can create, modify, publish/unpublish, or delete Battles.
+    // Regular users can only read battles, and vote via server-side API or user vote document.
+    match /battles/{battleId} {
+      allow read: if true;
+      allow write: if isSiteAdmin();
+
+      // User votes subcollection: One vote per authenticated user
+      match /votes/{userId} {
+        allow read: if isOwner(userId) || isSiteAdmin();
+        allow create: if isOwner(userId) &&
+          !exists(/databases/$(database)/documents/battles/$(battleId)/votes/$(userId)) &&
+          get(/databases/$(database)/documents/battles/$(battleId)).data.isEnded == false;
+        allow update, delete: if isSiteAdmin();
+      }
+    }
+
+    // World Chat:
+    // Authenticated users can read and write chat messages.
+    // Only author or admin can delete messages.
+    match /chat_messages/{messageId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update: if isSiteAdmin();
+      allow delete: if isSiteAdmin() || (isAuthenticated() && request.auth.uid == resource.data.userId);
+    }
+
+    // User Profiles:
+    // Users can edit only their own permitted profile information (e.g., name, avatar, bio).
+    // Users CANNOT modify their own role, admin privileges, coins or wins unless admin.
+    match /users/{userId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isSiteAdmin() || (
+        isOwner(userId) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'isAdmin', 'coins', 'wins'])
+      );
+      allow delete: if isSiteAdmin();
+    }
+
+    // Site Settings:
+    // Anyone can read site settings; only Admin can edit
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isSiteAdmin();
+    }
+  }
+}

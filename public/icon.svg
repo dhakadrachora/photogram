@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#C25E29" />
+      <stop offset="50%" stop-color="#A54018" />
+      <stop offset="100%" stop-color="#7B210F" />
+    </linearGradient>
+    <linearGradient id="sunGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FDE047" />
+      <stop offset="100%" stop-color="#F59E0B" />
+    </linearGradient>
+    <linearGradient id="pagriGrad" x1="0%" y1="0%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#FFFBEB" />
+      <stop offset="100%" stop-color="#FEF3C7" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Background Canvas -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)" />
+
+  <!-- Subtle Sun Aura in background -->
+  <circle cx="256" cy="190" r="110" fill="url(#sunGrad)" opacity="0.3" filter="blur(30px)" />
+  <circle cx="256" cy="190" r="85" fill="url(#sunGrad)" opacity="0.85" />
+
+  <!-- Desert Sand Waves at base -->
+  <path d="M0 420 Q 140 370 260 410 T 512 380 L 512 512 L 0 512 Z" fill="#D97706" opacity="0.4" />
+  <path d="M0 445 Q 160 410 320 440 T 512 420 L 512 512 L 0 512 Z" fill="#B45309" opacity="0.5" />
+
+  <!-- Central Pagri / Turban Motif with Filter Shadow -->
+  <g filter="url(#shadow)" transform="translate(136, 120) scale(10)">
+    <path fill="url(#pagriGrad)" d="M12 2C8.5 2 5.5 3.5 4 6c0 0 2.5 1.5 5 1 2.5-.5 5-2 7-1s3 3 4 3c-1.5-4-4.5-7-8-7zm-7.8 7c-.1.5-.2 1-.2 1.6 0 3.5 3.5 6.4 8 6.4 2.2 0 4.2-.7 5.7-1.9-1.2-.8-2.6-1.3-4.2-1.3-2.9 0-5.5 1.4-7.3-1.8zM12 18.5c-3.1 0-5.8-1.5-7.1-3.7-.6.9-.9 2-.9 3.2 0 2.2 3.6 4 8 4s8-1.8 8-4c0-1.1-.3-2.2-.9-3.1-1.4 2.1-4 3.6-7.1 3.6z" />
+  </g>
+
+  <!-- Feather / Kalangi Ornament on Pagri -->
+  <path d="M256 125 C256 95, 275 75, 290 65 C282 85, 280 110, 272 135 Z" fill="#FBBF24" />
+  <circle cx="266" cy="135" r="7" fill="#DC2626" />
+
+  <!-- App Title Typography -->
+  <text x="256" y="405" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="44" fill="#FFFFFF" letter-spacing="4">DHOTI AALE</text>
+  <text x="256" y="445" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="700" font-size="22" fill="#FDE68A" letter-spacing="2">गाँव का अपना डिजिटल मंच</text>
+</svg>

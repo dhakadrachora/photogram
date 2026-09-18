@@ -1,0 +1,6 @@
+{
+  "name": "DHOTI AALE - ढोटी की अपनी डिजिटल पहचान",
+  "description": "राजस्थान का पहला डिजिटल गाँव समुदाय | Rajasthan's Digital Village Community.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
