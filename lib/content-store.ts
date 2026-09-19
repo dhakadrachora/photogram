@@ -8,6 +8,7 @@ import {
   BattleEvent,
   SiteSettings,
   ChatMessage,
+  PresenceUser,
 } from '@/types';
 
 export interface BattleEventStore extends BattleEvent {
@@ -24,7 +25,7 @@ const initialNews: NewsItem[] = [
     excerpt: 'Gramin sabha has finalized the dates for the grand rural festival with wrestling, kabaddi, and folk music competitions.',
     content: 'The 2026 Dhoti aale Cultural Fest will span three days featuring traditional games, agricultural tech stalls, and an evening desi rap show. Registration for local youth competitions is now live.',
     imageUrl: 'https://images.unsplash.com/photo-1511556532299-8f662fc26c06?w=800&auto=format&fit=crop&q=80',
-    author: 'Rohit Kumar Nagar',
+    author: 'Dhoti Editorial Desk',
     published: true,
     createdAt: Date.now() - 1000 * 60 * 60 * 24 * 2,
     views: 420,
@@ -36,7 +37,7 @@ const initialNews: NewsItem[] = [
     excerpt: 'New cooperative solar pump installations set to power over 200 acres of agricultural land across the region.',
     content: 'A community-led cooperative has successfully brought clean solar energy to irrigate fields, cutting diesel costs by 70%. Dhoti aale youth pioneers are actively driving tech adoption.',
     imageUrl: 'https://images.unsplash.com/photo-1497440001374-f26997328c1b?w=800&auto=format&fit=crop&q=80',
-    author: 'Rohit Dhakad',
+    author: 'Community News Desk',
     published: true,
     createdAt: Date.now() - 1000 * 60 * 60 * 24 * 5,
     views: 650,
@@ -46,22 +47,22 @@ const initialNews: NewsItem[] = [
 const initialPeople: PersonProfile[] = [
   {
     id: 'person-1',
-    name: 'Rohit Kumar Nagar',
-    designation: 'Site Owner & Community Architect',
-    bio: 'Pioneering digital empowerment for rural communities, cultural heritage preservation, and modern interactive youth platforms.',
-    photoUrl: 'https://api.dicebear.com/7.x/bottts/svg?seed=rohit-admin',
-    achievements: 'Founder of Dhoti aale digital ecosystem, village tech promoter & youth community leader.',
+    name: 'Kailash Ji Dhakad',
+    designation: 'Village Elder & Community Guide',
+    bio: 'Pioneering community welfare for rural areas, cultural heritage preservation, and inspiring local youth.',
+    photoUrl: 'https://api.dicebear.com/7.x/bottts/svg?seed=elder-dhoti',
+    achievements: 'Lifetime community service, village welfare promoter & patron of folk arts.',
     category: 'Leadership 👑',
     published: true,
     createdAt: Date.now() - 1000 * 60 * 60 * 24 * 30,
   },
   {
     id: 'person-2',
-    name: 'Rohit Dhakad',
-    designation: 'Co-Founder & Creative Visionary',
-    bio: 'Championing rural rap, grassroots sports, and desi culture storytelling across national stages.',
-    photoUrl: 'https://api.dicebear.com/7.x/bottts/svg?seed=rohit-dhoti',
-    achievements: 'Co-founder of Dhoti aale movement, national level folk arts advocate.',
+    name: 'Suresh Choudhary',
+    designation: 'Folk Culture & Youth Mentor',
+    bio: 'Championing rural rap, grassroots sports, and desi culture storytelling across regional stages.',
+    photoUrl: 'https://api.dicebear.com/7.x/bottts/svg?seed=suresh-dhoti',
+    achievements: 'National level kabaddi player and traditional music promoter.',
     category: 'Culture & Arts 🎨',
     published: true,
     createdAt: Date.now() - 1000 * 60 * 60 * 24 * 30,
@@ -186,7 +187,7 @@ const initialUpdates: CommunityUpdate[] = [
   },
   {
     id: 'upd-3',
-    title: 'Rohit Kumar Nagar Launches Full Community Content Admin System',
+    title: 'DHOTI AALE Launches Full Community Content Admin System',
     summary: 'Direct management of battles, news, village businesses, and world chat moderation is now operational.',
     tag: 'Community',
     badgeColor: 'emerald',
@@ -296,7 +297,7 @@ const initialSettings: SiteSettings = {
   allowWorldChat: true,
   allowGuestAi: true,
   heroBadge: 'Pure Desi Vibe • 100% Real Community 👑',
-  contactEmail: 'rohitkumarnagar50@gmail.com',
+  contactEmail: 'rohitdhakaddhoti143@gmail.com',
 };
 
 const initialChatMessages: ChatMessage[] = [
@@ -321,13 +322,14 @@ const initialChatMessages: ChatMessage[] = [
   },
   {
     id: 'msg-3',
-    userId: 'usr_ai',
-    userName: 'Dhoti aale AI',
-    userAvatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=dhoti-ai-assistant',
+    userId: 'dhoti_aale_ai_official',
+    userName: 'DHOTI AALE AI',
+    userAvatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=dhoti-aale-official-ai',
     userBadge: 'Official AI ⚡',
     text: 'Arey Aman mere bhai! Tareef ke liye shukriya! Aur batao, aaj kiska mood khrab hai jisko witty roasting chahiye? 😉',
     timestamp: Date.now() - 1000 * 60 * 3,
     isAi: true,
+    isVerified: true,
   },
 ];
 
@@ -342,6 +344,21 @@ class GlobalContentStore {
   battles: Map<string, BattleEventStore> = new Map(initialBattles.map((b) => [b.id, b]));
   settings: SiteSettings = { ...initialSettings };
   chatMessages: ChatMessage[] = [...initialChatMessages];
+
+  // Verified users set (user IDs or emails verified by admin)
+  // Only admin rohitdhakaddhoti143@gmail.com can grant or revoke this
+  verifiedUsers: Set<string> = new Set(['rohitdhakaddhoti143@gmail.com', 'dhoti_aale_ai_official']);
+
+  // Real-time user presence tracking (keyed by unique userId)
+  activePresence: Map<string, PresenceUser> = new Map();
+
+  // Controlled AI Participant state
+  aiControlState = {
+    paused: false,
+    pausedAt: 0,
+    lastRepliedAt: 0,
+    lastRepliedMsgId: '',
+  };
 }
 
 declare global {

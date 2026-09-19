@@ -392,16 +392,28 @@ export async function updateUserProfileDetails(
  * Fetch all registered users for Admin view.
  * Passwords are NEVER queried or exposed.
  */
-export async function fetchSupabaseRegisteredUsers() {
+export async function fetchSupabaseRegisteredUsers(): Promise<any[] | null> {
   if (!isSupabaseConfigured()) return null;
   try {
-    const { data, error } = await supabase
+    const res = await supabase
+      .from('users')
+      .select('id, name, email, phone, avatar, badge, rank, role, is_admin, coins, wins, is_verified, created_at')
+      .order('created_at', { ascending: false });
+
+    if (!res.error && res.data) {
+      return res.data;
+    }
+
+    const fallback = await supabase
       .from('users')
       .select('id, name, email, phone, avatar, badge, rank, role, is_admin, coins, wins, created_at')
       .order('created_at', { ascending: false });
 
-    if (error || !data) return null;
-    return data;
+    if (fallback.data) {
+      return fallback.data;
+    }
+
+    return null;
   } catch {
     return null;
   }
@@ -600,6 +612,7 @@ export async function fetchSupabaseChatMessages(): Promise<ChatMessage[] | null>
       timestamp: m.created_at ? new Date(m.created_at).getTime() : Date.now(),
       sticker: m.sticker || undefined,
       isAi: Boolean(m.is_ai),
+      isVerified: Boolean(m.is_verified) || m.user_id === 'dhoti_aale_ai_official' || m.user_name === 'DHOTI AALE AI',
     }));
   } catch {
     return null;
@@ -609,7 +622,7 @@ export async function fetchSupabaseChatMessages(): Promise<ChatMessage[] | null>
 export async function insertSupabaseChatMessage(msg: ChatMessage): Promise<boolean> {
   if (!isSupabaseConfigured()) return false;
   try {
-    const { error } = await supabase.from('chat_messages').insert({
+    const payload: any = {
       id: msg.id,
       user_id: msg.userId,
       user_name: msg.userName,
@@ -618,9 +631,15 @@ export async function insertSupabaseChatMessage(msg: ChatMessage): Promise<boole
       text: msg.text,
       sticker: msg.sticker || null,
       is_ai: Boolean(msg.isAi),
+      is_verified: Boolean(msg.isVerified),
       created_at: new Date(msg.timestamp).toISOString(),
-    });
-    return !error;
+    };
+    const { error } = await supabase.from('chat_messages').insert(payload);
+    if (error) {
+      delete payload.is_verified;
+      await supabase.from('chat_messages').insert(payload);
+    }
+    return true;
   } catch {
     return false;
   }

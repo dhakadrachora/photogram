@@ -1,46 +1,65 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 
-export const SITE_OWNER_EMAILS = [
-  'rohitdhakaddhoti143@gmail.com',
-  'rohitkumarnagar50@gmail.com',
-];
-
-export const SITE_OWNER_EMAIL = SITE_OWNER_EMAILS[0];
+export const SITE_OWNER_EMAIL = 'rohitdhakaddhoti143@gmail.com';
+export const SITE_OWNER_EMAILS = [SITE_OWNER_EMAIL];
 
 /**
- * Validates if the given email belongs strictly to the site owner/admin.
+ * Validates if the given email belongs strictly to the verified site owner/admin.
  */
 export function isSiteAdmin(email?: string | null): boolean {
   if (!email || typeof email !== 'string') return false;
-  const clean = email.toLowerCase().trim();
-  return SITE_OWNER_EMAILS.some((owner) => owner.toLowerCase() === clean);
+  return email.toLowerCase().trim() === SITE_OWNER_EMAIL;
 }
 
 /**
- * Enforces admin authorization server-side from request headers.
- */
-export function verifyAdminRequest(req: Request): boolean {
-  const headerEmail = req.headers.get('x-user-email');
-  return isSiteAdmin(headerEmail);
-}
-
-/**
- * Enforces admin authorization verifying Supabase Auth identity or headers.
+ * Strict server-side verification of admin requests using authenticated Supabase session JWT.
+ * NEVER trusts client-side headers or client-claimed identities.
  */
 export async function verifyAdminRequestAsync(req: Request): Promise<boolean> {
   const authHeader = req.headers.get('authorization') || req.headers.get('Authorization');
-  if (authHeader && authHeader.startsWith('Bearer ') && isSupabaseConfigured()) {
-    const token = authHeader.replace('Bearer ', '').trim();
-    try {
-      const { data: { user }, error } = await supabase.auth.getUser(token);
-      if (!error && user?.email && isSiteAdmin(user.email)) {
-        return true;
-      }
-    } catch (e) {
-      console.warn('Error verifying Supabase admin token:', e);
-    }
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return false;
+  }
+  const token = authHeader.replace('Bearer ', '').trim();
+  if (!token || !isSupabaseConfigured()) {
+    return false;
   }
 
-  const headerEmail = req.headers.get('x-user-email');
-  return isSiteAdmin(headerEmail);
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    if (error || !user || !user.email) return false;
+    return isSiteAdmin(user.email);
+  } catch (e) {
+    console.warn('Error verifying Supabase admin token:', e);
+    return false;
+  }
+}
+
+/**
+ * Extracts and verifies the authenticated user from a Bearer token in the request.
+ */
+export async function getAuthenticatedUser(req: Request) {
+  const authHeader = req.headers.get('authorization') || req.headers.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return null;
+  }
+  const token = authHeader.replace('Bearer ', '').trim();
+  if (!token || !isSupabaseConfigured()) {
+    return null;
+  }
+
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    if (error || !user) return null;
+    return user;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Legacy synchronous check - deprecated to prevent header spoofing.
+ */
+export function verifyAdminRequest(_req: Request): boolean {
+  return false;
 }

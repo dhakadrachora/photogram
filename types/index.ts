@@ -13,6 +13,7 @@ export interface User {
   isGoogle?: boolean;
   role?: 'admin' | 'resident';
   isAdmin?: boolean;
+  isVerified?: boolean;
   createdAt?: number | string;
 }
 
@@ -26,10 +27,21 @@ export interface ChatMessage {
   timestamp: number;
   sticker?: string;
   isAi?: boolean;
+  isVerified?: boolean;
   battleInvite?: {
     battleId: string;
     mode: 'rap' | 'roast' | 'wit';
   };
+}
+
+export interface PresenceUser {
+  userId: string;
+  userName: string;
+  userAvatar: string;
+  userBadge?: string;
+  isVerified?: boolean;
+  isAdmin?: boolean;
+  lastActive: number;
 }
 
 export type VoiceState = 'disconnected' | 'connecting' | 'listening' | 'speaking';
@@ -177,5 +189,35 @@ export interface SiteSettings {
   allowGuestAi: boolean;
   heroBadge: string;
   contactEmail: string;
+}
+
+export type ReportStatus = 'Open' | 'Replied' | 'Resolved';
+
+export interface ReportMessage {
+  id: string;
+  reportId: string;
+  senderId: string;
+  senderName: string;
+  senderEmail: string;
+  senderRole: 'user' | 'admin';
+  message: string;
+  attachmentUrl?: string;
+  createdAt: string;
+}
+
+export interface ProblemReport {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  subject: string;
+  description: string;
+  category?: string;
+  attachmentUrl?: string;
+  status: ReportStatus;
+  latestMessage?: string;
+  createdAt: string;
+  updatedAt: string;
+  messages?: ReportMessage[];
 }
 

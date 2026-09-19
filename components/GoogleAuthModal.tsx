@@ -261,13 +261,6 @@ export function GoogleAuthModal({
     }
   };
 
-  // Pre-fill Admin Email
-  const prefillAdmin = () => {
-    setEmail('rohitdhakaddhoti143@gmail.com');
-    setName('Rohit Dhakad');
-    SoundEffects.playPop();
-  };
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200"
@@ -338,15 +331,8 @@ export function GoogleAuthModal({
           <form onSubmit={handleLoginSubmit} className="space-y-4">
             {/* Email Field */}
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center justify-between">
-                <span>ईमेल पता (Email)</span>
-                <button
-                  type="button"
-                  onClick={prefillAdmin}
-                  className="text-[10px] text-amber-400 hover:underline font-bold"
-                >
-                  Admin Email भरें 👑
-                </button>
+              <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                ईमेल पता (Email)
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -446,7 +432,7 @@ export function GoogleAuthModal({
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="उदा. रोहित धाकड़ / Rohit Kumar"
+                  placeholder="आपका पूरा नाम (Your Full Name)"
                   className="w-full pl-9 pr-3 py-2 bg-slate-950/80 border border-slate-700/80 rounded-xl text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors"
                 />
               </div>

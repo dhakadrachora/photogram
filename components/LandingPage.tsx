@@ -76,13 +76,13 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
   // Default village directory data
   const villagePeople = [
     {
-      name: 'Rohit Dhakad',
-      role: 'Co-Founder & Digital Lead 👑',
-      tag: 'Site Admin',
-      phone: '+91 96940 XXXXX',
+      name: 'Kailash Ji Dhakad',
+      role: 'Gram Vikas Lead & Coordinator 👑',
+      tag: 'Community Elder',
+      phone: '+91 98290 XXXXX',
       ward: 'Ward No. 3, Dhoti',
-      badge: 'Super Admin',
-      isFounder: true,
+      badge: 'Patron',
+      isFounder: false,
     },
     {
       name: 'Mukesh Ji Dhakad',

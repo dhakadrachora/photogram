@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAdminRequest } from '@/lib/admin-auth';
+import { verifyAdminRequestAsync, SITE_OWNER_EMAIL } from '@/lib/admin-auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
-  // 1. Strictly verify Admin authorization
-  if (!verifyAdminRequest(req)) {
+  // 1. Strictly verify Admin authorization via verified Supabase Bearer token
+  const isAdmin = await verifyAdminRequestAsync(req);
+  if (!isAdmin) {
     return NextResponse.json(
-      { error: 'Unauthorized: Only site owner/admin rohitkumarnagar50@gmail.com can upload assets.' },
+      { error: `Unauthorized: Only verified admin (${SITE_OWNER_EMAIL}) can upload assets.` },
       { status: 403 }
     );
   }

@@ -25,6 +25,8 @@ import {
   Loader2,
   Save,
   User as UserIcon,
+  AlertCircle,
+  HelpCircle,
 } from 'lucide-react';
 import { SoundEffects } from '@/lib/audio/sound-effects';
 import { PWAInstallButton } from './PWAInstallButton';
@@ -36,6 +38,7 @@ interface ProfileViewProps {
   onLogout: () => void;
   onNavigateTab: (tab: AppTab) => void;
   onUpdateUser?: (updated: Partial<User> | ((prev: User) => User)) => void;
+  onOpenReportModal?: () => void;
 }
 
 const AVATAR_PRESETS = [
@@ -52,6 +55,7 @@ export function ProfileView({
   onLogout,
   onNavigateTab,
   onUpdateUser,
+  onOpenReportModal,
 }: ProfileViewProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(currentUser?.name || '');
@@ -241,6 +245,15 @@ export function ProfileView({
                 <Share2 className="h-4 w-4" />
                 <span>Share Profile</span>
               </button>
+              {onOpenReportModal && (
+                <button
+                  onClick={onOpenReportModal}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-slate-800 hover:bg-amber-500/10 hover:border-amber-500/30 px-4 py-2.5 text-xs font-bold text-amber-300 border border-slate-700 transition-colors"
+                >
+                  <AlertCircle className="h-4 w-4 text-amber-400" />
+                  <span>Report a Problem</span>
+                </button>
+              )}
               <button
                 onClick={onLogout}
                 className="flex items-center justify-center gap-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 px-4 py-2.5 text-xs font-bold text-red-400 border border-red-500/30 transition-colors"
@@ -251,6 +264,35 @@ export function ProfileView({
             </div>
           </div>
         </div>
+
+        {/* User Help & Report a Problem Card */}
+        {onOpenReportModal && (
+          <div className="rounded-3xl bg-slate-900/90 border border-slate-800 p-5 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center shrink-0">
+                <AlertCircle className="h-6 w-6" />
+              </div>
+              <div>
+                <h4 className="text-base font-bold text-white flex items-center gap-2">
+                  <span>समस्या रिपोर्ट या सहायता / Report a Problem</span>
+                  <span className="text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                    Direct Admin Support
+                  </span>
+                </h4>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  कोई बग, लॉगिन समस्या या सुझाव है? अपनी शिकायत दर्ज करें और थ्रेड में एडमिन से सीधा उत्तर प्राप्त करें।
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onOpenReportModal}
+              className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-colors flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 shrink-0"
+            >
+              <AlertCircle className="h-4 w-4" />
+              <span>समस्या दर्ज करें (Open Support)</span>
+            </button>
+          </div>
+        )}
 
         {/* Quick Launchpad to Tools */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -443,7 +485,7 @@ export function ProfileView({
                     required
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    placeholder="उदा. रोहित धाकड़"
+                    placeholder="आपका पूरा नाम (Your Full Name)"
                     className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
                   />
                 </div>

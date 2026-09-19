@@ -15,6 +15,7 @@ import {
   Menu,
   X,
   Crown,
+  AlertCircle,
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -24,6 +25,7 @@ interface NavbarProps {
   onOpenAuth: () => void;
   onLogout: () => void;
   onlineCount: number;
+  onOpenReportModal?: () => void;
 }
 
 export function CrownIcon({ className = 'w-6 h-6 text-amber-400' }: { className?: string }) {
@@ -41,6 +43,7 @@ export function Navbar({
   onOpenAuth,
   onLogout,
   onlineCount,
+  onOpenReportModal,
 }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isAdmin = isSiteAdmin(currentUser?.email);
@@ -48,6 +51,13 @@ export function Navbar({
   const handleTabClick = (tab: AppTab) => {
     setActiveTab(tab);
     setMobileMenuOpen(false);
+  };
+
+  const handleOpenReport = () => {
+    setMobileMenuOpen(false);
+    if (onOpenReportModal) {
+      onOpenReportModal();
+    }
   };
 
   return (
@@ -246,6 +256,18 @@ export function Navbar({
             </button>
           )}
 
+          {/* Quick Report a Problem Icon Button */}
+          {onOpenReportModal && (
+            <button
+              onClick={handleOpenReport}
+              title="समस्या रिपोर्ट करें / Report a Problem"
+              className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-slate-900 border border-slate-800 hover:border-amber-500/50 text-slate-300 hover:text-amber-400 text-xs font-semibold transition-colors"
+            >
+              <AlertCircle className="h-3.5 w-3.5 text-amber-400" />
+              <span>रिपोर्ट / सहायता</span>
+            </button>
+          )}
+
           {/* Mobile Hamburger Toggle */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -305,6 +327,17 @@ export function Navbar({
             <UserIcon className="h-4 w-4" />
             <span>Profile</span>
           </button>
+
+          {/* Report a problem in mobile menu */}
+          {onOpenReportModal && (
+            <button
+              onClick={handleOpenReport}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-amber-400 hover:bg-slate-800"
+            >
+              <AlertCircle className="h-4 w-4 text-amber-400" />
+              <span>समस्या रिपोर्ट करें (Report a Problem)</span>
+            </button>
+          )}
 
           {/* Admin in Mobile Menu */}
           {isAdmin && (

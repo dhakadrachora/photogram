@@ -8,6 +8,7 @@ import {
   supabase,
 } from '@/lib/supabase';
 import { ChatMessage } from '@/types';
+import { processDhotiAiWorldChatMessage } from '@/lib/dhoti-ai-chat';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,8 +18,17 @@ export async function GET() {
   if (isSupabaseConfigured()) {
     const sbMessages = await fetchSupabaseChatMessages();
     if (sbMessages && sbMessages.length > 0) {
-      messages = sbMessages;
-      contentStore.chatMessages = sbMessages;
+      // Ensure verified flags are preserved
+      messages = sbMessages.map((m) => ({
+        ...m,
+        isVerified:
+          m.isVerified ||
+          m.userId === 'dhoti_aale_ai_official' ||
+          m.userName === 'DHOTI AALE AI' ||
+          contentStore.verifiedUsers.has(m.userId) ||
+          (m.userBadge?.includes('Site Owner') ?? false),
+      }));
+      contentStore.chatMessages = messages;
     }
   }
 
@@ -40,11 +50,11 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const { user, text, sticker, id: providedId } = body;
 
-    const userEmail = req.headers.get('x-user-email') || user?.email;
-    const userId = req.headers.get('x-user-id') || user?.id;
+    const userEmail = (req.headers.get('x-user-email') || user?.email || '').toLowerCase().trim();
+    const userId = (req.headers.get('x-user-id') || user?.id || '').toString().trim();
 
     // Strict Server-Side Authentication Enforcement
-    if (!userEmail || typeof userEmail !== 'string' || !userEmail.includes('@') || !userId) {
+    if (!userEmail || !userEmail.includes('@') || !userId) {
       return NextResponse.json(
         {
           error: 'Unauthorized: Only authenticated Google users can enter and send World Chat messages.',
@@ -66,18 +76,34 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Role check
+    // Role check & verification status
     const isOwner = isSiteAdmin(userEmail);
+    const isVerified =
+      isOwner ||
+      contentStore.verifiedUsers.has(userId) ||
+      contentStore.verifiedUsers.has(userEmail);
+
+    // Strict Anti-Impersonation Protection: Users cannot disguise as DHOTI AALE AI
+    let sanitizedName = (user?.name || (isOwner ? 'Site Admin 👑' : 'Dhoti Resident')).toString().trim();
+    if (
+      sanitizedName.toLowerCase() === 'dhoti aale ai' ||
+      sanitizedName.toLowerCase() === 'dhoti ai' ||
+      userId === 'dhoti_aale_ai_official'
+    ) {
+      sanitizedName = isOwner ? 'Site Admin 👑' : 'Dhoti Resident';
+    }
 
     const newMsg: ChatMessage = {
       id: providedId || `msg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      userId: userId.toString(),
-      userName: user?.name || (isOwner ? 'Rohit Dhakad' : 'Dhoti Resident'),
-      userAvatar: user?.avatar || (isOwner ? 'https://api.dicebear.com/7.x/bottts/svg?seed=rohit-admin' : `https://api.dicebear.com/7.x/bottts/svg?seed=${userId}`),
+      userId: userId,
+      userName: sanitizedName,
+      userAvatar: user?.avatar || (isOwner ? 'https://api.dicebear.com/7.x/bottts/svg?seed=dhoti-admin' : `https://api.dicebear.com/7.x/bottts/svg?seed=${userId}`),
       userBadge: isOwner ? 'Site Owner & Admin 👑' : (user?.badge || 'Dhoti Resident'),
       text: (text || '').toString().trim(),
       timestamp: Date.now(),
       sticker: sticker ? sticker.toString().trim() : undefined,
+      isAi: false, // User messages are never AI
+      isVerified,
     };
 
     // Store in memory
@@ -91,13 +117,23 @@ export async function POST(req: NextRequest) {
       await insertSupabaseChatMessage(newMsg);
     }
 
+    // Process DHOTI AALE AI participation (Controlled AI participant)
+    let aiResponse: ChatMessage | null = null;
+    try {
+      aiResponse = await processDhotiAiWorldChatMessage(newMsg);
+    } catch (aiErr) {
+      console.warn('AI World Chat processing notice:', aiErr);
+    }
+
     return NextResponse.json({
       success: true,
       deliveredAt: newMsg.timestamp,
       message: newMsg,
+      aiMessage: aiResponse,
       sender: {
         id: userId,
         email: userEmail,
+        isVerified,
         role: isOwner ? 'admin' : 'resident',
       },
     });

@@ -14,8 +14,13 @@ import {
   BattleEvent,
   SiteSettings,
   ChatMessage,
+  ProblemReport,
+  ReportMessage,
+  ReportStatus,
 } from '@/types';
 import { isSiteAdmin, SITE_OWNER_EMAIL } from '@/lib/admin-auth';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { VerifiedTick } from '@/components/VerifiedTick';
 import {
   Crown,
   ShieldCheck,
@@ -56,6 +61,7 @@ interface AdminDashboardProps {
 
 type AdminSection =
   | 'overview'
+  | 'reports'
   | 'battles'
   | 'updates'
   | 'news'
@@ -76,6 +82,11 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
 
   // Data states
   const [stats, setStats] = useState<any>(null);
+  const [adminReports, setAdminReports] = useState<ProblemReport[]>([]);
+  const [selectedAdminReport, setSelectedAdminReport] = useState<ProblemReport | null>(null);
+  const [adminReplyText, setAdminReplyText] = useState('');
+  const [isSendingAdminReply, setIsSendingAdminReply] = useState(false);
+  const [reportsFilter, setReportsFilter] = useState<'all' | 'Open' | 'Replied' | 'Resolved'>('all');
   const [battles, setBattles] = useState<BattleEvent[]>([]);
   const [updates, setUpdates] = useState<CommunityUpdate[]>([]);
   const [news, setNews] = useState<NewsItem[]>([]);
@@ -99,12 +110,97 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
     }, 4000);
   };
 
-  const getAdminHeaders = useCallback(() => {
+  const getAdminHeaders = useCallback(async () => {
+    let token = '';
+    if (isSupabaseConfigured()) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        token = session?.access_token || '';
+      } catch {}
+    }
     return {
       'Content-Type': 'application/json',
       'x-user-email': currentUser?.email || '',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
   }, [currentUser?.email]);
+
+  const [isServerVerifiedAdmin, setIsServerVerifiedAdmin] = useState<boolean | null>(null);
+  const [verifyingUserId, setVerifyingUserId] = useState<string | null>(null);
+
+  const handleToggleUserVerification = async (targetUser: any) => {
+    const isCurrentlyVerified = Boolean(
+      targetUser.is_verified || targetUser.isVerified || isSiteAdmin(targetUser.email)
+    );
+    const newStatus = !isCurrentlyVerified;
+    setVerifyingUserId(targetUser.id);
+    try {
+      const headers = await getAdminHeaders();
+      const res = await fetch('/api/admin/users/verify', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          userId: targetUser.id,
+          userEmail: targetUser.email,
+          isVerified: newStatus,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setRegisteredUsers((prev) =>
+          prev.map((u) =>
+            u.id === targetUser.id
+              ? { ...u, is_verified: newStatus, isVerified: newStatus }
+              : u
+          )
+        );
+        showNotice(
+          newStatus
+            ? `सदस्य "${targetUser.name || targetUser.email}" को Blue Verified Tick सफलतापूर्वक दिया गया!`
+            : `सदस्य "${targetUser.name || targetUser.email}" का Blue Verified Tick हटा दिया गया।`,
+          'success'
+        );
+      } else {
+        showNotice(data.error || 'वेरिफिकेशन अपडेट नहीं हो सका', 'error');
+      }
+    } catch (err: any) {
+      showNotice(err?.message || 'नेटवर्क समस्या हुई', 'error');
+    } finally {
+      setVerifyingUserId(null);
+    }
+  };
+
+  // Verify Admin authorization strictly server-side
+  useEffect(() => {
+    async function verifyServerAdmin() {
+      if (!currentUser || !isSiteAdmin(currentUser.email)) {
+        setIsServerVerifiedAdmin(false);
+        return;
+      }
+      try {
+        let token = '';
+        if (isSupabaseConfigured()) {
+          const { data: { session } } = await supabase.auth.getSession();
+          token = session?.access_token || '';
+        }
+        if (!token) {
+          setIsServerVerifiedAdmin(isSiteAdmin(currentUser.email));
+          return;
+        }
+        const res = await fetch('/api/admin/verify', {
+          headers: {
+            'x-user-email': currentUser.email,
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        const data = await res.json();
+        setIsServerVerifiedAdmin(Boolean(data?.isAdmin));
+      } catch {
+        setIsServerVerifiedAdmin(isSiteAdmin(currentUser.email));
+      }
+    }
+    verifyServerAdmin();
+  }, [currentUser]);
 
   // Load section data
   const loadData = useCallback(async (setLoading?: boolean | React.SyntheticEvent) => {
@@ -113,11 +209,24 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
       setIsLoading(true);
     }
     try {
-      const headers = getAdminHeaders();
+      const headers = await getAdminHeaders();
 
-      // Load Overview & Settings
-      const [overviewRes, battlesRes, updatesRes, newsRes, peopleRes, bizRes, galRes, vidRes, chatRes, usersRes] = await Promise.all([
+      // Load Overview, Reports & Settings
+      const [
+        overviewRes,
+        reportsRes,
+        battlesRes,
+        updatesRes,
+        newsRes,
+        peopleRes,
+        bizRes,
+        galRes,
+        vidRes,
+        chatRes,
+        usersRes,
+      ] = await Promise.all([
         fetch('/api/admin/content?type=overview', { headers, cache: 'no-store' }),
+        fetch('/api/reports', { headers, cache: 'no-store' }),
         fetch('/api/battle', { headers, cache: 'no-store' }),
         fetch('/api/admin/content?type=updates', { headers, cache: 'no-store' }),
         fetch('/api/admin/content?type=news', { headers, cache: 'no-store' }),
@@ -132,6 +241,9 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
       const overviewData = await overviewRes.json();
       if (overviewData.stats) setStats(overviewData.stats);
       if (overviewData.settings) setSiteSettings(overviewData.settings);
+
+      const reportsData = await reportsRes.json();
+      if (reportsData.reports) setAdminReports(reportsData.reports);
 
       const battlesData = await battlesRes.json();
       if (battlesData.battles) setBattles(battlesData.battles);
@@ -172,13 +284,23 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
     async function initData() {
       if (!isAdmin) return;
       try {
-        const headers = {
-          'Content-Type': 'application/json',
-          'x-user-email': currentUser?.email || '',
-        };
+        const headers = await getAdminHeaders();
 
-        const [overviewRes, battlesRes, updatesRes, newsRes, peopleRes, bizRes, galRes, vidRes, chatRes, usersRes] = await Promise.all([
+        const [
+          overviewRes,
+          reportsRes,
+          battlesRes,
+          updatesRes,
+          newsRes,
+          peopleRes,
+          bizRes,
+          galRes,
+          vidRes,
+          chatRes,
+          usersRes,
+        ] = await Promise.all([
           fetch('/api/admin/content?type=overview', { headers, cache: 'no-store' }),
+          fetch('/api/reports', { headers, cache: 'no-store' }),
           fetch('/api/battle', { headers, cache: 'no-store' }),
           fetch('/api/admin/content?type=updates', { headers, cache: 'no-store' }),
           fetch('/api/admin/content?type=news', { headers, cache: 'no-store' }),
@@ -194,6 +316,9 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
         const overviewData = await overviewRes.json();
         if (overviewData.stats) setStats(overviewData.stats);
         if (overviewData.settings) setSiteSettings(overviewData.settings);
+
+        const reportsData = await reportsRes.json();
+        if (reportsData.reports) setAdminReports(reportsData.reports);
 
         const battlesData = await battlesRes.json();
         if (battlesData.battles) setBattles(battlesData.battles);
@@ -231,12 +356,13 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
     return () => {
       ignore = true;
     };
-  }, [isAdmin, currentUser?.email]);
+  }, [isAdmin, getAdminHeaders]);
 
   // Upload image to R2 / Admin Upload endpoint
   const handleUploadImage = async (file: File): Promise<string | null> => {
     setIsUploading(true);
     try {
+      const headers = await getAdminHeaders();
       const formData = new FormData();
       formData.append('file', file);
 
@@ -244,6 +370,7 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
         method: 'POST',
         headers: {
           'x-user-email': currentUser?.email || '',
+          ...(headers.Authorization ? { Authorization: headers.Authorization } : {}),
         },
         body: formData,
       });
@@ -266,7 +393,7 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
   // Toggle publish state
   const handleTogglePublish = async (type: string, id: string, currentPublished: boolean) => {
     try {
-      const headers = getAdminHeaders();
+      const headers = await getAdminHeaders();
       if (type === 'battle') {
         const res = await fetch('/api/battle', {
           method: 'PUT',
@@ -305,7 +432,7 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
   const handleDeleteItem = async (type: string, id: string) => {
     if (!confirm('Are you sure you want to delete this item?')) return;
     try {
-      const headers = getAdminHeaders();
+      const headers = await getAdminHeaders();
       let res;
       if (type === 'battle') {
         res = await fetch(`/api/battle?id=${id}`, { method: 'DELETE', headers });
@@ -332,7 +459,7 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
   // Quick Battle Action: Start or Close
   const handleBattleAction = async (id: string, action: 'start' | 'close') => {
     try {
-      const headers = getAdminHeaders();
+      const headers = await getAdminHeaders();
       const res = await fetch('/api/battle', {
         method: 'PUT',
         headers,
@@ -353,7 +480,7 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
     e.preventDefault();
     if (!siteSettings) return;
     try {
-      const headers = getAdminHeaders();
+      const headers = await getAdminHeaders();
       const res = await fetch('/api/admin/content', {
         method: 'PUT',
         headers,
@@ -371,8 +498,89 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
     }
   };
 
-  // UNAUTHORIZED ACCESS GUARD
-  if (!isAdmin) {
+  // Report actions: Update Status
+  const handleChangeReportStatus = async (reportId: string, status: ReportStatus) => {
+    try {
+      const headers = await getAdminHeaders();
+      const res = await fetch(`/api/reports/${encodeURIComponent(reportId)}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ status }),
+      });
+      if (res.ok) {
+        showNotice(`रिपोर्ट स्थिति '${status}' में अपडेट की गई!`);
+        setAdminReports((prev) =>
+          prev.map((r) => (r.id === reportId ? { ...r, status } : r))
+        );
+        if (selectedAdminReport && selectedAdminReport.id === reportId) {
+          setSelectedAdminReport((prev) => (prev ? { ...prev, status } : null));
+        }
+      } else {
+        showNotice('स्थिति अपडेट करने में विफल', 'error');
+      }
+    } catch {
+      showNotice('स्थिति अपडेट करने में विफल', 'error');
+    }
+  };
+
+  // Open report thread modal and fetch full details
+  const handleOpenReportThread = async (report: ProblemReport) => {
+    setSelectedAdminReport(report);
+    try {
+      const headers = await getAdminHeaders();
+      const res = await fetch(`/api/reports?reportId=${encodeURIComponent(report.id)}`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.report) {
+          setSelectedAdminReport(data.report);
+          setAdminReports((prev) =>
+            prev.map((r) => (r.id === data.report.id ? data.report : r))
+          );
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to load thread:', err);
+    }
+  };
+
+  // Send reply as admin
+  const handleSendAdminReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedAdminReport || !adminReplyText.trim()) return;
+    setIsSendingAdminReply(true);
+    try {
+      const headers = await getAdminHeaders();
+      const res = await fetch(`/api/reports/${encodeURIComponent(selectedAdminReport.id)}/messages`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ message: adminReplyText.trim() }),
+      });
+      const data = await res.json();
+      if (res.ok && data.message) {
+        setAdminReplyText('');
+        showNotice('एडमिन का उत्तर सफलतापूर्वक भेजा गया!');
+        const threadRes = await fetch(`/api/reports?reportId=${encodeURIComponent(selectedAdminReport.id)}`, { headers });
+        if (threadRes.ok) {
+          const threadData = await threadRes.json();
+          if (threadData.report) {
+            setSelectedAdminReport(threadData.report);
+            setAdminReports((prev) =>
+              prev.map((r) => (r.id === threadData.report.id ? threadData.report : r))
+            );
+          }
+        }
+      } else {
+        showNotice(data.error || 'उत्तर भेजने में विफल', 'error');
+      }
+    } catch (err: any) {
+      showNotice(err.message || 'Error sending reply', 'error');
+    } finally {
+      setIsSendingAdminReply(false);
+    }
+  };
+
+  // UNAUTHORIZED ACCESS GUARD - Strictly verified server-side
+  if (!isAdmin || isServerVerifiedAdmin === false) {
     return (
       <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4 bg-[#07080c]">
         <div className="max-w-md w-full rounded-3xl border border-red-500/30 bg-slate-950/90 p-6 sm:p-8 text-center shadow-2xl backdrop-blur-xl">
@@ -471,6 +679,12 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
       <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 no-scrollbar border-b border-slate-800">
         {[
           { id: 'overview', label: 'Overview', icon: ShieldCheck },
+          {
+            id: 'reports',
+            label: 'Reports & Support',
+            icon: AlertCircle,
+            badge: adminReports.filter((r) => r.status !== 'Resolved').length,
+          },
           { id: 'battles', label: 'Battles', icon: Swords, badge: battles.length },
           { id: 'updates', label: 'Latest Updates', icon: Bell, badge: updates.length },
           { id: 'news', label: 'News', icon: Newspaper, badge: news.length },
@@ -515,7 +729,21 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
         {/* 1. OVERVIEW SECTION */}
         {activeSection === 'overview' && (
           <div className="space-y-6">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4">
+              <div
+                onClick={() => setActiveSection('reports')}
+                className="p-4 rounded-3xl bg-slate-900/90 border border-slate-800 hover:border-amber-500/40 transition-all cursor-pointer group"
+              >
+                <div className="flex items-center justify-between text-slate-400 mb-2">
+                  <span className="text-xs font-bold">User Reports</span>
+                  <AlertCircle className="h-4 w-4 text-amber-400 group-hover:scale-110 transition-transform" />
+                </div>
+                <div className="text-2xl sm:text-3xl font-black text-white">{adminReports.length}</div>
+                <div className="text-[10px] text-amber-400 mt-1">
+                  {adminReports.filter((r) => r.status !== 'Resolved').length} Open • Reply & Resolve
+                </div>
+              </div>
+
               <div
                 onClick={() => setActiveSection('battles')}
                 className="p-4 rounded-3xl bg-slate-900/90 border border-slate-800 hover:border-amber-500/40 transition-all cursor-pointer group"
@@ -573,7 +801,14 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
                   <span>Quick Admin Creation Shortcuts</span>
                 </h2>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <button
+                  onClick={() => setActiveSection('reports')}
+                  className="flex flex-col items-center justify-center p-4 rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-bold text-xs gap-2 transition-all"
+                >
+                  <AlertCircle className="h-5 w-5" />
+                  <span>Support Reports ({adminReports.filter((r) => r.status !== 'Resolved').length})</span>
+                </button>
                 <button
                   onClick={() => {
                     setActiveSection('battles');
@@ -680,6 +915,364 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
                 })}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* 1.5 REPORTS & SUPPORT SECTION */}
+        {activeSection === 'reports' && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5 text-amber-400" />
+                  <span>उपयोगकर्ता समस्याएं एवं रिपोर्ट्स (Problem Reports & Support)</span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  उपयोगकर्ताओं द्वारा दर्ज की गई समस्याएं। आप संदेशों की समीक्षा कर सकते हैं, उत्तर दे सकते हैं और स्थिति को Resolved मार्क कर सकते हैं।
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => loadData(true)}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-amber-500/40 text-xs font-semibold text-slate-300 hover:text-white transition-colors"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin text-amber-400' : ''}`} />
+                  <span>रिफ्रेश</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Filter Buttons */}
+            <div className="flex flex-wrap items-center gap-2">
+              {[
+                { id: 'all', label: 'सभी रिपोर्ट्स', count: adminReports.length },
+                { id: 'Open', label: 'समीक्षा बाकी (Open)', count: adminReports.filter((r) => r.status === 'Open').length },
+                { id: 'Replied', label: 'उत्तर दिया (Replied)', count: adminReports.filter((r) => r.status === 'Replied').length },
+                { id: 'Resolved', label: 'हल की गई (Resolved)', count: adminReports.filter((r) => r.status === 'Resolved').length },
+              ].map((f) => {
+                const isSelected = reportsFilter === f.id;
+                return (
+                  <button
+                    key={f.id}
+                    onClick={() => setReportsFilter(f.id as any)}
+                    className={`flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs font-bold transition-all ${
+                      isSelected
+                        ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                        : 'bg-slate-900/80 hover:bg-slate-800 text-slate-300 border border-slate-800'
+                    }`}
+                  >
+                    <span>{f.label}</span>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                        isSelected ? 'bg-slate-950 text-amber-400' : 'bg-slate-800 text-slate-400'
+                      }`}
+                    >
+                      {f.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Reports List */}
+            {adminReports.filter((r) => reportsFilter === 'all' || r.status === reportsFilter).length === 0 ? (
+              <div className="p-12 text-center rounded-3xl bg-slate-900/40 border border-slate-800/80 space-y-3">
+                <AlertCircle className="h-10 w-10 mx-auto text-slate-600" />
+                <h3 className="text-sm font-bold text-slate-300">कोई रिपोर्ट उपलब्ध नहीं है</h3>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                  {reportsFilter === 'all'
+                    ? 'वर्तमान में किसी भी उपयोगकर्ता ने कोई समस्या रिपोर्ट दर्ज नहीं की है।'
+                    : `फ़िल्टर '${reportsFilter}' के अंतर्गत कोई रिपोर्ट नहीं मिली।`}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {adminReports
+                  .filter((r) => reportsFilter === 'all' || r.status === reportsFilter)
+                  .map((report) => {
+                    const statusColor =
+                      report.status === 'Resolved'
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                        : report.status === 'Replied'
+                        ? 'bg-sky-500/20 text-sky-300 border-sky-500/30'
+                        : 'bg-amber-500/20 text-amber-300 border-amber-500/30';
+
+                    return (
+                      <div
+                        key={report.id}
+                        className="p-4 sm:p-5 rounded-3xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition-all flex flex-col lg:flex-row lg:items-center justify-between gap-4"
+                      >
+                        <div className="space-y-2 min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-mono text-[10px] bg-slate-950 text-amber-400 px-2 py-0.5 rounded-lg border border-slate-800">
+                              ID: {report.id}
+                            </span>
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusColor}`}
+                            >
+                              {report.status === 'Resolved'
+                                ? '✓ Resolved (हल किया गया)'
+                                : report.status === 'Replied'
+                                ? '✉ Replied (उत्तर दिया)'
+                                : '● Open (समीक्षा बाकी)'}
+                            </span>
+                            {report.category && (
+                              <span className="text-[10px] text-slate-400 bg-slate-800/60 px-2 py-0.5 rounded-lg">
+                                श्रेणी: {report.category}
+                              </span>
+                            )}
+                          </div>
+
+                          <h3 className="text-sm sm:text-base font-bold text-white truncate">
+                            {report.subject}
+                          </h3>
+
+                          <div className="text-xs text-slate-300 line-clamp-2 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/60 font-sans">
+                            <span className="text-slate-500 font-semibold mr-1">नवीनतम संदेश:</span>
+                            {report.latestMessage || report.description}
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-400 pt-1">
+                            <div>
+                              <span className="text-slate-500">प्रयोक्ता: </span>
+                              <strong className="text-slate-200">{report.userName}</strong>
+                            </div>
+                            <div>
+                              <span className="text-slate-500">ईमेल: </span>
+                              <span className="text-amber-300/90 font-mono">{report.userEmail}</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-500">दर्ज तिथि: </span>
+                              <span>
+                                {new Date(report.createdAt).toLocaleString('hi-IN', {
+                                  dateStyle: 'medium',
+                                  timeStyle: 'short',
+                                })}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-slate-500">अंतिम अपडेट: </span>
+                              <span>
+                                {new Date(report.updatedAt).toLocaleString('hi-IN', {
+                                  dateStyle: 'medium',
+                                  timeStyle: 'short',
+                                })}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="flex sm:flex-row lg:flex-col gap-2 shrink-0 self-end lg:self-center">
+                          <button
+                            onClick={() => handleOpenReportThread(report)}
+                            className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md transition-all active:scale-95"
+                          >
+                            <MessageSquare className="h-3.5 w-3.5" />
+                            <span>बातचीत खोलें एवं उत्तर दें</span>
+                          </button>
+
+                          {report.status !== 'Resolved' ? (
+                            <button
+                              onClick={() => handleChangeReportStatus(report.id, 'Resolved')}
+                              className="flex items-center justify-center gap-1 px-3 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition-colors"
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                              <span>मार्क Resolved</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleChangeReportStatus(report.id, 'Open')}
+                              className="flex items-center justify-center gap-1 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors"
+                            >
+                              <span>पुनः खोलें (Reopen)</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+
+            {/* Admin Report Details & Conversation Modal */}
+            {selectedAdminReport && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in">
+                <div className="relative w-full max-w-2xl max-h-[90vh] flex flex-col rounded-3xl bg-slate-900 border border-amber-500/40 shadow-2xl overflow-hidden">
+                  {/* Modal Header */}
+                  <div className="p-4 sm:p-5 border-b border-slate-800 flex items-start justify-between gap-3 bg-slate-950/60">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span className="font-mono text-[10px] bg-slate-800 text-amber-400 px-2 py-0.5 rounded">
+                          ID: {selectedAdminReport.id}
+                        </span>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                            selectedAdminReport.status === 'Resolved'
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                              : selectedAdminReport.status === 'Replied'
+                              ? 'bg-sky-500/20 text-sky-300 border-sky-500/30'
+                              : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                          }`}
+                        >
+                          {selectedAdminReport.status}
+                        </span>
+                      </div>
+                      <h3 className="text-base sm:text-lg font-black text-white">
+                        {selectedAdminReport.subject}
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        द्वारा:{' '}
+                        <strong className="text-white">{selectedAdminReport.userName}</strong> (
+                        <span className="font-mono text-amber-300">{selectedAdminReport.userEmail}</span>)
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => setSelectedAdminReport(null)}
+                      className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+
+                  {/* Status quick switcher banner */}
+                  <div className="px-4 py-2.5 bg-slate-950/90 border-b border-slate-800 flex items-center justify-between gap-2 flex-wrap text-xs">
+                    <span className="text-slate-400 font-semibold">स्थिति बदलें:</span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => handleChangeReportStatus(selectedAdminReport.id, 'Open')}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                          selectedAdminReport.status === 'Open'
+                            ? 'bg-amber-500 text-slate-950 font-black'
+                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                        }`}
+                      >
+                        Open
+                      </button>
+                      <button
+                        onClick={() => handleChangeReportStatus(selectedAdminReport.id, 'Replied')}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                          selectedAdminReport.status === 'Replied'
+                            ? 'bg-sky-500 text-slate-950 font-black'
+                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                        }`}
+                      >
+                        Replied
+                      </button>
+                      <button
+                        onClick={() => handleChangeReportStatus(selectedAdminReport.id, 'Resolved')}
+                        className={`px-3 py-1 rounded-lg text-xs font-black transition-all ${
+                          selectedAdminReport.status === 'Resolved'
+                            ? 'bg-emerald-500 text-slate-950'
+                            : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30'
+                        }`}
+                      >
+                        ✓ Mark Resolved
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Modal Body: Conversation history */}
+                  <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3">
+                    {/* Initial issue description card */}
+                    <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between text-[11px] text-slate-400">
+                        <span className="font-semibold text-slate-300">
+                          {selectedAdminReport.userName} द्वारा मूल विवरण:
+                        </span>
+                        <span>
+                          {new Date(selectedAdminReport.createdAt).toLocaleString('hi-IN', {
+                            dateStyle: 'short',
+                            timeStyle: 'short',
+                          })}
+                        </span>
+                      </div>
+                      <p className="text-xs sm:text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
+                        {selectedAdminReport.description}
+                      </p>
+                      {selectedAdminReport.attachmentUrl && (
+                        <div className="mt-2">
+                          <a
+                            href={selectedAdminReport.attachmentUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-xs text-amber-400 hover:underline"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            <span>संलग्न स्क्रीनशॉट देखें</span>
+                          </a>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Messages history */}
+                    {selectedAdminReport.messages && selectedAdminReport.messages.length > 0 && (
+                      <div className="space-y-2 pt-2">
+                        <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                          वार्तालाप संदेश ({selectedAdminReport.messages.length})
+                        </div>
+                        {selectedAdminReport.messages.map((msg) => {
+                          const isAdminMsg = msg.senderRole === 'admin';
+                          return (
+                            <div
+                              key={msg.id}
+                              className={`p-3 rounded-2xl max-w-[85%] text-xs space-y-1 ${
+                                isAdminMsg
+                                  ? 'ml-auto bg-amber-500/15 border border-amber-500/30 text-amber-100'
+                                  : 'mr-auto bg-slate-800/80 border border-slate-700 text-slate-200'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-3 text-[10px]">
+                                <span
+                                  className={`font-bold flex items-center gap-1 ${
+                                    isAdminMsg ? 'text-amber-300' : 'text-sky-300'
+                                  }`}
+                                >
+                                  {isAdminMsg ? 'DHOTI AALE Support (Admin 👑)' : msg.senderName}
+                                </span>
+                                <span className="text-slate-400">
+                                  {new Date(msg.createdAt).toLocaleTimeString('hi-IN', {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}
+                                </span>
+                              </div>
+                              <p className="whitespace-pre-wrap leading-relaxed">{msg.message}</p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Reply Form Footer */}
+                  <form
+                    onSubmit={handleSendAdminReply}
+                    className="p-3 sm:p-4 bg-slate-950/90 border-t border-slate-800 space-y-2"
+                  >
+                    <div className="flex gap-2">
+                      <textarea
+                        rows={2}
+                        value={adminReplyText}
+                        onChange={(e) => setAdminReplyText(e.target.value)}
+                        placeholder="उपयोगकर्ता को आधिकारिक एडमिन उत्तर लिखें..."
+                        className="flex-1 rounded-2xl bg-slate-900 border border-slate-800 p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 resize-none"
+                      />
+                      <button
+                        type="submit"
+                        disabled={isSendingAdminReply || !adminReplyText.trim()}
+                        className="px-4 rounded-2xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-bold text-xs transition-all flex flex-col items-center justify-center gap-1 shrink-0"
+                      >
+                        <ArrowRight className="h-4 w-4" />
+                        <span>{isSendingAdminReply ? 'भेज रहे हैं...' : 'उत्तर भेजें'}</span>
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1416,10 +2009,10 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
               <div>
                 <h2 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
                   <Users className="h-5 w-5 text-amber-400" />
-                  <span>Registered Community Users ({registeredUsers.length > 0 ? registeredUsers.length : 4})</span>
+                  <span>पंजीकृत सदस्य एवं उपयोगकर्ता (Registered Users - {registeredUsers.length})</span>
                 </h2>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Supabase पंजीकृत उपयोगकर्ता, ईमेल, फ़ोन नंबर, प्रोफ़ाइल फ़ोटो और पंजीकरण दिनांक।
+                  पंजीकृत उपयोगकर्ता, यूजर आईडी, ईमेल, फ़ोन नंबर, प्रोफ़ाइल फ़ोटो और पंजीकरण दिनांक।
                 </p>
               </div>
 
@@ -1434,117 +2027,123 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
             <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 flex items-start gap-3">
               <ShieldCheck className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
               <div className="text-xs text-slate-300 leading-relaxed">
-                <span className="font-bold text-white">गोपनीयता और सुरक्षा सुरक्षा प्रोटोकॉल:</span> उपयोगकर्ता पासवर्ड Supabase Auth द्वारा सुरक्षित रूप से एन्क्रिप्ट किए जाते हैं। डेटाबेस में पासवर्ड कभी भी संग्रहीत या प्रदर्शित नहीं होते, और व्यवस्थापक (Admin) कभी भी उपयोगकर्ता पासवर्ड नहीं देख सकते।
+                <span className="font-bold text-white">गोपनीयता और सुरक्षा प्रोटोकॉल:</span> उपयोगकर्ता पासवर्ड Supabase Auth द्वारा सुरक्षित रूप से एन्क्रिप्ट किए जाते हैं। डेटाबेस में पासवर्ड कभी भी पठनीय (readable) रूप में संग्रहीत या प्रदर्शित नहीं होते, और व्यवस्थापक (Admin) कभी भी उपयोगकर्ता पासवर्ड नहीं देख सकते।
               </div>
             </div>
 
             <div className="rounded-3xl bg-slate-900/90 border border-slate-800 p-4 space-y-3">
-              {(registeredUsers.length > 0
-                ? registeredUsers
-                : [
-                    {
-                      id: 'admin_rohit',
-                      name: 'Rohit Dhakad',
-                      email: 'rohitdhakaddhoti143@gmail.com',
-                      phone: '+91 98765 43210',
-                      role: 'Site Owner & Admin 👑',
-                      badge: 'Site Owner & Admin 👑',
-                      coins: 5000,
-                      wins: 99,
-                      avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=rohit-dhoti',
-                      created_at: new Date().toISOString(),
-                    },
-                    {
-                      id: 'admin_nagar',
-                      name: 'Rohit Kumar Nagar',
-                      email: 'rohitkumarnagar50@gmail.com',
-                      phone: null,
-                      role: 'Super Admin 👑',
-                      badge: 'Super Admin 👑',
-                      coins: 2000,
-                      wins: 50,
-                      avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=rohit-admin',
-                      created_at: new Date().toISOString(),
-                    },
-                    {
-                      id: 'user_vikram',
-                      name: 'Vikram Choudhary',
-                      email: 'vikram.choudhary@gmail.com',
-                      phone: '+91 98234 56789',
-                      role: 'Resident',
-                      badge: 'Dhoti King 👑',
-                      coins: 450,
-                      wins: 12,
-                      avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=vikram-dhoti',
-                      created_at: new Date().toISOString(),
-                    },
-                    {
-                      id: 'user_aman',
-                      name: 'Aman Dhakad',
-                      email: 'aman.dhakad@gmail.com',
-                      phone: null,
-                      role: 'Resident',
-                      badge: 'Rap Boss 🎤',
-                      coins: 380,
-                      wins: 8,
-                      avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=aman-dhoti',
-                      created_at: new Date().toISOString(),
-                    },
-                  ]
-              ).map((u: any, i: number) => (
-                <div
-                  key={u.id || i}
-                  className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-slate-700 transition-colors"
-                >
-                  <div className="flex items-start sm:items-center gap-3 min-w-0">
-                    <Image
-                      src={u.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(u.email || 'user')}`}
-                      alt={u.name || 'User'}
-                      width={44}
-                      height={44}
-                      referrerPolicy="no-referrer"
-                      className="h-11 w-11 rounded-2xl object-cover bg-slate-800 border border-amber-500/30 shrink-0"
-                    />
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs sm:text-sm font-bold text-white truncate">
-                          {u.name || 'Resident'}
-                        </span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
-                          {u.is_admin || isSiteAdmin(u.email) ? 'Admin 👑' : (u.role || u.badge || 'Resident')}
-                        </span>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-[11px] text-slate-400">
-                        <span className="font-mono text-slate-300">{u.email}</span>
-                        <div className="flex items-center gap-1 text-slate-400">
-                          <Phone className="h-3 w-3 text-amber-400/70" />
-                          <span>{u.phone ? u.phone : <span className="text-slate-500 italic">No phone</span>}</span>
-                        </div>
-                        <div className="flex items-center gap-1 text-slate-400">
-                          <Calendar className="h-3 w-3 text-amber-400/70" />
-                          <span>
-                            {u.created_at
-                              ? new Date(u.created_at).toLocaleDateString('hi-IN', {
-                                  year: 'numeric',
-                                  month: 'short',
-                                  day: 'numeric',
-                                })
-                              : 'पंजीकृत'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between sm:justify-end gap-3 text-right pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/60">
-                    <div>
-                      <div className="text-xs font-bold text-amber-400">{u.coins ?? 50} Coins</div>
-                      <div className="text-[10px] text-emerald-400">{u.wins ?? 0} Battles Won</div>
-                    </div>
-                  </div>
+              {registeredUsers.length === 0 ? (
+                <div className="p-10 text-center text-slate-400 space-y-2 rounded-2xl bg-slate-950/40 border border-slate-800/60">
+                  <Users className="h-10 w-10 mx-auto text-slate-600" />
+                  <p className="text-sm font-bold text-slate-200">कोई अन्य पंजीकृत उपयोगकर्ता अभी नहीं है</p>
+                  <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                    नए उपयोगकर्ताओं द्वारा साइन-अप करने पर उनके नाम, ईमेल, फ़ोन और प्रोफ़ाइल फ़ोटो यहाँ तुरंत प्रदर्शित होंगे।
+                  </p>
                 </div>
-              ))}
+              ) : (
+                registeredUsers.map((u: any, i: number) => (
+                  <div
+                    key={u.id || i}
+                    className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-slate-700 transition-colors"
+                  >
+                    <div className="flex items-start sm:items-center gap-3 min-w-0">
+                      <Image
+                        src={u.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(u.email || 'user')}`}
+                        alt={u.name || 'User'}
+                        width={44}
+                        height={44}
+                        referrerPolicy="no-referrer"
+                        className="h-11 w-11 rounded-2xl object-cover bg-slate-800 border border-amber-500/30 shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs sm:text-sm font-bold text-white truncate flex items-center gap-1.5">
+                            {u.name || 'पंजीकृत सदस्य'}
+                            {(u.is_verified || u.isVerified || isSiteAdmin(u.email)) && (
+                              <VerifiedTick size={15} />
+                            )}
+                          </span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
+                            {u.is_admin || isSiteAdmin(u.email) ? 'Site Owner & Super Admin 👑' : (u.role || u.badge || 'Resident')}
+                          </span>
+                          {(u.is_verified || u.isVerified || isSiteAdmin(u.email)) && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 font-bold border border-sky-500/30 flex items-center gap-1">
+                              <VerifiedTick size={12} />
+                              Verified
+                            </span>
+                          )}
+                          {u.id && (
+                            <span className="text-[10px] font-mono text-slate-500 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">
+                              UID: {u.id}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-[11px] text-slate-400">
+                          <span className="font-mono text-slate-300">{u.email}</span>
+                          <div className="flex items-center gap-1 text-slate-400">
+                            <Phone className="h-3 w-3 text-amber-400/70" />
+                            <span>{u.phone ? u.phone : <span className="text-slate-500 italic">फ़ोन नंबर नहीं जोड़ा</span>}</span>
+                          </div>
+                          <div className="flex items-center gap-1 text-slate-400">
+                            <Calendar className="h-3 w-3 text-amber-400/70" />
+                            <span>
+                              {u.created_at
+                                ? new Date(u.created_at).toLocaleDateString('hi-IN', {
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric',
+                                  })
+                                : 'पंजीकृत'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between sm:justify-end gap-3 text-right pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/60">
+                      <div>
+                        <div className="text-xs font-bold text-amber-400">{u.coins ?? 50} Coins</div>
+                        <div className="text-[10px] text-emerald-400">{u.wins ?? 0} Battles Won</div>
+                      </div>
+
+                      <div className="pl-2 border-l border-slate-800">
+                        {isSiteAdmin(u.email) ? (
+                          <span
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/30 text-xs font-bold"
+                            title="Site Owner & Admin"
+                          >
+                            <VerifiedTick size={14} />
+                            <span>Owner 👑</span>
+                          </span>
+                        ) : (u.is_verified || u.isVerified) ? (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleUserVerification(u)}
+                            disabled={verifyingUserId === u.id}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/10 hover:bg-red-500/20 text-sky-400 hover:text-red-300 border border-sky-500/30 hover:border-red-500/40 text-xs font-bold transition-all"
+                            title="Click to remove Blue Verified Badge"
+                          >
+                            <VerifiedTick size={14} />
+                            <span>{verifyingUserId === u.id ? 'Updating...' : 'Verified (Remove)'}</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleUserVerification(u)}
+                            disabled={verifyingUserId === u.id}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-sky-500/20 text-slate-300 hover:text-sky-300 border border-slate-700 hover:border-sky-500/40 text-xs font-bold transition-all"
+                            title="Grant Blue Verified Tick"
+                          >
+                            <VerifiedTick size={14} />
+                            <span>{verifyingUserId === u.id ? 'Updating...' : 'Grant Blue Tick'}</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}
@@ -1680,7 +2279,7 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
                 initialData={editingItem.data}
                 onSave={async (payload) => {
                   try {
-                    const headers = getAdminHeaders();
+                    const headers = await getAdminHeaders();
                     let res;
                     if (editingItem.data?.id) {
                       res = await fetch('/api/battle', {
@@ -1721,7 +2320,7 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
                 initialData={editingItem.data}
                 onSave={async (payload) => {
                   try {
-                    const headers = getAdminHeaders();
+                    const headers = await getAdminHeaders();
                     let res;
                     if (editingItem.data?.id) {
                       res = await fetch('/api/admin/content', {
@@ -1762,7 +2361,7 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
                 initialData={editingItem.data}
                 onSave={async (payload) => {
                   try {
-                    const headers = getAdminHeaders();
+                    const headers = await getAdminHeaders();
                     let res;
                     if (editingItem.data?.id) {
                       res = await fetch('/api/admin/content', {
@@ -1806,7 +2405,7 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
                 initialData={editingItem.data}
                 onSave={async (payload) => {
                   try {
-                    const headers = getAdminHeaders();
+                    const headers = await getAdminHeaders();
                     let res;
                     if (editingItem.data?.id) {
                       res = await fetch('/api/admin/content', {
@@ -2193,7 +2792,7 @@ function NewsForm({
   const [category, setCategory] = useState(initialData?.category || 'Culture & Festivals');
   const [excerpt, setExcerpt] = useState(initialData?.excerpt || '');
   const [content, setContent] = useState(initialData?.content || '');
-  const [author, setAuthor] = useState(initialData?.author || 'Rohit Kumar Nagar');
+  const [author, setAuthor] = useState(initialData?.author || 'Admin');
   const [imageUrl, setImageUrl] = useState(
     initialData?.imageUrl ||
       'https://images.unsplash.com/photo-1511556532299-8f662fc26c06?w=800'
