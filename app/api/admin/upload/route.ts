@@ -15,6 +15,14 @@ const ALLOWED_TYPES = new Set([
   'image/svg+xml',
 ]);
 
+const EXTENSION_BY_TYPE: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+  'image/svg+xml': 'svg',
+};
+
 function getR2Client() {
   const accountId = process.env.R2_ACCOUNT_ID;
   const accessKeyId = process.env.R2_ACCESS_KEY_ID;
@@ -35,40 +43,45 @@ function getR2Client() {
 }
 
 function cleanFilename(filename: string) {
-  return filename
-    .trim()
-    .replace(/[^a-zA-Z0-9._-]/g, '_')
-    .replace(/_+/g, '_')
-    .toLowerCase();
+  return (
+    filename
+      .trim()
+      .replace(/[^a-zA-Z0-9._-]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^\.+/, '')
+      .toLowerCase() || 'asset'
+  );
 }
 
-function getExtension(filename: string, contentType: string) {
-  const originalExtension = filename.includes('.')
-    ? filename.split('.').pop()?.toLowerCase()
-    : '';
+function getBaseName(filename: string) {
+  return filename.replace(/\.[^.]+$/, '') || 'asset';
+}
 
-  if (originalExtension) {
-    return originalExtension;
-  }
+function getExtension(contentType: string) {
+  return EXTENSION_BY_TYPE[contentType] || 'bin';
+}
 
-  const map: Record<string, string> = {
-    'image/jpeg': 'jpg',
-    'image/png': 'png',
-    'image/webp': 'webp',
-    'image/gif': 'gif',
-    'image/svg+xml': 'svg',
-  };
+function normalizePublicUrl(url: string) {
+  return url.trim().replace(/\/+$/, '');
+}
 
-  return map[contentType] || 'bin';
+function isDataUrl(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    /^data:[a-zA-Z0-9.+-]+;base64,/s.test(value)
+  );
 }
 
 export async function POST(req: NextRequest) {
-  // Only the verified Super Admin can upload assets.
+  // ---------------------------------------------------------
+  // SUPER ADMIN CHECK
+  // ---------------------------------------------------------
   const isAdmin = await verifyAdminRequestAsync(req);
 
   if (!isAdmin) {
     return NextResponse.json(
       {
+        success: false,
         error: `Unauthorized: Only verified admin (${SITE_OWNER_EMAIL}) can upload assets.`,
       },
       { status: 403 }
@@ -76,39 +89,52 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const contentType = req.headers.get('content-type') || '';
+    const contentType = (
+      req.headers.get('content-type') || ''
+    ).toLowerCase();
 
     let file: File | null = null;
     let requestedFilename = 'asset';
     let alt = 'Uploaded Asset';
 
-    // ---------------------------------------------------------
-    // JSON payload
-    // ---------------------------------------------------------
+    // =========================================================
+    // JSON / DATA URL
+    // =========================================================
     if (contentType.includes('application/json')) {
       const body = await req.json().catch(() => null);
 
-      if (!body) {
+      if (!body || typeof body !== 'object') {
         return NextResponse.json(
-          { error: 'Invalid JSON payload.' },
+          {
+            success: false,
+            error: 'Invalid JSON payload.',
+          },
           { status: 400 }
         );
       }
 
-      const {
-        dataUrl,
-        filename = 'asset',
-        alt: providedAlt = 'Uploaded Asset',
-      } = body;
+      const dataUrl = body.dataUrl;
+      const filename =
+        typeof body.filename === 'string'
+          ? body.filename
+          : 'asset';
 
-      if (!dataUrl || typeof dataUrl !== 'string') {
+      const providedAlt =
+        typeof body.alt === 'string'
+          ? body.alt
+          : 'Uploaded Asset';
+
+      if (!isDataUrl(dataUrl)) {
         return NextResponse.json(
-          { error: 'dataUrl is required.' },
+          {
+            success: false,
+            error:
+              'dataUrl is required and must be a valid base64 data URL.',
+          },
           { status: 400 }
         );
       }
 
-      // Parse data URL.
       const match = dataUrl.match(
         /^data:([a-zA-Z0-9.+-]+);base64,(.+)$/s
       );
@@ -116,8 +142,8 @@ export async function POST(req: NextRequest) {
       if (!match) {
         return NextResponse.json(
           {
-            error:
-              'Invalid dataUrl. Expected a base64 data URL such as data:image/png;base64,...',
+            success: false,
+            error: 'Invalid base64 data URL.',
           },
           { status: 400 }
         );
@@ -129,6 +155,7 @@ export async function POST(req: NextRequest) {
       if (!ALLOWED_TYPES.has(mimeType)) {
         return NextResponse.json(
           {
+            success: false,
             error: `Unsupported image type: ${mimeType}`,
             allowedTypes: Array.from(ALLOWED_TYPES),
           },
@@ -140,14 +167,20 @@ export async function POST(req: NextRequest) {
 
       if (!buffer.length) {
         return NextResponse.json(
-          { error: 'Uploaded image is empty.' },
+          {
+            success: false,
+            error: 'Uploaded image is empty.',
+          },
           { status: 400 }
         );
       }
 
       if (buffer.length > MAX_FILE_SIZE) {
         return NextResponse.json(
-          { error: 'File is too large. Maximum size is 10 MB.' },
+          {
+            success: false,
+            error: 'File is too large. Maximum size is 10 MB.',
+          },
           { status: 413 }
         );
       }
@@ -157,50 +190,61 @@ export async function POST(req: NextRequest) {
       });
 
       requestedFilename = filename;
-      alt = String(providedAlt || 'Uploaded Asset').slice(0, 300);
+      alt = providedAlt.trim().slice(0, 300);
     }
 
-    // ---------------------------------------------------------
-    // FormData payload
-    // ---------------------------------------------------------
+    // =========================================================
+    // FORMDATA
+    // =========================================================
     else {
       const formData = await req.formData();
       const uploadedFile = formData.get('file');
 
       if (!(uploadedFile instanceof File)) {
         return NextResponse.json(
-          { error: 'No valid file provided in form data.' },
+          {
+            success: false,
+            error: 'No valid file provided in form data.',
+          },
           { status: 400 }
         );
       }
 
       file = uploadedFile;
-
       requestedFilename = uploadedFile.name || 'asset';
 
       const formAlt = formData.get('alt');
 
-      if (typeof formAlt === 'string' && formAlt.trim()) {
+      if (
+        typeof formAlt === 'string' &&
+        formAlt.trim()
+      ) {
         alt = formAlt.trim().slice(0, 300);
       }
     }
 
+    // =========================================================
+    // BASIC VALIDATION
+    // =========================================================
     if (!file) {
       return NextResponse.json(
-        { error: 'No file provided.' },
+        {
+          success: false,
+          error: 'No file provided.',
+        },
         { status: 400 }
       );
     }
 
-    // ---------------------------------------------------------
-    // Validate file
-    // ---------------------------------------------------------
-    const mimeType = (file.type || 'application/octet-stream').toLowerCase();
+    const mimeType = (
+      file.type || 'application/octet-stream'
+    ).toLowerCase();
 
     if (!ALLOWED_TYPES.has(mimeType)) {
       return NextResponse.json(
         {
-          error: `Unsupported file type: ${mimeType}`,
+          success: false,
+          error: `Unsupported image type: ${mimeType}`,
           allowedTypes: Array.from(ALLOWED_TYPES),
         },
         { status: 400 }
@@ -209,29 +253,53 @@ export async function POST(req: NextRequest) {
 
     if (file.size <= 0) {
       return NextResponse.json(
-        { error: 'Uploaded file is empty.' },
+        {
+          success: false,
+          error: 'Uploaded file is empty.',
+        },
         { status: 400 }
       );
     }
 
     if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json(
-        { error: 'File is too large. Maximum size is 10 MB.' },
+        {
+          success: false,
+          error: 'File is too large. Maximum size is 10 MB.',
+        },
         { status: 413 }
       );
     }
 
-    // ---------------------------------------------------------
-    // Check R2 configuration
-    // ---------------------------------------------------------
+    // =========================================================
+    // R2 CONFIGURATION
+    // =========================================================
+    const accountId = process.env.R2_ACCOUNT_ID;
+    const accessKeyId = process.env.R2_ACCESS_KEY_ID;
+    const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
+
     const bucketName = process.env.R2_BUCKET_NAME;
     const publicUrl = process.env.R2_PUBLIC_URL;
 
-    if (!bucketName || !publicUrl) {
+    if (
+      !accountId ||
+      !accessKeyId ||
+      !secretAccessKey ||
+      !bucketName ||
+      !publicUrl
+    ) {
       return NextResponse.json(
         {
+          success: false,
           error:
-            'Cloudflare R2 is not configured. Missing R2_BUCKET_NAME or R2_PUBLIC_URL.',
+            'Cloudflare R2 is not fully configured.',
+          missing: {
+            R2_ACCOUNT_ID: !accountId,
+            R2_ACCESS_KEY_ID: !accessKeyId,
+            R2_SECRET_ACCESS_KEY: !secretAccessKey,
+            R2_BUCKET_NAME: !bucketName,
+            R2_PUBLIC_URL: !publicUrl,
+          },
         },
         { status: 500 }
       );
@@ -242,70 +310,106 @@ export async function POST(req: NextRequest) {
     if (!r2) {
       return NextResponse.json(
         {
-          error:
-            'Cloudflare R2 credentials are not configured. Missing R2_ACCOUNT_ID, R2_ACCESS_KEY_ID or R2_SECRET_ACCESS_KEY.',
+          success: false,
+          error: 'Cloudflare R2 client could not be created.',
         },
         { status: 500 }
       );
     }
 
-    // ---------------------------------------------------------
-    // Create safe unique object key
-    // ---------------------------------------------------------
-    const safeFilename = cleanFilename(requestedFilename) || 'asset';
+    // =========================================================
+    // CREATE UNIQUE OBJECT KEY
+    // =========================================================
+    const safeFilename = cleanFilename(requestedFilename);
 
-    const extension = getExtension(
-      safeFilename,
-      mimeType
-    );
+    const baseName = getBaseName(safeFilename);
 
-    const baseName = safeFilename.replace(/\.[^.]+$/, '') || 'asset';
+    const extension = getExtension(mimeType);
+
+    const dateFolder = new Date()
+      .toISOString()
+      .slice(0, 10);
+
+    const uniqueId = crypto.randomUUID();
 
     const objectKey =
-      `uploads/${new Date().toISOString().slice(0, 10)}/` +
-      `${Date.now()}-${crypto.randomUUID()}-${baseName}.${extension}`;
+      `uploads/${dateFolder}/` +
+      `${Date.now()}-${uniqueId}-${baseName}.${extension}`;
 
-    // ---------------------------------------------------------
-    // Read file
-    // ---------------------------------------------------------
-    const buffer = Buffer.from(await file.arrayBuffer());
+    // =========================================================
+    // READ FILE
+    // =========================================================
+    const buffer = Buffer.from(
+      await file.arrayBuffer()
+    );
 
-    // ---------------------------------------------------------
-    // ACTUAL Cloudflare R2 upload
-    // ---------------------------------------------------------
+    if (!buffer.length) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Unable to read uploaded file.',
+        },
+        { status: 400 }
+      );
+    }
+
+    // =========================================================
+    // UPLOAD TO CLOUDFLARE R2
+    // =========================================================
     await r2.send(
       new PutObjectCommand({
         Bucket: bucketName,
         Key: objectKey,
         Body: buffer,
+        ContentLength: buffer.length,
         ContentType: mimeType,
-        CacheControl: 'public, max-age=31536000, immutable',
+        CacheControl:
+          'public, max-age=31536000, immutable',
         Metadata: {
           alt: alt.slice(0, 300),
-          uploadedBy: SITE_OWNER_EMAIL,
+          uploadedby: SITE_OWNER_EMAIL,
         },
       })
     );
 
-    // ---------------------------------------------------------
-    // Public URL
-    // ---------------------------------------------------------
-    const normalizedPublicUrl = publicUrl.replace(/\/+$/, '');
+    // =========================================================
+    // FINAL PUBLIC URL
+    // =========================================================
+    const normalizedPublicUrl =
+      normalizePublicUrl(publicUrl);
 
-    const finalUrl = `${normalizedPublicUrl}/${objectKey}`;
+    const finalUrl =
+      `${normalizedPublicUrl}/${objectKey}`;
 
+    // =========================================================
+    // RESPONSE
+    // =========================================================
     return NextResponse.json({
       success: true,
+
       url: finalUrl,
+
+      publicUrl: finalUrl,
+
       storage: 'cloudflare-r2',
+
       filename: safeFilename,
+
       key: objectKey,
+
+      objectKey,
+
       contentType: mimeType,
+
       size: buffer.length,
+
       alt,
     });
   } catch (error: unknown) {
-    console.error('Admin asset upload failed:', error);
+    console.error(
+      'Admin asset upload failed:',
+      error
+    );
 
     const message =
       error instanceof Error

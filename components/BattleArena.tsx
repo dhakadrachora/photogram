@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Swords,
   Trophy,
@@ -11,12 +11,14 @@ import {
   RefreshCw,
   AlertCircle,
 } from 'lucide-react';
-
 import { createClient } from '@supabase/supabase-js';
 
 type BattleOption = {
   id: string;
-  name: string;
+  name?: string | null;
+  label?: string | null;
+  tagline?: string | null;
+  emoji?: string | null;
   imageUrl?: string | null;
   image_url?: string | null;
   votes?: number | null;
@@ -28,18 +30,19 @@ type Battle = {
   description?: string | null;
   question?: string | null;
 
-  options?: BattleOption[];
+  options?: BattleOption[] | null;
 
-  optionA?: BattleOption;
-  optionB?: BattleOption;
+  optionA?: BattleOption | null;
+  optionB?: BattleOption | null;
 
-  startsAt?: string | null;
-  starts_at?: string | null;
+  startsAt?: string | number | null;
+  starts_at?: string | number | null;
 
-  endsAt?: string | null;
-  ends_at?: string | null;
+  endsAt?: string | number | null;
+  ends_at?: string | number | null;
 
   status?: string | null;
+  published?: boolean;
 
   winnerOptionId?: string | null;
   winner_option_id?: string | null;
@@ -49,15 +52,11 @@ type BattleComment = {
   id: string;
   battle_id?: string;
   battleId?: string;
-
   user_id?: string;
   userId?: string;
-
   user_name?: string;
   userName?: string;
-
   message: string;
-
   created_at?: string;
   createdAt?: string;
 };
@@ -71,19 +70,15 @@ type BattleArenaProps = {
   } | null;
 
   onOpenAuth?: () => void;
-
   selectedOpponent?: string;
 
   onUpdateUser?: (
-    updater:
-      | ((previous: any) => any)
-      | Partial<any>
+    updater: ((previous: any) => any) | Partial<any>
   ) => void;
 
   onNavigateTab?: (tab: any) => void;
 
   userEmail?: string | null;
-
   currentUserEmail?: string | null;
 };
 
@@ -94,62 +89,143 @@ const SUPABASE_URL =
 const SUPABASE_KEY =
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  'sb_publishable_JxGddMQ5KqRFTANuZG2TGg_I05TTskS';
+  '';
 
 const supabase = createClient(
   SUPABASE_URL,
   SUPABASE_KEY
 );
 
+/* ---------------------------------------------------------
+   NORMALIZATION
+--------------------------------------------------------- */
+
+function normalizeOption(
+  option: any,
+  fallbackId: string
+): BattleOption {
+  return {
+    id: String(option?.id || fallbackId),
+
+    name:
+      option?.name ??
+      option?.label ??
+      '',
+
+    label:
+      option?.label ??
+      option?.name ??
+      '',
+
+    tagline:
+      option?.tagline ??
+      '',
+
+    emoji:
+      option?.emoji ??
+      '',
+
+    imageUrl:
+      option?.imageUrl ??
+      option?.image_url ??
+      option?.image ??
+      option?.photoUrl ??
+      option?.photo_url ??
+      '',
+
+    image_url:
+      option?.image_url ??
+      option?.imageUrl ??
+      option?.image ??
+      option?.photoUrl ??
+      option?.photo_url ??
+      '',
+
+    votes:
+      Number(option?.votes ?? 0),
+  };
+}
+
 function getOptions(
   battle: Battle | null
 ): BattleOption[] {
-  if (!battle) {
-    return [];
-  }
+  if (!battle) return [];
 
   if (
-    Array.isArray(battle.options)
+    Array.isArray(battle.options) &&
+    battle.options.length > 0
   ) {
-    return battle.options;
+    return battle.options
+      .slice(0, 2)
+      .map((option, index) =>
+        normalizeOption(
+          option,
+          index === 0 ? 'option_a' : 'option_b'
+        )
+      );
   }
 
-  const options: BattleOption[] = [];
+  const result: BattleOption[] = [];
 
   if (battle.optionA) {
-    options.push(battle.optionA);
+    result.push(
+      normalizeOption(
+        battle.optionA,
+        'option_a'
+      )
+    );
   }
 
   if (battle.optionB) {
-    options.push(battle.optionB);
+    result.push(
+      normalizeOption(
+        battle.optionB,
+        'option_b'
+      )
+    );
   }
 
-  return options;
+  return result.slice(0, 2);
 }
 
-function getImage(
+function getOptionName(
   option: BattleOption
-): string {
+) {
   return (
+    option.name ||
+    option.label ||
+    'Participant'
+  );
+}
+
+function getOptionImage(
+  option: BattleOption
+) {
+  const url =
     option.imageUrl ||
     option.image_url ||
-    ''
-  );
+    '';
+
+  return typeof url === 'string'
+    ? url.trim()
+    : '';
 }
 
 function getEndTime(
   battle: Battle | null
 ): number | null {
-  if (!battle) {
-    return null;
-  }
+  if (!battle) return null;
 
   const value =
-    battle.endsAt ||
+    battle.endsAt ??
     battle.ends_at;
 
-  if (!value) {
-    return null;
+  if (!value) return null;
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value)
+      ? value
+      : null;
   }
 
   const time =
@@ -162,33 +238,60 @@ function getEndTime(
 
 function formatTime(
   milliseconds: number
-): string {
+) {
   const seconds = Math.max(
     0,
     Math.floor(milliseconds / 1000)
   );
 
+  const days = Math.floor(
+    seconds / 86400
+  );
+
+  const hours = Math.floor(
+    (seconds % 86400) / 3600
+  );
+
   const minutes = Math.floor(
-    seconds / 60
+    (seconds % 3600) / 60
   );
 
   const remainingSeconds =
     seconds % 60;
 
-  return `${String(minutes).padStart(
+  if (days > 0) {
+    return `${days}d ${String(hours).padStart(
+      2,
+      '0'
+    )}:${String(minutes).padStart(
+      2,
+      '0'
+    )}:${String(remainingSeconds).padStart(
+      2,
+      '0'
+    )}`;
+  }
+
+  return `${String(hours).padStart(
     2,
     '0'
-  )}:${String(
-    remainingSeconds
-  ).padStart(2, '0')}`;
+  )}:${String(minutes).padStart(
+    2,
+    '0'
+  )}:${String(remainingSeconds).padStart(
+    2,
+    '0'
+  )}`;
 }
+
+/* ---------------------------------------------------------
+   COMPONENT
+--------------------------------------------------------- */
 
 export function BattleArena({
   currentUser,
   onOpenAuth,
   selectedOpponent,
-  onUpdateUser,
-  onNavigateTab,
   userEmail,
   currentUserEmail,
 }: BattleArenaProps) {
@@ -241,6 +344,44 @@ export function BattleArena({
         : null
     );
 
+  const options = useMemo(
+    () => getOptions(battle),
+    [battle]
+  );
+
+  const totalVotes = useMemo(
+    () =>
+      options.reduce(
+        (sum, option) =>
+          sum +
+          Number(option.votes || 0),
+        0
+      ),
+    [options]
+  );
+
+  const winnerId =
+    battle?.winnerOptionId ||
+    battle?.winner_option_id ||
+    null;
+
+  const winner =
+    winnerId
+      ? options.find(
+          option =>
+            option.id === winnerId
+        )
+      : null;
+
+  const finished =
+    battle?.status === 'completed' ||
+    battle?.status === 'closed' ||
+    remaining <= 0;
+
+  /* -------------------------------------------------------
+     AUTH TOKEN
+  ------------------------------------------------------- */
+
   async function getToken() {
     const {
       data: { session },
@@ -251,6 +392,10 @@ export function BattleArena({
       session?.access_token || null
     );
   }
+
+  /* -------------------------------------------------------
+     LOAD BATTLE
+  ------------------------------------------------------- */
 
   async function loadBattle(
     refresh = false
@@ -266,12 +411,16 @@ export function BattleArena({
           {
             method: 'GET',
             cache: 'no-store',
+            headers: {
+              Accept:
+                'application/json',
+            },
           }
         );
 
       if (!response.ok) {
         throw new Error(
-          'Battle load failed'
+          `Battle API failed: ${response.status}`
         );
       }
 
@@ -283,40 +432,51 @@ export function BattleArena({
 
       if (data?.battle) {
         result = data.battle;
-      } else if (
-        Array.isArray(
-          data?.battles
-        )
+      }
+
+      if (
+        !result &&
+        Array.isArray(data?.battles)
       ) {
         result =
           data.battles.find(
             (item: Battle) =>
-              item.status ===
-                'active' ||
-              item.status ===
-                'completed' ||
-              item.status ===
-                'published'
+              item?.published !== false
           ) || null;
-      } else if (
+      }
+
+      if (
+        !result &&
         Array.isArray(data)
       ) {
         result =
           data.find(
             (item: Battle) =>
-              item.status ===
-                'active' ||
-              item.status ===
-                'completed' ||
-              item.status ===
-                'published'
+              item?.published !== false
           ) || null;
+      }
+
+      if (result) {
+        console.log(
+          'COMMUNITY BATTLE:',
+          result
+        );
+
+        console.log(
+          'OPTION A:',
+          result.optionA
+        );
+
+        console.log(
+          'OPTION B:',
+          result.optionB
+        );
       }
 
       setBattle(result);
     } catch (error) {
       console.error(
-        'Battle error:',
+        'Battle load error:',
         error
       );
     } finally {
@@ -324,6 +484,10 @@ export function BattleArena({
       setRefreshing(false);
     }
   }
+
+  /* -------------------------------------------------------
+     COMMENTS
+  ------------------------------------------------------- */
 
   async function loadComments(
     battleId: string
@@ -339,26 +503,24 @@ export function BattleArena({
           }
         );
 
-      if (!response.ok) {
-        return;
-      }
+      if (!response.ok) return;
 
       const data =
         await response.json();
 
-      if (
+      const list =
         Array.isArray(data)
-      ) {
-        setComments(data);
-      } else if (
-        Array.isArray(
-          data?.comments
+          ? data
+          : Array.isArray(data?.comments)
+          ? data.comments
+          : [];
+
+      setComments(
+        list.filter(
+          (item: BattleComment) =>
+            item?.id
         )
-      ) {
-        setComments(
-          data.comments
-        );
-      }
+      );
     } catch (error) {
       console.error(
         'Comments error:',
@@ -367,19 +529,19 @@ export function BattleArena({
     }
   }
 
+  /* -------------------------------------------------------
+     VOTE STATUS
+  ------------------------------------------------------- */
+
   async function loadVoteStatus(
     battleId: string
   ) {
-    if (!email) {
-      return;
-    }
+    if (!email) return;
 
     const token =
       await getToken();
 
-    if (!token) {
-      return;
-    }
+    if (!token) return;
 
     try {
       const response =
@@ -396,9 +558,7 @@ export function BattleArena({
           }
         );
 
-      if (!response.ok) {
-        return;
-      }
+      if (!response.ok) return;
 
       const data =
         await response.json();
@@ -414,7 +574,7 @@ export function BattleArena({
 
       if (data?.optionId) {
         setSelectedOption(
-          data.optionId
+          String(data.optionId)
         );
       }
     } catch (error) {
@@ -425,10 +585,14 @@ export function BattleArena({
     }
   }
 
+  /* -------------------------------------------------------
+     INITIAL LOAD
+  ------------------------------------------------------- */
+
   useEffect(() => {
     void loadBattle();
 
-    async function getUser() {
+    async function loadUser() {
       const {
         data: { user },
       } =
@@ -441,13 +605,11 @@ export function BattleArena({
       }
     }
 
-    void getUser();
+    void loadUser();
   }, []);
 
   useEffect(() => {
-    if (!battle?.id) {
-      return;
-    }
+    if (!battle?.id) return;
 
     void loadComments(
       battle.id
@@ -456,12 +618,14 @@ export function BattleArena({
     void loadVoteStatus(
       battle.id
     );
-  }, [battle?.id]);
+  }, [battle?.id, email]);
+
+  /* -------------------------------------------------------
+     TIMER
+  ------------------------------------------------------- */
 
   useEffect(() => {
-    if (!battle) {
-      return;
-    }
+    if (!battle) return;
 
     const updateTimer = () => {
       const end =
@@ -495,10 +659,12 @@ export function BattleArena({
     };
   }, [battle]);
 
+  /* -------------------------------------------------------
+     REALTIME COMMENTS
+  ------------------------------------------------------- */
+
   useEffect(() => {
-    if (!battle?.id) {
-      return;
-    }
+    if (!battle?.id) return;
 
     const channel =
       supabase
@@ -514,28 +680,26 @@ export function BattleArena({
             filter:
               `battle_id=eq.${battle.id}`,
           },
-          (payload) => {
+          payload => {
             const incoming =
               payload.new as BattleComment;
 
-            setComments(
-              (old) => {
-                if (
-                  old.some(
-                    (item) =>
-                      item.id ===
-                      incoming.id
-                  )
-                ) {
-                  return old;
-                }
-
-                return [
-                  ...old,
-                  incoming,
-                ];
+            setComments(old => {
+              if (
+                old.some(
+                  item =>
+                    item.id ===
+                    incoming.id
+                )
+              ) {
+                return old;
               }
-            );
+
+              return [
+                ...old,
+                incoming,
+              ];
+            });
           }
         )
         .on(
@@ -547,17 +711,16 @@ export function BattleArena({
             filter:
               `battle_id=eq.${battle.id}`,
           },
-          (payload) => {
+          payload => {
             const deleted =
               payload.old as BattleComment;
 
-            setComments(
-              (old) =>
-                old.filter(
-                  (item) =>
-                    item.id !==
-                    deleted.id
-                )
+            setComments(old =>
+              old.filter(
+                item =>
+                  item.id !==
+                  deleted.id
+              )
             );
           }
         )
@@ -570,30 +733,29 @@ export function BattleArena({
     };
   }, [battle?.id]);
 
+  /* -------------------------------------------------------
+     VOTE
+  ------------------------------------------------------- */
+
   async function vote(
     optionId: string
   ) {
     setVoteError('');
 
     if (!email) {
-      onOpenAuth?.();
-
       setVoteError(
         'Vote karne ke liye login karo.'
       );
-
+      onOpenAuth?.();
       return;
     }
 
-    if (!battle?.id) {
-      return;
-    }
+    if (!battle?.id) return;
 
-    if (remaining <= 0) {
+    if (finished) {
       setVoteError(
         'Voting close ho chuki hai.'
       );
-
       return;
     }
 
@@ -601,7 +763,6 @@ export function BattleArena({
       setVoteError(
         'Aap already vote kar chuke ho.'
       );
-
       return;
     }
 
@@ -612,7 +773,6 @@ export function BattleArena({
       setVoteError(
         'Login session expire ho gaya.'
       );
-
       return;
     }
 
@@ -666,43 +826,39 @@ export function BattleArena({
     }
   }
 
+  /* -------------------------------------------------------
+     COMMENT
+  ------------------------------------------------------- */
+
   async function sendComment() {
     setCommentError('');
 
     if (!email) {
-      onOpenAuth?.();
-
       setCommentError(
         'Comment karne ke liye login karo.'
       );
-
+      onOpenAuth?.();
       return;
     }
 
-    if (!battle?.id) {
-      return;
-    }
+    if (!battle?.id) return;
 
-    if (remaining <= 0) {
+    if (finished) {
       setCommentError(
         'Battle khatam ho chuki hai.'
       );
-
       return;
     }
 
     const message =
       comment.trim();
 
-    if (!message) {
-      return;
-    }
+    if (!message) return;
 
     if (message.length > 500) {
       setCommentError(
         'Maximum 500 characters allowed.'
       );
-
       return;
     }
 
@@ -713,7 +869,6 @@ export function BattleArena({
       setCommentError(
         'Login session expire ho gaya.'
       );
-
       return;
     }
 
@@ -752,12 +907,22 @@ export function BattleArena({
       }
 
       if (data?.comment) {
-        setComments(
-          (old) => [
+        setComments(old => {
+          if (
+            old.some(
+              item =>
+                item.id ===
+                data.comment.id
+            )
+          ) {
+            return old;
+          }
+
+          return [
             ...old,
             data.comment,
-          ]
-        );
+          ];
+        });
       }
 
       setComment('');
@@ -771,15 +936,17 @@ export function BattleArena({
     }
   }
 
+  /* -------------------------------------------------------
+     DELETE COMMENT
+  ------------------------------------------------------- */
+
   async function deleteComment(
     commentId: string
   ) {
     const token =
       await getToken();
 
-    if (!token) {
-      return;
-    }
+    if (!token) return;
 
     try {
       const response =
@@ -796,17 +963,14 @@ export function BattleArena({
           }
         );
 
-      if (!response.ok) {
-        return;
-      }
+      if (!response.ok) return;
 
-      setComments(
-        (old) =>
-          old.filter(
-            (item) =>
-              item.id !==
-              commentId
-          )
+      setComments(old =>
+        old.filter(
+          item =>
+            item.id !==
+            commentId
+        )
       );
     } catch (error) {
       console.error(
@@ -815,6 +979,10 @@ export function BattleArena({
       );
     }
   }
+
+  /* -------------------------------------------------------
+     UI
+  ------------------------------------------------------- */
 
   if (loading) {
     return (
@@ -863,48 +1031,12 @@ export function BattleArena({
     );
   }
 
-  const options =
-    getOptions(battle);
-
-  const totalVotes =
-    options.reduce(
-      (sum, option) =>
-        sum +
-        Number(
-          option.votes || 0
-        ),
-      0
-    );
-
-  const winnerId =
-    battle.winnerOptionId ||
-    battle.winner_option_id ||
-    null;
-
-  const finished =
-    battle.status ===
-      'completed' ||
-    battle.status ===
-      'closed' ||
-    remaining <= 0;
-
-  const winner =
-    winnerId
-      ? options.find(
-          (option) =>
-            option.id ===
-            winnerId
-        )
-      : null;
-
   return (
     <div className="w-full overflow-hidden rounded-3xl border border-white/10 bg-black/20">
 
       {/* HEADER */}
       <div className="border-b border-white/10 p-5 sm:p-6">
-
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-
           <div>
             <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-red-400">
               <Swords className="h-4 w-4" />
@@ -947,15 +1079,13 @@ export function BattleArena({
             />
             Refresh
           </button>
-
         </div>
       </div>
 
       {/* TIMER */}
       <div className="border-b border-white/10 bg-white/[0.02] p-5 text-center">
-
         {finished ? (
-          <div className="text-red-300">
+          <div className="text-yellow-300">
             <Trophy className="mx-auto mb-2 h-7 w-7" />
             <div className="font-bold">
               Battle Finished
@@ -968,145 +1098,147 @@ export function BattleArena({
               Time Remaining
             </div>
 
-            <div className="font-mono text-4xl font-black text-white">
-              {formatTime(
-                remaining
-              )}
+            <div className="font-mono text-3xl font-black text-white sm:text-4xl">
+              {formatTime(remaining)}
             </div>
           </>
         )}
-
       </div>
 
       {/* OPTIONS */}
       <div className="grid gap-5 p-5 sm:grid-cols-2 sm:p-6">
+        {options.map(option => {
+          const votes =
+            Number(option.votes || 0);
 
-        {options.map(
-          (option) => {
-            const votes =
-              Number(
-                option.votes || 0
-              );
+          const percentage =
+            totalVotes > 0
+              ? Math.round(
+                  (votes /
+                    totalVotes) *
+                    100
+                )
+              : 0;
 
-            const percentage =
-              totalVotes > 0
-                ? Math.round(
-                    (votes /
-                      totalVotes) *
-                      100
-                  )
-                : 0;
+          const selected =
+            selectedOption ===
+            option.id;
 
-            const selected =
-              selectedOption ===
-              option.id;
+          const isWinner =
+            winner?.id ===
+            option.id;
 
-            const isWinner =
-              winner?.id ===
-              option.id;
+          const image =
+            getOptionImage(option);
 
-            return (
-              <div
-                key={option.id}
-                className={`overflow-hidden rounded-3xl border ${
-                  isWinner
-                    ? 'border-yellow-400/50 bg-yellow-400/10'
-                    : selected
-                    ? 'border-red-400/50 bg-red-400/10'
-                    : 'border-white/10 bg-white/[0.03]'
-                }`}
-              >
+          return (
+            <div
+              key={option.id}
+              className={`overflow-hidden rounded-3xl border ${
+                isWinner
+                  ? 'border-yellow-400/50 bg-yellow-400/10'
+                  : selected
+                  ? 'border-red-400/50 bg-red-400/10'
+                  : 'border-white/10 bg-white/[0.03]'
+              }`}
+            >
 
-                <div className="aspect-[16/10] bg-white/5">
+              {/* IMAGE */}
+              <div className="aspect-[16/10] bg-white/5">
+                {image ? (
+                  <img
+                    src={image}
+                    alt={getOptionName(option)}
+                    loading="eager"
+                    className="h-full w-full object-cover"
+                    onError={event => {
+                      console.error(
+                        'Battle image failed:',
+                        image
+                      );
 
-                  {getImage(
-                    option
-                  ) ? (
-                    <img
-                      src={getImage(
-                        option
-                      )}
-                      alt={option.name}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-white/20">
-                      <UsersIcon />
-                    </div>
-                  )}
+                      event.currentTarget.style.display =
+                        'none';
+                    }}
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-white/20">
+                    <UsersIcon />
+                  </div>
+                )}
+              </div>
 
-                </div>
+              <div className="p-5">
 
-                <div className="p-5">
-
-                  <div className="flex items-center justify-between gap-3">
-
+                <div className="flex items-center justify-between gap-3">
+                  <div>
                     <h3 className="text-xl font-black text-white">
-                      {option.name}
+                      {getOptionName(option)}
                     </h3>
 
-                    {isWinner && (
-                      <Trophy className="h-5 w-5 text-yellow-400" />
+                    {option.tagline && (
+                      <p className="mt-1 text-xs text-white/40">
+                        {option.tagline}
+                      </p>
                     )}
-
                   </div>
 
-                  <div className="mt-4">
-
-                    <div className="mb-2 flex justify-between text-xs text-white/50">
-                      <span>
-                        {votes} votes
-                      </span>
-
-                      <span>
-                        {percentage}%
-                      </span>
-                    </div>
-
-                    <div className="h-2 overflow-hidden rounded-full bg-white/10">
-                      <div
-                        className="h-full rounded-full bg-red-500 transition-all"
-                        style={{
-                          width:
-                            `${percentage}%`,
-                        }}
-                      />
-                    </div>
-
-                  </div>
-
-                  {!finished && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void vote(
-                          option.id
-                        )
-                      }
-                      disabled={
-                        voting ||
-                        hasVoted
-                      }
-                      className="mt-5 w-full rounded-xl bg-red-500 px-4 py-3 font-bold text-white hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {voting &&
-                      selected
-                        ? 'Voting...'
-                        : hasVoted
-                        ? 'Already Voted'
-                        : 'Vote'}
-                    </button>
+                  {isWinner && (
+                    <Trophy className="h-5 w-5 shrink-0 text-yellow-400" />
                   )}
-
                 </div>
-              </div>
-            );
-          }
-        )}
 
+                <div className="mt-4">
+                  <div className="mb-2 flex justify-between text-xs text-white/50">
+                    <span>
+                      {votes} votes
+                    </span>
+
+                    <span>
+                      {percentage}%
+                    </span>
+                  </div>
+
+                  <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                    <div
+                      className="h-full rounded-full bg-red-500 transition-all"
+                      style={{
+                        width:
+                          `${percentage}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {!finished && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void vote(
+                        option.id
+                      )
+                    }
+                    disabled={
+                      voting ||
+                      hasVoted
+                    }
+                    className="mt-5 w-full rounded-xl bg-red-500 px-4 py-3 font-bold text-white hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {voting &&
+                    selected
+                      ? 'Voting...'
+                      : hasVoted
+                      ? 'Already Voted'
+                      : 'Vote'}
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      {/* VOTE ERROR */}
+      {/* ERROR */}
       {voteError && (
         <div className="mx-5 mb-5 flex items-center gap-2 rounded-xl border border-red-400/20 bg-red-400/10 p-3 text-sm text-red-300 sm:mx-6">
           <AlertCircle className="h-4 w-4" />
@@ -1117,7 +1249,6 @@ export function BattleArena({
       {/* RESULT */}
       {finished && (
         <div className="border-y border-white/10 bg-yellow-400/5 p-6 text-center">
-
           <Trophy className="mx-auto mb-3 h-10 w-10 text-yellow-400" />
 
           {winner ? (
@@ -1127,17 +1258,17 @@ export function BattleArena({
               </div>
 
               <h3 className="mt-1 text-3xl font-black text-white">
-                {winner.name}
+                {getOptionName(winner)}
               </h3>
 
-              {getImage(
+              {getOptionImage(
                 winner
               ) && (
                 <img
-                  src={getImage(
+                  src={getOptionImage(
                     winner
                   )}
-                  alt={winner.name}
+                  alt={getOptionName(winner)}
                   className="mx-auto mt-5 max-h-[350px] max-w-md rounded-2xl object-cover"
                 />
               )}
@@ -1147,13 +1278,11 @@ export function BattleArena({
               It&apos;s a Draw!
             </h3>
           )}
-
         </div>
       )}
 
       {/* COMMENTS */}
       <div className="p-5 sm:p-6">
-
         <div className="mb-4 flex items-center gap-2">
           <MessageCircle className="h-5 w-5 text-white/60" />
 
@@ -1167,79 +1296,69 @@ export function BattleArena({
         </div>
 
         <div className="max-h-[350px] space-y-3 overflow-y-auto">
-
           {comments.length === 0 ? (
             <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-sm text-white/30">
               No comments yet.
             </div>
           ) : (
-            comments.map(
-              (item) => {
-                const itemUserId =
-                  item.userId ||
-                  item.user_id;
+            comments.map(item => {
+              const itemUserId =
+                item.userId ||
+                item.user_id;
 
-                const own =
-                  !!userId &&
-                  !!itemUserId &&
-                  String(userId) ===
-                    String(itemUserId);
+              const own =
+                !!userId &&
+                !!itemUserId &&
+                String(userId) ===
+                  String(itemUserId);
 
-                return (
-                  <div
-                    key={item.id}
-                    className="rounded-xl border border-white/10 bg-white/[0.03] p-4"
-                  >
-
-                    <div className="flex justify-between gap-3">
-
-                      <div className="text-sm font-bold text-white">
-                        {item.userName ||
-                          item.user_name ||
-                          'User'}
-                      </div>
-
-                      {own && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            void deleteComment(
-                              item.id
-                            )
-                          }
-                          className="text-xs text-red-300"
-                        >
-                          Delete
-                        </button>
-                      )}
-
+              return (
+                <div
+                  key={item.id}
+                  className="rounded-xl border border-white/10 bg-white/[0.03] p-4"
+                >
+                  <div className="flex justify-between gap-3">
+                    <div className="text-sm font-bold text-white">
+                      {item.userName ||
+                        item.user_name ||
+                        'User'}
                     </div>
 
-                    <p className="mt-2 whitespace-pre-wrap break-words text-sm text-white/60">
-                      {item.message}
-                    </p>
-
+                    {own && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void deleteComment(
+                            item.id
+                          )
+                        }
+                        className="text-xs text-red-300"
+                      >
+                        Delete
+                      </button>
+                    )}
                   </div>
-                );
-              }
-            )
-          )}
 
+                  <p className="mt-2 whitespace-pre-wrap break-words text-sm text-white/60">
+                    {item.message}
+                  </p>
+                </div>
+              );
+            })
+          )}
         </div>
 
         {!finished && email && (
           <div className="mt-5">
-
             <div className="flex gap-2">
-
               <input
                 value={comment}
-                onChange={(event) =>
+                onChange={event =>
                   setComment(
                     event.target.value
                   )
                 }
-                onKeyDown={(event) => {
+                onKeyDown={event => {
                   if (
                     event.key ===
                     'Enter'
@@ -1274,7 +1393,6 @@ export function BattleArena({
                   Send
                 </span>
               </button>
-
             </div>
 
             {commentError && (
@@ -1282,7 +1400,6 @@ export function BattleArena({
                 {commentError}
               </p>
             )}
-
           </div>
         )}
 
@@ -1297,7 +1414,6 @@ export function BattleArena({
             Login to comment
           </button>
         )}
-
       </div>
     </div>
   );
@@ -1314,20 +1430,10 @@ function UsersIcon() {
       strokeWidth="1.5"
       className="text-white/20"
     >
-      <path
-        d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"
-      />
-      <circle
-        cx="9"
-        cy="7"
-        r="4"
-      />
-      <path
-        d="M22 21v-2a4 4 0 0 0-3-3.87"
-      />
-      <path
-        d="M16 3.13a4 4 0 0 1 0 7.75"
-      />
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
     </svg>
   );
 }
