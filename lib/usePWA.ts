@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useIsMounted } from './useIsMounted';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -28,22 +29,17 @@ function getIsOnline(): boolean {
 }
 
 export function usePWA() {
+  const isMounted = useIsMounted();
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [isInstalled, setIsInstalled] = useState<boolean>(false);
-  const [isIOS, setIsIOS] = useState<boolean>(false);
+  const [isInstalled, setIsInstalled] = useState<boolean>(() => getIsStandalone());
+  const [isIOS, setIsIOS] = useState<boolean>(() => getIsIOS());
   const [canInstall, setCanInstall] = useState<boolean>(false);
   const [updateAvailable, setUpdateAvailable] = useState<boolean>(false);
   const [isUpdating, setIsUpdating] = useState<boolean>(false);
-  const [isOnline, setIsOnline] = useState<boolean>(true);
+  const [isOnline, setIsOnline] = useState<boolean>(() => getIsOnline());
   const [swRegistration, setSwRegistration] = useState<ServiceWorkerRegistration | null>(null);
-  const [isMounted, setIsMounted] = useState<boolean>(false);
 
   useEffect(() => {
-    setIsMounted(true);
-    setIsInstalled(getIsStandalone());
-    setIsIOS(getIsIOS());
-    setIsOnline(getIsOnline());
-
     // Check online status listeners
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);

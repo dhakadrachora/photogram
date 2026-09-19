@@ -1,16 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAdminRequest } from '@/lib/admin-auth';
+import { verifyAdminRequestAsync, isSiteAdmin } from '@/lib/admin-auth';
 import { contentStore } from '@/lib/content-store';
+import {
+  fetchSupabaseChatMessages,
+  insertSupabaseChatMessage,
+  isSupabaseConfigured,
+  supabase,
+} from '@/lib/supabase';
 import { ChatMessage } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
+  let messages = contentStore.chatMessages;
+
+  if (isSupabaseConfigured()) {
+    const sbMessages = await fetchSupabaseChatMessages();
+    if (sbMessages && sbMessages.length > 0) {
+      messages = sbMessages;
+      contentStore.chatMessages = sbMessages;
+    }
+  }
+
   return NextResponse.json({
     channel: 'Dhoti aale World Chat',
     status: 'online',
     requiresAuth: true,
-    messages: contentStore.chatMessages,
+    messages,
     rules: [
       'Google authentication required to post',
       'Desi swag & respectful banter',
@@ -51,12 +67,12 @@ export async function POST(req: NextRequest) {
     }
 
     // Role check
-    const isOwner = userEmail.toLowerCase() === 'rohitkumarnagar50@gmail.com';
+    const isOwner = isSiteAdmin(userEmail);
 
     const newMsg: ChatMessage = {
       id: providedId || `msg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       userId: userId.toString(),
-      userName: user?.name || (isOwner ? 'Rohit Kumar Nagar' : 'Dhoti Resident'),
+      userName: user?.name || (isOwner ? 'Rohit Dhakad' : 'Dhoti Resident'),
       userAvatar: user?.avatar || (isOwner ? 'https://api.dicebear.com/7.x/bottts/svg?seed=rohit-admin' : `https://api.dicebear.com/7.x/bottts/svg?seed=${userId}`),
       userBadge: isOwner ? 'Site Owner & Admin 👑' : (user?.badge || 'Dhoti Resident'),
       text: (text || '').toString().trim(),
@@ -64,10 +80,15 @@ export async function POST(req: NextRequest) {
       sticker: sticker ? sticker.toString().trim() : undefined,
     };
 
+    // Store in memory
     contentStore.chatMessages.push(newMsg);
-    // Keep last 100 messages
     if (contentStore.chatMessages.length > 100) {
       contentStore.chatMessages = contentStore.chatMessages.slice(-100);
+    }
+
+    // Persist to Supabase Database
+    if (isSupabaseConfigured()) {
+      await insertSupabaseChatMessage(newMsg);
     }
 
     return NextResponse.json({
@@ -90,9 +111,10 @@ export async function POST(req: NextRequest) {
 
 // DELETE: Admin moderates inappropriate chat messages (SERVER-SIDE ENFORCED)
 export async function DELETE(req: NextRequest) {
-  if (!verifyAdminRequest(req)) {
+  const isAdmin = await verifyAdminRequestAsync(req);
+  if (!isAdmin) {
     return NextResponse.json(
-      { error: 'Unauthorized: Only admin rohitkumarnagar50@gmail.com can moderate chat messages.' },
+      { error: 'Unauthorized: Only site admin can moderate chat messages.' },
       { status: 403 }
     );
   }
@@ -107,6 +129,14 @@ export async function DELETE(req: NextRequest) {
   const prevCount = contentStore.chatMessages.length;
   contentStore.chatMessages = contentStore.chatMessages.filter((m) => m.id !== messageId);
   const deleted = contentStore.chatMessages.length < prevCount;
+
+  if (isSupabaseConfigured()) {
+    try {
+      await supabase.from('chat_messages').delete().eq('id', messageId);
+    } catch (e) {
+      console.warn('Could not delete message from Supabase:', e);
+    }
+  }
 
   return NextResponse.json({
     success: deleted,

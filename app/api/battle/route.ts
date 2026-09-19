@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAdminRequest } from '@/lib/admin-auth';
+import { verifyAdminRequestAsync, verifyAdminRequest } from '@/lib/admin-auth';
 import { contentStore, BattleEventStore } from '@/lib/content-store';
+import {
+  fetchSupabaseBattles,
+  isSupabaseConfigured,
+  supabase,
+} from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,7 +33,22 @@ function formatBattleAdmin(b: BattleEventStore) {
 
 // GET: Returns battles list
 export async function GET(req: NextRequest) {
-  const isAdmin = verifyAdminRequest(req);
+  const isAdmin = await verifyAdminRequestAsync(req);
+
+  if (isSupabaseConfigured()) {
+    const sbBattles = await fetchSupabaseBattles();
+    if (sbBattles && sbBattles.length > 0) {
+      for (const sb of sbBattles) {
+        if (!contentStore.battles.has(sb.id)) {
+          contentStore.battles.set(sb.id, {
+            ...sb,
+            votedUserEmails: new Set<string>(),
+            userVotes: new Map<string, string>(),
+          });
+        }
+      }
+    }
+  }
 
   const battles = Array.from(contentStore.battles.values())
     .filter((b) => (isAdmin ? true : b.published !== false))
@@ -47,9 +67,10 @@ export async function GET(req: NextRequest) {
 
 // POST: Admin creates a Battle (SERVER-SIDE AUTHORIZATION ENFORCED)
 export async function POST(req: NextRequest) {
-  if (!verifyAdminRequest(req)) {
+  const isAdmin = await verifyAdminRequestAsync(req);
+  if (!isAdmin) {
     return NextResponse.json(
-      { error: 'Unauthorized: Only site owner/admin rohitkumarnagar50@gmail.com can create Battles.' },
+      { error: 'Unauthorized: Only site owner/admin can create Battles.' },
       { status: 403 }
     );
   }
@@ -76,7 +97,7 @@ export async function POST(req: NextRequest) {
 
     const id = `battle_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const parsedStartsAt = startsAt ? Number(startsAt) : Date.now();
-    const parsedEndsAt = endsAt ? Number(endsAt) : Date.now() + 1000 * 60 * 60 * 24 * 3; // Default 3 days
+    const parsedEndsAt = endsAt ? Number(endsAt) : Date.now() + 1000 * 60 * 60 * 24 * 3;
 
     const newBattle: BattleEventStore = {
       id,
@@ -110,6 +131,27 @@ export async function POST(req: NextRequest) {
 
     contentStore.battles.set(id, newBattle);
 
+    // Save to Supabase
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('battles').insert({
+          id,
+          title: newBattle.title,
+          category: newBattle.category,
+          description: newBattle.description,
+          option_a: newBattle.optionA,
+          option_b: newBattle.optionB,
+          is_ended: false,
+          starts_at: new Date(parsedStartsAt).toISOString(),
+          ends_at: new Date(parsedEndsAt).toISOString(),
+          published: newBattle.published,
+          status: 'active',
+        });
+      } catch (err) {
+        console.warn('Failed to insert battle to Supabase:', err);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Battle created successfully!',
@@ -123,11 +165,12 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// PUT: Admin edits Battle, changes participants, dates, starts/ends/closes battle (SERVER-SIDE PROTECTED)
+// PUT: Admin edits Battle
 export async function PUT(req: NextRequest) {
-  if (!verifyAdminRequest(req)) {
+  const isAdmin = await verifyAdminRequestAsync(req);
+  if (!isAdmin) {
     return NextResponse.json(
-      { error: 'Unauthorized: Only site owner/admin rohitkumarnagar50@gmail.com can manage Battles.' },
+      { error: 'Unauthorized: Only site owner/admin can manage Battles.' },
       { status: 403 }
     );
   }
@@ -142,31 +185,20 @@ export async function PUT(req: NextRequest) {
 
     const battle = contentStore.battles.get(id)!;
 
-    // Quick Admin Actions
     if (action === 'toggle_publish') {
       battle.published = !battle.published;
-      return NextResponse.json({ success: true, battle: formatBattleAdmin(battle) });
-    }
-
-    if (action === 'start') {
+    } else if (action === 'start') {
       battle.isEnded = false;
       battle.status = 'active';
       if (battle.endsAt <= Date.now()) {
-        battle.endsAt = Date.now() + 1000 * 60 * 60 * 24 * 2; // Extend 2 days
+        battle.endsAt = Date.now() + 1000 * 60 * 60 * 24 * 2;
       }
-      return NextResponse.json({ success: true, battle: formatBattleAdmin(battle) });
-    }
-
-    if (action === 'end' || action === 'close') {
+    } else if (action === 'end' || action === 'close') {
       battle.isEnded = true;
       battle.status = 'closed';
       battle.endsAt = Date.now();
       battle.winnerOptionId = battle.optionA.votes >= battle.optionB.votes ? battle.optionA.id : battle.optionB.id;
-      return NextResponse.json({ success: true, battle: formatBattleAdmin(battle) });
-    }
-
-    // Full Edits
-    if (updates) {
+    } else if (updates) {
       if (updates.title) battle.title = updates.title.trim();
       if (updates.category) battle.category = updates.category.trim();
       if (updates.description) battle.description = updates.description.trim();
@@ -174,19 +206,27 @@ export async function PUT(req: NextRequest) {
       if (typeof updates.isEnded === 'boolean') battle.isEnded = updates.isEnded;
       if (updates.startsAt) battle.startsAt = Number(updates.startsAt);
       if (updates.endsAt) battle.endsAt = Number(updates.endsAt);
+      if (updates.optionA) battle.optionA = { ...battle.optionA, ...updates.optionA };
+      if (updates.optionB) battle.optionB = { ...battle.optionB, ...updates.optionB };
+    }
 
-      if (updates.optionA) {
-        battle.optionA = {
-          ...battle.optionA,
-          ...updates.optionA,
-        };
-      }
-
-      if (updates.optionB) {
-        battle.optionB = {
-          ...battle.optionB,
-          ...updates.optionB,
-        };
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('battles').update({
+          title: battle.title,
+          category: battle.category,
+          description: battle.description,
+          option_a: battle.optionA,
+          option_b: battle.optionB,
+          is_ended: battle.isEnded,
+          starts_at: new Date(battle.startsAt || Date.now()).toISOString(),
+          ends_at: new Date(battle.endsAt).toISOString(),
+          published: battle.published,
+          status: battle.status,
+          winner_option_id: battle.winnerOptionId || null,
+        }).eq('id', id);
+      } catch (err) {
+        console.warn('Failed to update battle in Supabase:', err);
       }
     }
 
@@ -203,11 +243,12 @@ export async function PUT(req: NextRequest) {
   }
 }
 
-// DELETE: Admin deletes a Battle (SERVER-SIDE PROTECTED)
+// DELETE: Admin deletes a Battle
 export async function DELETE(req: NextRequest) {
-  if (!verifyAdminRequest(req)) {
+  const isAdmin = await verifyAdminRequestAsync(req);
+  if (!isAdmin) {
     return NextResponse.json(
-      { error: 'Unauthorized: Only site owner/admin rohitkumarnagar50@gmail.com can delete Battles.' },
+      { error: 'Unauthorized: Only site owner/admin can delete Battles.' },
       { status: 403 }
     );
   }
@@ -220,6 +261,15 @@ export async function DELETE(req: NextRequest) {
   }
 
   contentStore.battles.delete(id);
+
+  if (isSupabaseConfigured()) {
+    try {
+      await supabase.from('battles').delete().eq('id', id);
+      await supabase.from('battle_votes').delete().eq('battle_id', id);
+    } catch (err) {
+      console.warn('Failed to delete battle from Supabase:', err);
+    }
+  }
 
   return NextResponse.json({ success: true, deletedId: id });
 }

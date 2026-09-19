@@ -3,15 +3,17 @@ export interface User {
   name: string;
   email: string;
   avatar: string;
+  phone?: string;
   badge: string;
   coins: number;
   dhotiCoins?: number;
   wins: number;
   battles: number;
   rank: string;
-  isGoogle: boolean;
+  isGoogle?: boolean;
   role?: 'admin' | 'resident';
   isAdmin?: boolean;
+  createdAt?: number | string;
 }
 
 export interface ChatMessage {

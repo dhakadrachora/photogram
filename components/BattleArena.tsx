@@ -333,7 +333,7 @@ export function BattleArena({
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-0.5">
-            Public viewing for all • Official voting requires Google Sign-In • One vote per resident
+            Public viewing for all • Official voting requires Resident Login • One vote per resident
           </p>
         </div>
 
@@ -395,7 +395,7 @@ export function BattleArena({
                   Public Battle Results • Verified Resident Voting
                 </h4>
                 <p className="text-[11px] text-slate-400">
-                  Anyone can view ongoing clashes and scores. Google Sign-In is required to vote (1 vote per battle, validated server-side).
+                  Anyone can view ongoing clashes and scores. Resident Login is required to vote (1 vote per battle, validated server-side).
                 </p>
               </div>
             </div>

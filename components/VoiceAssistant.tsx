@@ -120,9 +120,9 @@ export function VoiceAssistant({ currentUser, onNavigateTab, onOpenAuth }: Voice
   const toggleConnection = async () => {
     setErrorMessage(null);
 
-    // Strict Voice Mode Access Control: If logged out, show Google Login prompt
+    // Strict Voice Mode Access Control: If logged out, show Login prompt
     if (!currentUser) {
-      setErrorMessage('Google Sign-In is required to activate AI Voice mode.');
+      setErrorMessage('Login is required to activate AI Voice mode.');
       onOpenAuth();
       return;
     }
@@ -311,7 +311,7 @@ export function VoiceAssistant({ currentUser, onNavigateTab, onOpenAuth }: Voice
               className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 hover:bg-amber-500/20 px-3.5 py-1 text-xs font-bold text-amber-300 border border-amber-500/30 transition-all hover:scale-105"
             >
               <LogIn className="h-3.5 w-3.5" />
-              <span>Login with Google to enable Voice Mode</span>
+              <span>Login to enable Voice Mode</span>
             </button>
           )}
 

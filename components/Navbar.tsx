@@ -236,30 +236,13 @@ export function Navbar({
             </div>
           ) : (
             <button
-              id="google-login-navbar-button"
+              id="login-navbar-button"
               onClick={onOpenAuth}
-              className="flex items-center gap-2 rounded-full bg-white hover:bg-slate-100 text-slate-900 font-bold px-3.5 py-2 text-xs shadow-[0_2px_10px_rgba(255,255,255,0.15)] transition-all active:scale-95"
+              className="flex items-center gap-2 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black px-4 py-2 text-xs shadow-md shadow-amber-500/20 transition-all active:scale-95"
             >
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                />
-              </svg>
-              <span className="whitespace-nowrap hidden sm:inline">Sign in with Google</span>
-              <span className="whitespace-nowrap sm:hidden text-xs">Sign In</span>
+              <UserIcon className="w-3.5 h-3.5 text-slate-950" />
+              <span className="whitespace-nowrap hidden sm:inline">लॉगिन / साइन-अप</span>
+              <span className="whitespace-nowrap sm:hidden text-xs">लॉगिन</span>
             </button>
           )}
 

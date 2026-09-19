@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { contentStore, BattleEventStore } from '@/lib/content-store';
+import {
+  isSupabaseConfigured,
+  recordSupabaseVote,
+  supabase,
+} from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,7 +35,28 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const userEmail = searchParams.get('email');
 
-  // Filter only published battles for public client
+  // If user provides email and Supabase is configured, check their vote in Supabase
+  if (userEmail && isSupabaseConfigured()) {
+    try {
+      const { data: userVotes } = await supabase
+        .from('battle_votes')
+        .select('battle_id, option_id')
+        .eq('user_email', userEmail.toLowerCase().trim());
+
+      if (userVotes && userVotes.length > 0) {
+        for (const uv of userVotes) {
+          const b = contentStore.battles.get(uv.battle_id);
+          if (b) {
+            b.votedUserEmails.add(userEmail.toLowerCase().trim());
+            b.userVotes.set(userEmail.toLowerCase().trim(), uv.option_id);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Error querying user votes from Supabase:', e);
+    }
+  }
+
   const battles = Array.from(contentStore.battles.values())
     .filter((b) => b.published !== false)
     .map((b) => formatBattleForClient(b, userEmail));
@@ -49,10 +75,12 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { battleId, optionId, userEmail: bodyEmail } = body;
+    const { battleId, optionId, userEmail: bodyEmail, userId } = body;
 
     const headerEmail = req.headers.get('x-user-email');
+    const headerUserId = req.headers.get('x-user-id');
     const userEmail = (headerEmail || bodyEmail || '').toString().trim().toLowerCase();
+    const effectiveUserId = headerUserId || userId;
 
     // 1. Authentication Check: Google Sign-In is required to vote in Battle
     if (!userEmail || !userEmail.includes('@')) {
@@ -86,7 +114,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 4. One Vote Per User Check (Server-Side Enforced)
+    // 4. One Vote Per User Check (Server-Side Enforced via Memory)
     if (battle.votedUserEmails.has(userEmail)) {
       const existingVote = battle.userVotes.get(userEmail);
       return NextResponse.json(
@@ -99,7 +127,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 5. Option Validation Check
+    // 5. One Vote Per User Check (Supabase Database Enforced)
+    if (isSupabaseConfigured()) {
+      const voteResult = await recordSupabaseVote(battleId, userEmail, optionId, effectiveUserId);
+      if (voteResult.alreadyVoted) {
+        battle.votedUserEmails.add(userEmail);
+        return NextResponse.json(
+          {
+            error: 'You have already voted in this battle. Only one vote per user is allowed.',
+            code: 'ALREADY_VOTED',
+          },
+          { status: 409 }
+        );
+      }
+    }
+
+    // 6. Option Validation Check
     if (optionId !== battle.optionA.id && optionId !== battle.optionB.id) {
       return NextResponse.json(
         { error: 'Invalid option chosen for this battle.', code: 'INVALID_OPTION' },
@@ -107,7 +150,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 6. Record Vote
+    // 7. Record Vote in memory
     if (optionId === battle.optionA.id) {
       battle.optionA.votes += 1;
     } else {
@@ -115,6 +158,21 @@ export async function POST(req: NextRequest) {
     }
     battle.votedUserEmails.add(userEmail);
     battle.userVotes.set(userEmail, optionId);
+
+    // Sync updated vote counts to Supabase
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase
+          .from('battles')
+          .update({
+            option_a: battle.optionA,
+            option_b: battle.optionB,
+          })
+          .eq('id', battleId);
+      } catch (err) {
+        console.warn('Failed to update battle vote count in Supabase:', err);
+      }
+    }
 
     const updatedBattle = formatBattleForClient(battle, userEmail);
 

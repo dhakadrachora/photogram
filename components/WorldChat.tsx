@@ -119,7 +119,7 @@ export function WorldChat({ currentUser, onOpenAuth, onStartBattleInvite }: Worl
 
       if (!authRes.ok) {
         if (authRes.status === 401) {
-          setAuthError('Google authentication required to post. Please sign in again.');
+          setAuthError('Authentication required to post. Please sign in again.');
           onOpenAuth();
           return;
         }
@@ -397,13 +397,13 @@ export function WorldChat({ currentUser, onOpenAuth, onStartBattleInvite }: Worl
                 </div>
                 <div>
                   <h4 className="text-sm sm:text-base font-black text-white flex items-center justify-center sm:justify-start gap-2">
-                    Login with Google to join World Chat
+                    Login to join World Chat
                     <span className="rounded-md bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-300">
                       Auth Required
                     </span>
                   </h4>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    Only authenticated Google users can enter and send World Chat messages.
+                    Only authenticated users can enter and send World Chat messages.
                   </p>
                 </div>
               </div>
@@ -411,10 +411,10 @@ export function WorldChat({ currentUser, onOpenAuth, onStartBattleInvite }: Worl
               <button
                 id="world-chat-login-btn"
                 onClick={onOpenAuth}
-                className="flex items-center gap-2.5 rounded-2xl bg-white hover:bg-slate-100 text-slate-950 px-6 py-3 text-xs sm:text-sm font-black shadow-xl transition-all hover:scale-105 active:scale-95 shrink-0"
+                className="flex items-center gap-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 px-6 py-3 text-xs sm:text-sm font-black shadow-xl transition-all hover:scale-105 active:scale-95 shrink-0"
               >
-                <LogIn className="h-4 w-4 text-blue-600" />
-                <span>Login with Google to join World Chat</span>
+                <LogIn className="h-4 w-4 text-slate-950" />
+                <span>Login to join World Chat</span>
               </button>
             </div>
           )}

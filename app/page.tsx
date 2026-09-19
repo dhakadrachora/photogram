@@ -13,6 +13,12 @@ import { PWAInstallBanner } from '@/components/PWAInstallBanner';
 import { isSiteAdmin } from '@/lib/admin-auth';
 import { useIsMounted } from '@/lib/useIsMounted';
 import {
+  supabase,
+  isSupabaseConfigured,
+  mapSupabaseUserToAppUser,
+  signOutSupabase,
+} from '@/lib/supabase';
+import {
   Home as HomeIcon,
   Compass,
   MessageSquare,
@@ -98,9 +104,64 @@ export default function Home() {
     notifyUserListeners();
   };
 
-  const handleUpdateUser = (updater: (prev: User) => User) => {
+  // Sync Supabase Auth session with application user state
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+
+    const syncUserWithProfile = async (sbUser: any) => {
+      let appUser = mapSupabaseUserToAppUser(sbUser);
+      try {
+        const { data: dbUser } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', sbUser.id)
+          .maybeSingle();
+
+        if (dbUser) {
+          appUser = {
+            ...appUser,
+            name: dbUser.name || appUser.name,
+            avatar: dbUser.avatar || appUser.avatar,
+            phone: dbUser.phone || appUser.phone,
+            badge: dbUser.badge || appUser.badge,
+            coins: dbUser.coins ?? appUser.coins,
+            wins: dbUser.wins ?? appUser.wins,
+            battles: dbUser.battles ?? appUser.battles,
+            rank: dbUser.rank || appUser.rank,
+            role: dbUser.role || appUser.role,
+            isAdmin: Boolean(dbUser.is_admin) || isSiteAdmin(appUser.email),
+            createdAt: dbUser.created_at || appUser.createdAt,
+          };
+        }
+      } catch (err) {
+        console.warn('Could not enrich user profile from Supabase:', err);
+      }
+      handleLoginSuccess(appUser);
+    };
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        void syncUserWithProfile(session.user);
+      }
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        void syncUserWithProfile(session.user);
+      }
+    });
+
+    return () => {
+      subscription?.unsubscribe();
+    };
+  }, []);
+
+  const handleUpdateUser = (updater: ((prev: User) => User) | Partial<User>) => {
     if (!currentUser) return;
-    const updated = updater(currentUser);
+    const updated =
+      typeof updater === 'function' ? updater(currentUser) : { ...currentUser, ...updater };
     try {
       localStorage.setItem('dhoti_user', JSON.stringify(updated));
     } catch (e) {
@@ -109,7 +170,8 @@ export default function Home() {
     notifyUserListeners();
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await signOutSupabase();
     try {
       localStorage.removeItem('dhoti_user');
       localStorage.removeItem('phone_google_user');
@@ -117,6 +179,7 @@ export default function Home() {
       console.warn('Could not remove user from storage', e);
     }
     notifyUserListeners();
+    setActiveTab('home');
   };
 
   const handleStartBattleInvite = (opponentName: string) => {
@@ -206,6 +269,7 @@ export default function Home() {
             onOpenAuth={() => setIsAuthModalOpen(true)}
             onLogout={handleLogout}
             onNavigateTab={setActiveTab}
+            onUpdateUser={handleUpdateUser}
           />
         )}
 
