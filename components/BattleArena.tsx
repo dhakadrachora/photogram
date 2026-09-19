@@ -1,36 +1,186 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import Image from 'next/image';
-import { User, BattleState, BattleRound, BattleEvent, AppTab } from '@/types';
-import { SoundEffects } from '@/lib/audio/sound-effects';
-import { isSiteAdmin } from '@/lib/admin-auth';
+import React, { useEffect, useState } from 'react';
 import {
   Swords,
-  Flame,
   Trophy,
-  Volume2,
-  Mic,
-  Send,
-  Sparkles,
-  RefreshCw,
-  Award,
-  Zap,
-  CheckCircle2,
-  Lock,
-  LogIn,
-  Vote,
   Clock,
-  ShieldCheck,
-  Crown,
+  MessageCircle,
+  Send,
+  Loader2,
+  RefreshCw,
+  AlertCircle,
 } from 'lucide-react';
 
-interface BattleArenaProps {
-  currentUser: User | null;
-  onOpenAuth: () => void;
+import { createClient } from '@supabase/supabase-js';
+
+type BattleOption = {
+  id: string;
+  name: string;
+  imageUrl?: string | null;
+  image_url?: string | null;
+  votes?: number | null;
+};
+
+type Battle = {
+  id: string;
+  title?: string | null;
+  description?: string | null;
+  question?: string | null;
+
+  options?: BattleOption[];
+
+  optionA?: BattleOption;
+  optionB?: BattleOption;
+
+  startsAt?: string | null;
+  starts_at?: string | null;
+
+  endsAt?: string | null;
+  ends_at?: string | null;
+
+  status?: string | null;
+
+  winnerOptionId?: string | null;
+  winner_option_id?: string | null;
+};
+
+type BattleComment = {
+  id: string;
+  battle_id?: string;
+  battleId?: string;
+
+  user_id?: string;
+  userId?: string;
+
+  user_name?: string;
+  userName?: string;
+
+  message: string;
+
+  created_at?: string;
+  createdAt?: string;
+};
+
+type BattleArenaProps = {
+  currentUser?: {
+    id?: string;
+    email?: string | null;
+    name?: string | null;
+    [key: string]: any;
+  } | null;
+
+  onOpenAuth?: () => void;
+
   selectedOpponent?: string;
-  onUpdateUser?: (updater: (prev: User) => User) => void;
-  onNavigateTab?: (tab: AppTab) => void;
+
+  onUpdateUser?: (
+    updater:
+      | ((previous: any) => any)
+      | Partial<any>
+  ) => void;
+
+  onNavigateTab?: (tab: any) => void;
+
+  userEmail?: string | null;
+
+  currentUserEmail?: string | null;
+};
+
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  'https://zlngcbefvdtbihndaeun.supabase.co';
+
+const SUPABASE_KEY =
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  'sb_publishable_JxGddMQ5KqRFTANuZG2TGg_I05TTskS';
+
+const supabase = createClient(
+  SUPABASE_URL,
+  SUPABASE_KEY
+);
+
+function getOptions(
+  battle: Battle | null
+): BattleOption[] {
+  if (!battle) {
+    return [];
+  }
+
+  if (
+    Array.isArray(battle.options)
+  ) {
+    return battle.options;
+  }
+
+  const options: BattleOption[] = [];
+
+  if (battle.optionA) {
+    options.push(battle.optionA);
+  }
+
+  if (battle.optionB) {
+    options.push(battle.optionB);
+  }
+
+  return options;
+}
+
+function getImage(
+  option: BattleOption
+): string {
+  return (
+    option.imageUrl ||
+    option.image_url ||
+    ''
+  );
+}
+
+function getEndTime(
+  battle: Battle | null
+): number | null {
+  if (!battle) {
+    return null;
+  }
+
+  const value =
+    battle.endsAt ||
+    battle.ends_at;
+
+  if (!value) {
+    return null;
+  }
+
+  const time =
+    new Date(value).getTime();
+
+  return Number.isFinite(time)
+    ? time
+    : null;
+}
+
+function formatTime(
+  milliseconds: number
+): string {
+  const seconds = Math.max(
+    0,
+    Math.floor(milliseconds / 1000)
+  );
+
+  const minutes = Math.floor(
+    seconds / 60
+  );
+
+  const remainingSeconds =
+    seconds % 60;
+
+  return `${String(minutes).padStart(
+    2,
+    '0'
+  )}:${String(
+    remainingSeconds
+  ).padStart(2, '0')}`;
 }
 
 export function BattleArena({
@@ -39,836 +189,1147 @@ export function BattleArena({
   selectedOpponent,
   onUpdateUser,
   onNavigateTab,
+  userEmail,
+  currentUserEmail,
 }: BattleArenaProps) {
-  const isAdmin = isSiteAdmin(currentUser?.email);
-  const [activeArenaTab, setActiveArenaTab] = useState<'events' | '1v1'>('events');
-  const [battleMode, setBattleMode] = useState<'rap' | 'roast' | 'wit'>('rap');
-  const opponentName = selectedOpponent || 'Dhoti aale AI Champion';
-  const [inBattle, setInBattle] = useState(false);
-  const [currentRound, setCurrentRound] = useState(1);
-  const [rounds, setRounds] = useState<BattleRound[]>([]);
-  const [playerTotalScore, setPlayerTotalScore] = useState(0);
-  const [opponentTotalScore, setOpponentTotalScore] = useState(0);
-  const [crowdHype, setCrowdHype] = useState(65);
-  const [userVerseInput, setUserVerseInput] = useState('');
-  const [isJudging, setIsJudging] = useState(false);
-  const [winnerDeclared, setWinnerDeclared] = useState<'player' | 'opponent' | 'tie' | null>(null);
-  const [latestCommentary, setLatestCommentary] = useState('');
+  const email =
+    currentUserEmail ||
+    userEmail ||
+    currentUser?.email ||
+    null;
 
-  // Community Battles & Voting State
-  const [battleEvents, setBattleEvents] = useState<BattleEvent[]>([]);
-  const [isLoadingBattles, setIsLoadingBattles] = useState(true);
-  const [votingBattleId, setVotingBattleId] = useState<string | null>(null);
-  const [voteFeedback, setVoteFeedback] = useState<{ battleId: string; message: string; type: 'success' | 'error' } | null>(null);
+  const [battle, setBattle] =
+    useState<Battle | null>(null);
 
-  useEffect(() => {
-    let ignore = false;
-    async function loadBattles() {
-      try {
-        const emailParam = currentUser?.email ? `?email=${encodeURIComponent(currentUser.email)}` : '';
-        const res = await fetch(`/api/battle/vote${emailParam}`, {
-          cache: 'no-store',
-        });
-        const data = await res.json();
-        if (!ignore && data.battles && Array.isArray(data.battles)) {
-          setBattleEvents(data.battles);
-        }
-      } catch (err) {
-        console.warn('Could not fetch battle events:', err);
-      } finally {
-        if (!ignore) {
-          setIsLoadingBattles(false);
-        }
-      }
-    }
-    loadBattles();
-    return () => {
-      ignore = true;
-    };
-  }, [currentUser?.email]);
+  const [comments, setComments] =
+    useState<BattleComment[]>([]);
 
-  const reloadBattles = async () => {
+  const [loading, setLoading] =
+    useState(true);
+
+  const [refreshing, setRefreshing] =
+    useState(false);
+
+  const [remaining, setRemaining] =
+    useState(0);
+
+  const [selectedOption, setSelectedOption] =
+    useState<string | null>(null);
+
+  const [hasVoted, setHasVoted] =
+    useState(false);
+
+  const [voting, setVoting] =
+    useState(false);
+
+  const [voteError, setVoteError] =
+    useState('');
+
+  const [comment, setComment] =
+    useState('');
+
+  const [sendingComment, setSendingComment] =
+    useState(false);
+
+  const [commentError, setCommentError] =
+    useState('');
+
+  const [userId, setUserId] =
+    useState<string | null>(
+      currentUser?.id
+        ? String(currentUser.id)
+        : null
+    );
+
+  async function getToken() {
+    const {
+      data: { session },
+    } =
+      await supabase.auth.getSession();
+
+    return (
+      session?.access_token || null
+    );
+  }
+
+  async function loadBattle(
+    refresh = false
+  ) {
     try {
-      const emailParam = currentUser?.email ? `?email=${encodeURIComponent(currentUser.email)}` : '';
-      const res = await fetch(`/api/battle/vote${emailParam}`, {
-        cache: 'no-store',
-      });
-      const data = await res.json();
-      if (data.battles && Array.isArray(data.battles)) {
-        setBattleEvents(data.battles);
+      if (refresh) {
+        setRefreshing(true);
       }
-    } catch (err) {
-      console.warn('Could not reload battle events:', err);
+
+      const response =
+        await fetch(
+          '/api/battle',
+          {
+            method: 'GET',
+            cache: 'no-store',
+          }
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          'Battle load failed'
+        );
+      }
+
+      const data =
+        await response.json();
+
+      let result: Battle | null =
+        null;
+
+      if (data?.battle) {
+        result = data.battle;
+      } else if (
+        Array.isArray(
+          data?.battles
+        )
+      ) {
+        result =
+          data.battles.find(
+            (item: Battle) =>
+              item.status ===
+                'active' ||
+              item.status ===
+                'completed' ||
+              item.status ===
+                'published'
+          ) || null;
+      } else if (
+        Array.isArray(data)
+      ) {
+        result =
+          data.find(
+            (item: Battle) =>
+              item.status ===
+                'active' ||
+              item.status ===
+                'completed' ||
+              item.status ===
+                'published'
+          ) || null;
+      }
+
+      setBattle(result);
+    } catch (error) {
+      console.error(
+        'Battle error:',
+        error
+      );
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
-  };
+  }
 
-  // Handle Voting in Community Battles
-  const handleVoteInBattle = async (battle: BattleEvent, optionId: string) => {
-    // Access Control: Google Sign-In is required to vote in Battle
-    if (!currentUser) {
-      onOpenAuth();
-      return;
-    }
-
-    // Access Control: Prevent voting after battle has ended
-    if (battle.isEnded) {
-      setVoteFeedback({
-        battleId: battle.id,
-        message: 'This battle has ended. No further votes can be submitted.',
-        type: 'error',
-      });
-      return;
-    }
-
-    // Access Control: One authenticated user can vote only once per battle
-    if (battle.userVotedOptionId) {
-      setVoteFeedback({
-        battleId: battle.id,
-        message: 'You have already voted in this battle! Only 1 vote per user is allowed.',
-        type: 'error',
-      });
-      return;
-    }
-
-    setVotingBattleId(battle.id);
-    setVoteFeedback(null);
-
+  async function loadComments(
+    battleId: string
+  ) {
     try {
-      const res = await fetch('/api/battle/vote', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-email': currentUser.email,
-        },
-        body: JSON.stringify({
-          battleId: battle.id,
-          optionId,
-          userEmail: currentUser.email,
-        }),
-      });
+      const response =
+        await fetch(
+          `/api/battle/comments?battleId=${encodeURIComponent(
+            battleId
+          )}`,
+          {
+            cache: 'no-store',
+          }
+        );
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        setVoteFeedback({
-          battleId: battle.id,
-          message: data.error || 'Voting failed. Please try again.',
-          type: 'error',
-        });
-        if (res.status === 401) {
-          onOpenAuth();
-        }
+      if (!response.ok) {
         return;
       }
 
-      SoundEffects.playCheer();
-      setVoteFeedback({
-        battleId: battle.id,
-        message: `Vote securely verified & registered for ${optionId === battle.optionA.id ? battle.optionA.label : battle.optionB.label}!`,
-        type: 'success',
-      });
+      const data =
+        await response.json();
 
-      // Update state with updated battle data from server
-      if (data.battle) {
-        setBattleEvents((prev) =>
-          prev.map((b) => (b.id === battle.id ? { ...data.battle, userVotedOptionId: optionId } : b))
+      if (
+        Array.isArray(data)
+      ) {
+        setComments(data);
+      } else if (
+        Array.isArray(
+          data?.comments
+        )
+      ) {
+        setComments(
+          data.comments
         );
-      } else {
-        reloadBattles();
       }
-    } catch {
-      setVoteFeedback({
-        battleId: battle.id,
-        message: 'Network issue while submitting vote. Please try again.',
-        type: 'error',
-      });
-    } finally {
-      setVotingBattleId(null);
+    } catch (error) {
+      console.error(
+        'Comments error:',
+        error
+      );
     }
-  };
+  }
 
-  const startNewBattle = (mode: 'rap' | 'roast' | 'wit') => {
-    SoundEffects.playDhol();
-    setBattleMode(mode);
-    setInBattle(true);
-    setCurrentRound(1);
-    setRounds([]);
-    setPlayerTotalScore(0);
-    setOpponentTotalScore(0);
-    setCrowdHype(70);
-    setWinnerDeclared(null);
-    setLatestCommentary('Round 1 shuru! Apni sabse dumdaar punchline feko!');
-  };
+  async function loadVoteStatus(
+    battleId: string
+  ) {
+    if (!email) {
+      return;
+    }
 
-  const handleVerseSubmit = async (verse: string) => {
-    if (!verse.trim() || isJudging) return;
+    const token =
+      await getToken();
 
-    SoundEffects.playWhistle();
-    setIsJudging(true);
+    if (!token) {
+      return;
+    }
 
     try {
-      const response = await fetch('/api/gemini/battle', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mode: battleMode,
-          userVerse: verse,
-          roundNumber: currentRound,
-          opponentName,
-          userScore: playerTotalScore,
-          opponentScore: opponentTotalScore,
-        }),
-      });
-
-      const data = await response.json();
-      const pScore = data.playerScore || 8;
-      const oScore = data.opponentScore || 8;
-      const commentary = data.commentary || 'Kya dumdaar round tha bhaiyo!';
-      const opponentVerse =
-        data.opponentVerse ||
-        'Dhoti aale ke aage tikna mushkil hai, agle round me dekh lenge!';
-      const hypeDelta = data.hypeChange || 10;
-
-      const newRound: BattleRound = {
-        roundNumber: currentRound,
-        playerVerse: verse,
-        opponentVerse,
-        playerScore: pScore,
-        opponentScore: oScore,
-        commentary,
-      };
-
-      const nextPlayerTotal = playerTotalScore + pScore;
-      const nextOpponentTotal = opponentTotalScore + oScore;
-
-      setRounds((prev) => [...prev, newRound]);
-      setPlayerTotalScore(nextPlayerTotal);
-      setOpponentTotalScore(nextOpponentTotal);
-      setCrowdHype((prev) => Math.min(100, Math.max(20, prev + hypeDelta)));
-      setLatestCommentary(commentary);
-      setUserVerseInput('');
-
-      if (currentRound >= 3) {
-        // Battle Complete
-        setTimeout(() => {
-          let winner: 'player' | 'opponent' | 'tie' = 'tie';
-          if (nextPlayerTotal > nextOpponentTotal) {
-            winner = 'player';
-            SoundEffects.playCheer();
-            if (onUpdateUser) {
-              onUpdateUser((prev) => ({
-                ...prev,
-                coins: prev.coins + 100,
-                wins: prev.wins + 1,
-                battles: prev.battles + 1,
-              }));
-            }
-          } else if (nextOpponentTotal > nextPlayerTotal) {
-            winner = 'opponent';
-            SoundEffects.playAirhorn();
-            if (onUpdateUser) {
-              onUpdateUser((prev) => ({
-                ...prev,
-                coins: prev.coins + 20,
-                battles: prev.battles + 1,
-              }));
-            }
-          } else {
-            winner = 'tie';
+      const response =
+        await fetch(
+          `/api/battle/vote?battleId=${encodeURIComponent(
+            battleId
+          )}&status=true`,
+          {
+            headers: {
+              Authorization:
+                `Bearer ${token}`,
+            },
+            cache: 'no-store',
           }
-          setWinnerDeclared(winner);
-        }, 800);
-      } else {
-        setCurrentRound((prev) => prev + 1);
+        );
+
+      if (!response.ok) {
+        return;
       }
-    } catch {
-      // Fallback round
-      const newRound: BattleRound = {
-        roundNumber: currentRound,
-        playerVerse: verse,
-        opponentVerse: 'Dhoti aale ka flow dekh kar sab dang reh gaye!',
-        playerScore: 8,
-        opponentScore: 7,
-        commentary: 'Public ne dono ko aag bol diya!',
-      };
-      setRounds((prev) => [...prev, newRound]);
-      setPlayerTotalScore((p) => p + 8);
-      setOpponentTotalScore((o) => o + 7);
-      if (currentRound >= 3) {
-        setWinnerDeclared('player');
-      } else {
-        setCurrentRound((prev) => prev + 1);
+
+      const data =
+        await response.json();
+
+      if (
+        typeof data?.hasVoted ===
+        'boolean'
+      ) {
+        setHasVoted(
+          data.hasVoted
+        );
       }
-    } finally {
-      setIsJudging(false);
+
+      if (data?.optionId) {
+        setSelectedOption(
+          data.optionId
+        );
+      }
+    } catch (error) {
+      console.error(
+        'Vote status error:',
+        error
+      );
     }
-  };
+  }
 
-  const sampleVerses = {
-    rap: [
-      'Gaam ka chhora, dhoti me swag, mic pe baith ke system kar de hang!',
-      'Desi beat pe flow aisa ki stadium pura jhum jaye!',
-      'Gadi me bass, hotho pe rap, Dhoti aale always on top of the map!',
-    ],
-    roast: [
-      'Filter laga ke photo me hero bante ho, samne aao to billo bagge bilauri!',
-      'Gadi me petrol nahi aur swag helicopter ka dikhate ho!',
-      'Dhoti aale ke samne hero mat bano, yaha referee bhi tumse tez bolta hai!',
-    ],
-    wit: [
-      'Dimag itna tez hai ki Google bhi search karne mujhse poochta hai!',
-      'Witty punchline aisa ki stage pe aag lag jaye bina matchbox ke!',
-    ],
-  };
+  useEffect(() => {
+    void loadBattle();
 
-  return (
-    <div className="relative min-h-[calc(100vh-4rem)] w-full flex flex-col p-3 sm:p-6 max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-center justify-between pb-4 border-b border-slate-800 gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-black text-white">Dhoti aale Battle Arena</h1>
-            <span className="rounded-full bg-orange-500/20 px-2.5 py-0.5 text-xs font-bold text-orange-400 border border-orange-500/30">
-              Battle Events & 1v1 Clash
-            </span>
-          </div>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Public viewing for all • Official voting requires Resident Login • One vote per resident
-          </p>
-        </div>
+    async function getUser() {
+      const {
+        data: { user },
+      } =
+        await supabase.auth.getUser();
 
-        {/* Arena Sub-Navigation Tabs */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {isAdmin && onNavigateTab && (
-            <button
-              onClick={() => onNavigateTab('admin')}
-              className="flex items-center gap-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 px-3 py-1.5 text-xs font-black shadow-md transition-all active:scale-95"
-            >
-              <Crown className="h-3.5 w-3.5" />
-              <span>Admin Battle Controls 👑</span>
-            </button>
-          )}
+      if (user?.id) {
+        setUserId(
+          String(user.id)
+        );
+      }
+    }
 
-          <div className="flex items-center gap-1.5 bg-slate-900/90 rounded-2xl p-1.5 border border-slate-800 shadow-inner">
-            <button
-              id="tab-community-battles"
-              onClick={() => {
-                setActiveArenaTab('events');
-                setInBattle(false);
-              }}
-              className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all ${
-                activeArenaTab === 'events'
-                  ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 shadow-md'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Vote className="h-3.5 w-3.5" />
-              <span>Community Battles</span>
-            </button>
-            <button
-              id="tab-1v1-clash"
-              onClick={() => setActiveArenaTab('1v1')}
-              className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all ${
-                activeArenaTab === '1v1'
-                  ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 shadow-md'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Swords className="h-3.5 w-3.5" />
-              <span>1v1 Live Clash</span>
-            </button>
-          </div>
+    void getUser();
+  }, []);
+
+  useEffect(() => {
+    if (!battle?.id) {
+      return;
+    }
+
+    void loadComments(
+      battle.id
+    );
+
+    void loadVoteStatus(
+      battle.id
+    );
+  }, [battle?.id]);
+
+  useEffect(() => {
+    if (!battle) {
+      return;
+    }
+
+    const updateTimer = () => {
+      const end =
+        getEndTime(battle);
+
+      if (end === null) {
+        setRemaining(0);
+        return;
+      }
+
+      setRemaining(
+        Math.max(
+          0,
+          end - Date.now()
+        )
+      );
+    };
+
+    updateTimer();
+
+    const timer =
+      window.setInterval(
+        updateTimer,
+        1000
+      );
+
+    return () => {
+      window.clearInterval(
+        timer
+      );
+    };
+  }, [battle]);
+
+  useEffect(() => {
+    if (!battle?.id) {
+      return;
+    }
+
+    const channel =
+      supabase
+        .channel(
+          `battle-comments-${battle.id}`
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'battle_comments',
+            filter:
+              `battle_id=eq.${battle.id}`,
+          },
+          (payload) => {
+            const incoming =
+              payload.new as BattleComment;
+
+            setComments(
+              (old) => {
+                if (
+                  old.some(
+                    (item) =>
+                      item.id ===
+                      incoming.id
+                  )
+                ) {
+                  return old;
+                }
+
+                return [
+                  ...old,
+                  incoming,
+                ];
+              }
+            );
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'battle_comments',
+            filter:
+              `battle_id=eq.${battle.id}`,
+          },
+          (payload) => {
+            const deleted =
+              payload.old as BattleComment;
+
+            setComments(
+              (old) =>
+                old.filter(
+                  (item) =>
+                    item.id !==
+                    deleted.id
+                )
+            );
+          }
+        )
+        .subscribe();
+
+    return () => {
+      void supabase.removeChannel(
+        channel
+      );
+    };
+  }, [battle?.id]);
+
+  async function vote(
+    optionId: string
+  ) {
+    setVoteError('');
+
+    if (!email) {
+      onOpenAuth?.();
+
+      setVoteError(
+        'Vote karne ke liye login karo.'
+      );
+
+      return;
+    }
+
+    if (!battle?.id) {
+      return;
+    }
+
+    if (remaining <= 0) {
+      setVoteError(
+        'Voting close ho chuki hai.'
+      );
+
+      return;
+    }
+
+    if (hasVoted) {
+      setVoteError(
+        'Aap already vote kar chuke ho.'
+      );
+
+      return;
+    }
+
+    const token =
+      await getToken();
+
+    if (!token) {
+      setVoteError(
+        'Login session expire ho gaya.'
+      );
+
+      return;
+    }
+
+    try {
+      setVoting(true);
+
+      const response =
+        await fetch(
+          '/api/battle/vote',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type':
+                'application/json',
+              Authorization:
+                `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              battleId:
+                battle.id,
+              optionId,
+            }),
+          }
+        );
+
+      const data =
+        await response
+          .json()
+          .catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+            'Vote submit nahi hua.'
+        );
+      }
+
+      setHasVoted(true);
+      setSelectedOption(
+        optionId
+      );
+
+      await loadBattle();
+    } catch (error: any) {
+      setVoteError(
+        error?.message ||
+          'Vote submit nahi hua.'
+      );
+    } finally {
+      setVoting(false);
+    }
+  }
+
+  async function sendComment() {
+    setCommentError('');
+
+    if (!email) {
+      onOpenAuth?.();
+
+      setCommentError(
+        'Comment karne ke liye login karo.'
+      );
+
+      return;
+    }
+
+    if (!battle?.id) {
+      return;
+    }
+
+    if (remaining <= 0) {
+      setCommentError(
+        'Battle khatam ho chuki hai.'
+      );
+
+      return;
+    }
+
+    const message =
+      comment.trim();
+
+    if (!message) {
+      return;
+    }
+
+    if (message.length > 500) {
+      setCommentError(
+        'Maximum 500 characters allowed.'
+      );
+
+      return;
+    }
+
+    const token =
+      await getToken();
+
+    if (!token) {
+      setCommentError(
+        'Login session expire ho gaya.'
+      );
+
+      return;
+    }
+
+    try {
+      setSendingComment(true);
+
+      const response =
+        await fetch(
+          '/api/battle/comments',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type':
+                'application/json',
+              Authorization:
+                `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              battleId:
+                battle.id,
+              message,
+            }),
+          }
+        );
+
+      const data =
+        await response
+          .json()
+          .catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+            'Comment send nahi hua.'
+        );
+      }
+
+      if (data?.comment) {
+        setComments(
+          (old) => [
+            ...old,
+            data.comment,
+          ]
+        );
+      }
+
+      setComment('');
+    } catch (error: any) {
+      setCommentError(
+        error?.message ||
+          'Comment send nahi hua.'
+      );
+    } finally {
+      setSendingComment(false);
+    }
+  }
+
+  async function deleteComment(
+    commentId: string
+  ) {
+    const token =
+      await getToken();
+
+    if (!token) {
+      return;
+    }
+
+    try {
+      const response =
+        await fetch(
+          `/api/battle/comments?id=${encodeURIComponent(
+            commentId
+          )}`,
+          {
+            method: 'DELETE',
+            headers: {
+              Authorization:
+                `Bearer ${token}`,
+            },
+          }
+        );
+
+      if (!response.ok) {
+        return;
+      }
+
+      setComments(
+        (old) =>
+          old.filter(
+            (item) =>
+              item.id !==
+              commentId
+          )
+      );
+    } catch (error) {
+      console.error(
+        'Delete comment error:',
+        error
+      );
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[300px] items-center justify-center rounded-3xl border border-white/10 bg-black/20">
+        <div className="flex items-center gap-3 text-white/70">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>
+            Battle loading...
+          </span>
         </div>
       </div>
+    );
+  }
 
-      {/* VIEW 1: Community Battle Events & Voting (PUBLIC ACCESS TO VIEW, LOGIN TO VOTE) */}
-      {activeArenaTab === 'events' && (
-        <div className="flex-1 flex flex-col py-4 space-y-6">
-          {/* Access Control Information Banner */}
-          <div className="rounded-2xl bg-gradient-to-r from-slate-900/90 via-slate-900 to-slate-950 border border-slate-800 p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
-            <div className="flex items-center gap-3 text-center sm:text-left">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                <ShieldCheck className="h-5 w-5" />
-              </div>
-              <div>
-                <h4 className="text-xs sm:text-sm font-bold text-white">
-                  Public Battle Results • Verified Resident Voting
-                </h4>
-                <p className="text-[11px] text-slate-400">
-                  Anyone can view ongoing clashes and scores. Resident Login is required to vote (1 vote per battle, validated server-side).
-                </p>
-              </div>
+  if (!battle) {
+    return (
+      <div className="flex min-h-[300px] flex-col items-center justify-center rounded-3xl border border-white/10 bg-black/20 p-8 text-center">
+        <Swords className="mb-4 h-12 w-12 text-white/30" />
+
+        <h2 className="text-xl font-bold text-white">
+          No active battle
+        </h2>
+
+        <p className="mt-2 text-sm text-white/40">
+          Abhi koi Community Battle available nahi hai.
+        </p>
+
+        <button
+          type="button"
+          onClick={() =>
+            void loadBattle(true)
+          }
+          disabled={refreshing}
+          className="mt-5 flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15 disabled:opacity-50"
+        >
+          <RefreshCw
+            className={
+              refreshing
+                ? 'h-4 w-4 animate-spin'
+                : 'h-4 w-4'
+            }
+          />
+          Refresh
+        </button>
+      </div>
+    );
+  }
+
+  const options =
+    getOptions(battle);
+
+  const totalVotes =
+    options.reduce(
+      (sum, option) =>
+        sum +
+        Number(
+          option.votes || 0
+        ),
+      0
+    );
+
+  const winnerId =
+    battle.winnerOptionId ||
+    battle.winner_option_id ||
+    null;
+
+  const finished =
+    battle.status ===
+      'completed' ||
+    battle.status ===
+      'closed' ||
+    remaining <= 0;
+
+  const winner =
+    winnerId
+      ? options.find(
+          (option) =>
+            option.id ===
+            winnerId
+        )
+      : null;
+
+  return (
+    <div className="w-full overflow-hidden rounded-3xl border border-white/10 bg-black/20">
+
+      {/* HEADER */}
+      <div className="border-b border-white/10 p-5 sm:p-6">
+
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+
+          <div>
+            <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-red-400">
+              <Swords className="h-4 w-4" />
+              Community Battle
             </div>
 
-            {!currentUser && (
-              <button
-                id="battle-public-login-btn"
-                onClick={onOpenAuth}
-                className="flex items-center gap-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-950 px-4 py-2 text-xs font-bold shadow-md transition-all active:scale-95 shrink-0"
-              >
-                <LogIn className="h-3.5 w-3.5 text-blue-600" />
-                <span>Login to Vote</span>
-              </button>
+            <h2 className="text-2xl font-black text-white">
+              {battle.title ||
+                battle.question ||
+                'Community Battle'}
+            </h2>
+
+            {battle.description && (
+              <p className="mt-2 text-sm text-white/50">
+                {battle.description}
+              </p>
+            )}
+
+            {selectedOpponent && (
+              <p className="mt-2 text-xs text-white/30">
+                Opponent: {selectedOpponent}
+              </p>
             )}
           </div>
 
-          {/* Battles List */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {battleEvents.map((battle) => {
-              const totalVotes = battle.optionA.votes + battle.optionB.votes;
-              const percentA = totalVotes > 0 ? Math.round((battle.optionA.votes / totalVotes) * 100) : 50;
-              const percentB = 100 - percentA;
-              const isEnded = Boolean(battle.isEnded);
-              const hasVoted = Boolean(battle.userVotedOptionId);
+          <button
+            type="button"
+            onClick={() =>
+              void loadBattle(true)
+            }
+            disabled={refreshing}
+            className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10 disabled:opacity-50"
+          >
+            <RefreshCw
+              className={
+                refreshing
+                  ? 'h-4 w-4 animate-spin'
+                  : 'h-4 w-4'
+              }
+            />
+            Refresh
+          </button>
 
-              return (
-                <div
-                  key={battle.id}
-                  className={`rounded-3xl bg-slate-900/90 border p-5 flex flex-col justify-between shadow-xl transition-all ${
-                    isEnded
-                      ? 'border-slate-800 opacity-90'
-                      : 'border-slate-800 hover:border-amber-500/40'
-                  }`}
-                >
-                  <div>
-                    {/* Category & Status Badges */}
-                    <div className="flex items-center justify-between gap-2 mb-3">
-                      <span className="text-[10px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2.5 py-0.5 rounded-full">
-                        {battle.category}
-                      </span>
-                      {isEnded ? (
-                        <span className="flex items-center gap-1 text-[10px] font-bold bg-red-500/20 text-red-300 border border-red-500/30 px-2.5 py-0.5 rounded-full">
-                          <Lock className="h-3 w-3" />
-                          Battle Ended
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1 text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
-                          Active Poll
-                        </span>
-                      )}
-                    </div>
+        </div>
+      </div>
 
-                    <h3 className="text-base sm:text-lg font-black text-white leading-tight mb-1.5">
-                      {battle.title}
-                    </h3>
-                    <p className="text-xs text-slate-400 mb-4 leading-relaxed">
-                      {battle.description}
-                    </p>
+      {/* TIMER */}
+      <div className="border-b border-white/10 bg-white/[0.02] p-5 text-center">
 
-                    {/* Voting Bars / Results Display */}
-                    <div className="space-y-3.5 mb-4">
-                      {/* Option A */}
-                      <div className="space-y-1.5 p-2 rounded-2xl bg-slate-950/40 border border-slate-800/80">
-                        <div className="flex items-center justify-between text-xs font-semibold">
-                          <div className="flex items-center gap-2">
-                            {battle.optionA.imageUrl ? (
-                              <Image
-                                src={battle.optionA.imageUrl}
-                                alt={battle.optionA.label}
-                                width={28}
-                                height={28}
-                                referrerPolicy="no-referrer"
-                                className="h-7 w-7 rounded-lg object-cover border border-amber-500/40"
-                              />
-                            ) : (
-                              <span className="text-base">{battle.optionA.emoji}</span>
-                            )}
-                            <div>
-                              <span className="text-slate-200 font-bold block">{battle.optionA.label}</span>
-                              {battle.optionA.tagline && (
-                                <span className="text-[10px] text-slate-400 font-normal block">
-                                  {battle.optionA.tagline}
-                                </span>
-                              )}
-                            </div>
-                            {battle.userVotedOptionId === battle.optionA.id && (
-                              <span className="text-amber-400 font-bold text-[10px] ml-1 bg-amber-400/10 px-1.5 py-0.2 rounded">
-                                (Your Vote ✓)
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-amber-400 font-bold">
-                            {battle.optionA.votes} votes ({percentA}%)
-                          </span>
-                        </div>
-                        <div className="h-2.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-full transition-all duration-500"
-                            style={{ width: `${percentA}%` }}
-                          />
-                        </div>
-                      </div>
+        {finished ? (
+          <div className="text-red-300">
+            <Trophy className="mx-auto mb-2 h-7 w-7" />
+            <div className="font-bold">
+              Battle Finished
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="mb-1 flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-wider text-white/40">
+              <Clock className="h-4 w-4" />
+              Time Remaining
+            </div>
 
-                      {/* Option B */}
-                      <div className="space-y-1.5 p-2 rounded-2xl bg-slate-950/40 border border-slate-800/80">
-                        <div className="flex items-center justify-between text-xs font-semibold">
-                          <div className="flex items-center gap-2">
-                            {battle.optionB.imageUrl ? (
-                              <Image
-                                src={battle.optionB.imageUrl}
-                                alt={battle.optionB.label}
-                                width={28}
-                                height={28}
-                                referrerPolicy="no-referrer"
-                                className="h-7 w-7 rounded-lg object-cover border border-orange-500/40"
-                              />
-                            ) : (
-                              <span className="text-base">{battle.optionB.emoji}</span>
-                            )}
-                            <div>
-                              <span className="text-slate-200 font-bold block">{battle.optionB.label}</span>
-                              {battle.optionB.tagline && (
-                                <span className="text-[10px] text-slate-400 font-normal block">
-                                  {battle.optionB.tagline}
-                                </span>
-                              )}
-                            </div>
-                            {battle.userVotedOptionId === battle.optionB.id && (
-                              <span className="text-orange-400 font-bold text-[10px] ml-1 bg-orange-400/10 px-1.5 py-0.2 rounded">
-                                (Your Vote ✓)
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-orange-400 font-bold">
-                            {battle.optionB.votes} votes ({percentB}%)
-                          </span>
-                        </div>
-                        <div className="h-2.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-gradient-to-r from-orange-500 to-rose-500 rounded-full transition-all duration-500"
-                            style={{ width: `${percentB}%` }}
-                          />
-                        </div>
-                      </div>
-                    </div>
+            <div className="font-mono text-4xl font-black text-white">
+              {formatTime(
+                remaining
+              )}
+            </div>
+          </>
+        )}
 
-                    {/* Feedback message for this battle */}
-                    {voteFeedback?.battleId === battle.id && (
-                      <div
-                        className={`mb-3 rounded-xl p-2.5 text-xs font-semibold flex items-center gap-1.5 ${
-                          voteFeedback.type === 'success'
-                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                            : 'bg-red-500/20 text-red-300 border border-red-500/30'
-                        }`}
-                      >
-                        <span>{voteFeedback.message}</span>
-                      </div>
-                    )}
-                  </div>
+      </div>
 
-                  {/* Actions / Vote Buttons */}
-                  <div className="pt-2 border-t border-slate-800">
-                    {isEnded ? (
-                      <div className="rounded-2xl bg-slate-800/80 border border-slate-700/60 p-2.5 text-center text-xs text-slate-400 flex items-center justify-center gap-1.5">
-                        <Lock className="h-3.5 w-3.5 text-slate-500" />
-                        <span>Voting Ended • Results Finalized</span>
-                      </div>
-                    ) : hasVoted ? (
-                      <div className="rounded-2xl bg-emerald-500/10 border border-emerald-500/30 p-2.5 text-center text-xs text-emerald-300 font-bold flex items-center justify-center gap-1.5">
-                        <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                        <span>You have voted (1 vote recorded)</span>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          id={`vote-optA-${battle.id}`}
-                          onClick={() => handleVoteInBattle(battle, battle.optionA.id)}
-                          disabled={votingBattleId === battle.id}
-                          className="rounded-2xl bg-slate-800 hover:bg-amber-500/20 border border-slate-700 hover:border-amber-400/50 p-2.5 text-xs font-bold text-slate-200 hover:text-amber-300 transition-all active:scale-95 text-center"
-                        >
-                          Vote {battle.optionA.emoji}
-                        </button>
-                        <button
-                          id={`vote-optB-${battle.id}`}
-                          onClick={() => handleVoteInBattle(battle, battle.optionB.id)}
-                          disabled={votingBattleId === battle.id}
-                          className="rounded-2xl bg-slate-800 hover:bg-orange-500/20 border border-slate-700 hover:border-orange-400/50 p-2.5 text-xs font-bold text-slate-200 hover:text-orange-300 transition-all active:scale-95 text-center"
-                        >
-                          Vote {battle.optionB.emoji}
-                        </button>
-                      </div>
-                    )}
+      {/* OPTIONS */}
+      <div className="grid gap-5 p-5 sm:grid-cols-2 sm:p-6">
 
-                    <div className="mt-2 text-center text-[10px] text-slate-500">
-                      Total: {totalVotes} community votes recorded
-                    </div>
-                  </div>
-                </div>
+        {options.map(
+          (option) => {
+            const votes =
+              Number(
+                option.votes || 0
               );
-            })}
-          </div>
+
+            const percentage =
+              totalVotes > 0
+                ? Math.round(
+                    (votes /
+                      totalVotes) *
+                      100
+                  )
+                : 0;
+
+            const selected =
+              selectedOption ===
+              option.id;
+
+            const isWinner =
+              winner?.id ===
+              option.id;
+
+            return (
+              <div
+                key={option.id}
+                className={`overflow-hidden rounded-3xl border ${
+                  isWinner
+                    ? 'border-yellow-400/50 bg-yellow-400/10'
+                    : selected
+                    ? 'border-red-400/50 bg-red-400/10'
+                    : 'border-white/10 bg-white/[0.03]'
+                }`}
+              >
+
+                <div className="aspect-[16/10] bg-white/5">
+
+                  {getImage(
+                    option
+                  ) ? (
+                    <img
+                      src={getImage(
+                        option
+                      )}
+                      alt={option.name}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-white/20">
+                      <UsersIcon />
+                    </div>
+                  )}
+
+                </div>
+
+                <div className="p-5">
+
+                  <div className="flex items-center justify-between gap-3">
+
+                    <h3 className="text-xl font-black text-white">
+                      {option.name}
+                    </h3>
+
+                    {isWinner && (
+                      <Trophy className="h-5 w-5 text-yellow-400" />
+                    )}
+
+                  </div>
+
+                  <div className="mt-4">
+
+                    <div className="mb-2 flex justify-between text-xs text-white/50">
+                      <span>
+                        {votes} votes
+                      </span>
+
+                      <span>
+                        {percentage}%
+                      </span>
+                    </div>
+
+                    <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                      <div
+                        className="h-full rounded-full bg-red-500 transition-all"
+                        style={{
+                          width:
+                            `${percentage}%`,
+                        }}
+                      />
+                    </div>
+
+                  </div>
+
+                  {!finished && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void vote(
+                          option.id
+                        )
+                      }
+                      disabled={
+                        voting ||
+                        hasVoted
+                      }
+                      className="mt-5 w-full rounded-xl bg-red-500 px-4 py-3 font-bold text-white hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {voting &&
+                      selected
+                        ? 'Voting...'
+                        : hasVoted
+                        ? 'Already Voted'
+                        : 'Vote'}
+                    </button>
+                  )}
+
+                </div>
+              </div>
+            );
+          }
+        )}
+
+      </div>
+
+      {/* VOTE ERROR */}
+      {voteError && (
+        <div className="mx-5 mb-5 flex items-center gap-2 rounded-xl border border-red-400/20 bg-red-400/10 p-3 text-sm text-red-300 sm:mx-6">
+          <AlertCircle className="h-4 w-4" />
+          {voteError}
         </div>
       )}
 
-      {/* VIEW 2: 1v1 Live Rap/Roast Clash Arena */}
-      {activeArenaTab === '1v1' && !inBattle && (
-        /* Battle Mode Select Screen */
-        <div className="flex-1 flex flex-col items-center justify-center py-8">
-          <div className="text-center max-w-lg mb-8">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-tr from-orange-600 to-amber-400 text-slate-950 shadow-xl shadow-orange-500/20">
-              <Swords className="h-8 w-8" />
-            </div>
-            <h2 className="text-2xl sm:text-3xl font-black text-white">Choose Your 1v1 Battle Arena</h2>
-            <p className="text-xs sm:text-sm text-slate-400 mt-2">
-              Clash against {opponentName} across 3 intense rounds. Score high, hype up the stadium, and earn +100 Dhoti Coins!
-            </p>
-          </div>
+      {/* RESULT */}
+      {finished && (
+        <div className="border-y border-white/10 bg-yellow-400/5 p-6 text-center">
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full max-w-4xl">
-            {/* Rap Battle */}
-            <div className="rounded-3xl bg-slate-900/90 border border-slate-800 hover:border-amber-500/50 p-6 flex flex-col justify-between shadow-xl group transition-all">
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-3xl">🎤</span>
-                  <span className="text-[10px] font-bold uppercase bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full">
-                    Flow & Rhyme
-                  </span>
-                </div>
-                <h3 className="text-lg font-black text-white group-hover:text-amber-400 transition-colors">
-                  Desi Rap Battle
-                </h3>
-                <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                  Spit high-voltage rhythmic bars in Hindi/Haryanvi style. Rhymes and punchlines get bonus hype.
-                </p>
+          <Trophy className="mx-auto mb-3 h-10 w-10 text-yellow-400" />
+
+          {winner ? (
+            <>
+              <div className="text-xs font-bold uppercase tracking-wider text-yellow-400">
+                Winner
               </div>
-              <button
-                id="start-rap-battle-btn"
-                onClick={() => startNewBattle('rap')}
-                className="mt-6 w-full rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 py-3 text-xs font-bold text-slate-950 shadow-md transition-transform active:scale-95"
-              >
-                Enter Rap Arena ⚔️
-              </button>
-            </div>
 
-            {/* Roast Battle */}
-            <div className="rounded-3xl bg-slate-900/90 border border-slate-800 hover:border-orange-500/50 p-6 flex flex-col justify-between shadow-xl group transition-all">
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-3xl">🔥</span>
-                  <span className="text-[10px] font-bold uppercase bg-orange-500/20 text-orange-300 px-2 py-0.5 rounded-full">
-                    Banter & Wit
-                  </span>
-                </div>
-                <h3 className="text-lg font-black text-white group-hover:text-orange-400 transition-colors">
-                  Desi Roast Battle
-                </h3>
-                <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                  Deliver funny, witty, playful roasts. Keep it clever, lighthearted, and full of desi swag!
-                </p>
-              </div>
-              <button
-                id="start-roast-battle-btn"
-                onClick={() => startNewBattle('roast')}
-                className="mt-6 w-full rounded-2xl bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 py-3 text-xs font-bold text-slate-950 shadow-md transition-transform active:scale-95"
-              >
-                Enter Roast Arena 🔥
-              </button>
-            </div>
+              <h3 className="mt-1 text-3xl font-black text-white">
+                {winner.name}
+              </h3>
 
-            {/* Wit & Trivia */}
-            <div className="rounded-3xl bg-slate-900/90 border border-slate-800 hover:border-blue-500/50 p-6 flex flex-col justify-between shadow-xl group transition-all">
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-3xl">⚡</span>
-                  <span className="text-[10px] font-bold uppercase bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full">
-                    Instant Comeback
-                  </span>
-                </div>
-                <h3 className="text-lg font-black text-white group-hover:text-blue-400 transition-colors">
-                  Wit & Trivia Clash
-                </h3>
-                <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                  Fast desi trivia, witty comebacks, and rapid-fire questions to test your speed.
-                </p>
-              </div>
-              <button
-                id="start-wit-battle-btn"
-                onClick={() => startNewBattle('wit')}
-                className="mt-6 w-full rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 py-3 text-xs font-bold text-white shadow-md transition-transform active:scale-95"
-              >
-                Enter Wit Arena ⚡
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 1v1 ACTIVE CLASH STAGE */}
-      {activeArenaTab === '1v1' && inBattle && (
-        <div className="flex-1 flex flex-col justify-between py-4 space-y-4">
-          {/* Top Scoreboard & Crowd Hype Meter */}
-          <div className="grid grid-cols-3 gap-2 sm:gap-4 p-4 rounded-3xl bg-slate-900/90 border border-slate-800 shadow-xl items-center">
-            {/* Player Info */}
-            <div className="flex flex-col items-center sm:items-start text-center sm:text-left">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                {currentUser?.name || 'You (Resident)'}
-              </span>
-              <span className="text-2xl sm:text-3xl font-black text-amber-400">
-                {playerTotalScore} pts
-              </span>
-              <span className="text-[10px] text-slate-500">
-                {currentUser ? currentUser.badge : 'Guest Resident'}
-              </span>
-            </div>
-
-            {/* Stadium Hype Center */}
-            <div className="flex flex-col items-center text-center">
-              <div className="flex items-center gap-1.5 mb-1">
-                <Flame className="h-4 w-4 text-orange-400 animate-bounce" />
-                <span className="text-xs font-black text-white">ROUND {currentRound} / 3</span>
-              </div>
-              <div className="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-orange-600 via-amber-500 to-yellow-300 transition-all duration-300"
-                  style={{ width: `${crowdHype}%` }}
+              {getImage(
+                winner
+              ) && (
+                <img
+                  src={getImage(
+                    winner
+                  )}
+                  alt={winner.name}
+                  className="mx-auto mt-5 max-h-[350px] max-w-md rounded-2xl object-cover"
                 />
-              </div>
-              <span className="text-[10px] text-amber-300 font-bold mt-1">
-                Stadium Hype: {crowdHype}%
-              </span>
-            </div>
-
-            {/* Opponent Info */}
-            <div className="flex flex-col items-center sm:items-end text-center sm:text-right">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate max-w-[120px]">
-                {opponentName}
-              </span>
-              <span className="text-2xl sm:text-3xl font-black text-orange-400">
-                {opponentTotalScore} pts
-              </span>
-              <span className="text-[10px] text-slate-500">Defending AI Champ</span>
-            </div>
-          </div>
-
-          {/* AI Referee Live Commentary Banner */}
-          {latestCommentary && (
-            <div className="rounded-2xl bg-amber-500/10 border border-amber-500/30 p-3 flex items-center justify-between gap-2 text-xs">
-              <div className="flex items-center gap-2">
-                <span className="text-base">📢</span>
-                <span className="text-amber-300 font-semibold">{latestCommentary}</span>
-              </div>
-              <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold shrink-0">
-                Live Referee
-              </span>
-            </div>
+              )}
+            </>
+          ) : (
+            <h3 className="text-2xl font-black text-white">
+              It&apos;s a Draw!
+            </h3>
           )}
 
-          {/* Verses Battle Exchange History */}
-          <div className="flex-1 overflow-y-auto space-y-3 min-h-[220px] max-h-[360px] p-2">
-            {rounds.map((r, idx) => (
-              <div
-                key={idx}
-                className="rounded-2xl bg-slate-900/60 border border-slate-800/80 p-3 sm:p-4 space-y-2"
-              >
-                <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 border-b border-slate-800 pb-1">
-                  <span>Round {r.roundNumber} Clash</span>
-                  <span>
-                    You: +{r.playerScore} | Opponent: +{r.opponentScore}
-                  </span>
-                </div>
+        </div>
+      )}
 
-                {/* Player Verse */}
-                <div className="flex items-start gap-2">
-                  <span className="text-xs font-black text-amber-400">You:</span>
-                  <p className="text-xs sm:text-sm text-slate-200 font-medium">&ldquo;{r.playerVerse}&rdquo;</p>
-                </div>
+      {/* COMMENTS */}
+      <div className="p-5 sm:p-6">
 
-                {/* Opponent Verse */}
-                <div className="flex items-start gap-2 bg-slate-950/40 p-2 rounded-xl">
-                  <span className="text-xs font-black text-orange-400">{opponentName}:</span>
-                  <p className="text-xs sm:text-sm text-slate-100 font-medium italic">&ldquo;{r.opponentVerse}&rdquo;</p>
-                </div>
-              </div>
-            ))}
-          </div>
+        <div className="mb-4 flex items-center gap-2">
+          <MessageCircle className="h-5 w-5 text-white/60" />
 
-          {/* Round Complete / Winner Modal */}
-          {winnerDeclared ? (
-            <div className="rounded-3xl bg-slate-900 border-2 border-amber-400 p-6 text-center shadow-2xl animate-in zoom-in-95">
-              <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-3xl bg-amber-500 text-slate-950 shadow-xl">
-                <Trophy className="h-8 w-8" />
-              </div>
-              <h2 className="text-2xl sm:text-3xl font-black text-white">
-                {winnerDeclared === 'player'
-                  ? 'VICTORY! YOU ARE THE DHOTI CHAMPION!'
-                  : winnerDeclared === 'opponent'
-                  ? `${opponentName.toUpperCase()} TAKES THE WIN!`
-                  : 'IT IS A LEGENDARY TIE!'}
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-300 mt-1">
-                Final Score: You {playerTotalScore} - {opponentTotalScore} {opponentName}
-              </p>
-              {winnerDeclared === 'player' && (
-                <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 px-3 py-1 text-xs font-bold text-amber-300 border border-amber-500/40">
-                  <Award className="h-4 w-4 text-amber-400" />
-                  <span>+100 Dhoti Coins Reward Credited to Profile!</span>
-                </div>
-              )}
+          <h3 className="font-black text-white">
+            Comments
+          </h3>
 
-              <div className="mt-6 flex justify-center gap-3">
-                <button
-                  onClick={() => startNewBattle(battleMode)}
-                  className="rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-2.5 text-xs font-bold text-slate-950 shadow-lg"
-                >
-                  Rematch ⚔️
-                </button>
-                <button
-                  onClick={() => setInBattle(false)}
-                  className="rounded-2xl bg-slate-800 px-6 py-2.5 text-xs font-bold text-slate-300 hover:bg-slate-700"
-                >
-                  Back to Arenas
-                </button>
-              </div>
+          <span className="text-xs text-white/30">
+            ({comments.length})
+          </span>
+        </div>
+
+        <div className="max-h-[350px] space-y-3 overflow-y-auto">
+
+          {comments.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-sm text-white/30">
+              No comments yet.
             </div>
           ) : (
-            /* Verse Entry Section */
-            <div className="rounded-3xl bg-slate-950/90 border border-slate-800 p-4 shadow-xl">
-              <div className="mb-2 flex items-center justify-between text-xs font-semibold text-slate-400">
-                <span>Deliver your punchline for Round {currentRound}</span>
-                <span className="text-amber-400">Or pick a quick desi rhyme below</span>
-              </div>
+            comments.map(
+              (item) => {
+                const itemUserId =
+                  item.userId ||
+                  item.user_id;
 
-              {/* Quick Rhyme Chips */}
-              <div className="flex flex-wrap gap-1.5 mb-3">
-                {sampleVerses[battleMode].map((verse, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setUserVerseInput(verse)}
-                    className="rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 px-3 py-1 text-[11px] font-medium text-slate-300 hover:text-amber-300 transition-colors"
+                const own =
+                  !!userId &&
+                  !!itemUserId &&
+                  String(userId) ===
+                    String(itemUserId);
+
+                return (
+                  <div
+                    key={item.id}
+                    className="rounded-xl border border-white/10 bg-white/[0.03] p-4"
                   >
-                    &ldquo;{verse.slice(0, 35)}...&rdquo;
-                  </button>
-                ))}
-              </div>
 
-              <div className="flex gap-2">
-                <input
-                  id="battle-verse-input"
-                  type="text"
-                  placeholder={`Write your Round ${currentRound} ${battleMode} line...`}
-                  value={userVerseInput}
-                  onChange={(e) => setUserVerseInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleVerseSubmit(userVerseInput);
-                  }}
-                  disabled={isJudging}
-                  className="flex-1 rounded-2xl bg-slate-900 border border-slate-800 px-4 py-3 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
-                />
+                    <div className="flex justify-between gap-3">
 
-                <button
-                  id="battle-verse-submit-btn"
-                  onClick={() => handleVerseSubmit(userVerseInput)}
-                  disabled={isJudging || !userVerseInput.trim()}
-                  className="rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 px-5 py-3 text-xs sm:text-sm font-bold text-slate-950 shadow-md transition-transform active:scale-95 disabled:opacity-50"
-                >
-                  {isJudging ? 'Judging...' : 'Drop Bar 🔥'}
-                </button>
-              </div>
-            </div>
+                      <div className="text-sm font-bold text-white">
+                        {item.userName ||
+                          item.user_name ||
+                          'User'}
+                      </div>
+
+                      {own && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void deleteComment(
+                              item.id
+                            )
+                          }
+                          className="text-xs text-red-300"
+                        >
+                          Delete
+                        </button>
+                      )}
+
+                    </div>
+
+                    <p className="mt-2 whitespace-pre-wrap break-words text-sm text-white/60">
+                      {item.message}
+                    </p>
+
+                  </div>
+                );
+              }
+            )
           )}
+
         </div>
-      )}
+
+        {!finished && email && (
+          <div className="mt-5">
+
+            <div className="flex gap-2">
+
+              <input
+                value={comment}
+                onChange={(event) =>
+                  setComment(
+                    event.target.value
+                  )
+                }
+                onKeyDown={(event) => {
+                  if (
+                    event.key ===
+                    'Enter'
+                  ) {
+                    event.preventDefault();
+                    void sendComment();
+                  }
+                }}
+                maxLength={500}
+                placeholder="Write a comment..."
+                className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30"
+              />
+
+              <button
+                type="button"
+                onClick={() =>
+                  void sendComment()
+                }
+                disabled={
+                  sendingComment ||
+                  !comment.trim()
+                }
+                className="flex items-center gap-2 rounded-xl bg-red-500 px-4 py-3 font-bold text-white disabled:opacity-50"
+              >
+                {sendingComment ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+
+                <span className="hidden sm:inline">
+                  Send
+                </span>
+              </button>
+
+            </div>
+
+            {commentError && (
+              <p className="mt-2 text-xs text-red-300">
+                {commentError}
+              </p>
+            )}
+
+          </div>
+        )}
+
+        {!email && (
+          <button
+            type="button"
+            onClick={() =>
+              onOpenAuth?.()
+            }
+            className="mt-5 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-white hover:bg-white/10"
+          >
+            Login to comment
+          </button>
+        )}
+
+      </div>
     </div>
   );
 }
+
+function UsersIcon() {
+  return (
+    <svg
+      width="48"
+      height="48"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      className="text-white/20"
+    >
+      <path
+        d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"
+      />
+      <circle
+        cx="9"
+        cy="7"
+        r="4"
+      />
+      <path
+        d="M22 21v-2a4 4 0 0 0-3-3.87"
+      />
+      <path
+        d="M16 3.13a4 4 0 0 1 0 7.75"
+      />
+    </svg>
+  );
+}
+
+export default BattleArena;
