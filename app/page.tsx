@@ -121,8 +121,11 @@ export default function Home() {
   };
 
   /*
-   * Sync Supabase Auth session with application user state.
+   * ============================================================
+   * SUPABASE AUTH SESSION SYNC
+   * ============================================================
    */
+
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
 
@@ -261,6 +264,124 @@ export default function Home() {
     };
   }, []);
 
+  /*
+   * ============================================================
+   * REAL ONLINE PRESENCE HEARTBEAT
+   * ============================================================
+   *
+   * Every logged-in user sends a heartbeat to:
+   *
+   * /api/presence
+   *
+   * Identity comes from the real Supabase access token.
+   *
+   * No fake users.
+   * No random online count.
+   * No client-supplied user ID used as identity.
+   *
+   * Presence is refreshed every 15 seconds.
+   */
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+
+    let cancelled = false;
+    let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+
+    const sendPresenceHeartbeat = async () => {
+      if (cancelled) return;
+
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (cancelled) return;
+
+        if (!session?.access_token || !session.user) {
+          return;
+        }
+
+        const response = await fetch('/api/presence', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userName:
+              currentUser?.name ||
+              session.user.user_metadata?.name ||
+              session.user.user_metadata?.full_name ||
+              session.user.email?.split('@')[0] ||
+              'User',
+
+            userAvatar:
+              currentUser?.avatar ||
+              session.user.user_metadata?.avatar_url ||
+              session.user.user_metadata?.picture ||
+              '',
+
+            userBadge:
+              currentUser?.badge ||
+              '',
+
+            isVerified:
+              Boolean(currentUser?.isVerified),
+
+            isAdmin:
+              Boolean(currentUser?.isAdmin) ||
+              isSiteAdmin(session.user.email),
+          }),
+        });
+
+        if (!response.ok) {
+          const text = await response.text().catch(() => '');
+
+          console.warn(
+            'Presence heartbeat failed:',
+            response.status,
+            text
+          );
+        }
+      } catch (error) {
+        console.warn(
+          'Could not send presence heartbeat:',
+          error
+        );
+      }
+    };
+
+    /*
+     * Send immediately when a logged-in user exists.
+     */
+    if (currentUser) {
+      void sendPresenceHeartbeat();
+
+      /*
+       * Refresh every 15 seconds.
+       */
+      heartbeatTimer = setInterval(() => {
+        void sendPresenceHeartbeat();
+      }, 15_000);
+    }
+
+    return () => {
+      cancelled = true;
+
+      if (heartbeatTimer) {
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
+      }
+    };
+  }, [currentUser]);
+
+  /*
+   * ============================================================
+   * USER UPDATE
+   * ============================================================
+   */
+
   const handleUpdateUser = (
     updater: ((prev: User) => User) | Partial<User>
   ) => {
@@ -289,9 +410,64 @@ export default function Home() {
     notifyUserListeners();
   };
 
+  /*
+   * ============================================================
+   * LOGOUT
+   * ============================================================
+   *
+   * First remove the authenticated user's presence.
+   * Then sign out from Supabase.
+   */
+
   const handleLogout = async () => {
+    try {
+      /*
+       * Get the real Supabase session.
+       */
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      /*
+       * Remove presence using the authenticated token.
+       */
+      if (session?.access_token) {
+        try {
+          const response = await fetch('/api/presence', {
+            method: 'DELETE',
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
+          });
+
+          if (!response.ok) {
+            console.warn(
+              'Could not remove user presence:',
+              response.status
+            );
+          }
+        } catch (presenceError) {
+          console.warn(
+            'Presence logout cleanup failed:',
+            presenceError
+          );
+        }
+      }
+    } catch (error) {
+      console.warn(
+        'Could not get session before logout:',
+        error
+      );
+    }
+
+    /*
+     * Sign out from Supabase Auth.
+     */
     await signOutSupabase();
 
+    /*
+     * Remove local application session.
+     */
     try {
       localStorage.removeItem('dhoti_user');
       localStorage.removeItem('phone_google_user');
@@ -308,6 +484,12 @@ export default function Home() {
     setSelectedOpponent(undefined);
   };
 
+  /*
+   * ============================================================
+   * BATTLE INVITE
+   * ============================================================
+   */
+
   const handleStartBattleInvite = (
     opponentName: string
   ) => {
@@ -319,15 +501,6 @@ export default function Home() {
    * ============================================================
    * AI VOICE ASSISTANT — TEMPORARILY LOCKED
    * ============================================================
-   *
-   * VoiceAssistant intentionally isn't rendered here.
-   * If user opens Assistant from LandingPage, only the locked
-   * premium screen will be shown.
-   *
-   * Later:
-   * const AI_VOICE_LOCKED = false;
-   *
-   * and VoiceAssistant can be connected again.
    */
 
   const AI_VOICE_LOCKED = true;
@@ -393,10 +566,6 @@ export default function Home() {
           <LandingPage
             currentUser={currentUser}
             onNavigateTab={(tab) => {
-              /*
-               * AI Voice ko landing page se bhi locked
-               * rakha gaya hai.
-               */
               if (
                 tab === 'assistant' &&
                 AI_VOICE_LOCKED
@@ -413,9 +582,7 @@ export default function Home() {
           />
         )}
 
-        {/* ======================================================
-            AI VOICE — LOCKED
-            ====================================================== */}
+        {/* AI VOICE — LOCKED */}
         {activeTab === 'assistant' &&
           AI_VOICE_LOCKED && (
             <div className="min-h-[75vh] w-full flex items-center justify-center px-4 py-12">
@@ -424,19 +591,16 @@ export default function Home() {
 
                 <div className="relative overflow-hidden rounded-3xl border border-amber-200 bg-white p-8 text-center shadow-xl">
 
-                  {/* Background decoration */}
                   <div className="pointer-events-none absolute -right-12 -top-12 h-32 w-32 rounded-full bg-amber-100/70 blur-2xl" />
 
                   <div className="pointer-events-none absolute -bottom-12 -left-12 h-32 w-32 rounded-full bg-orange-100/70 blur-2xl" />
 
                   <div className="relative">
 
-                    {/* Lock Icon */}
                     <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-amber-100">
                       <LockKeyhole className="h-9 w-9 text-amber-600" />
                     </div>
 
-                    {/* Premium Label */}
                     <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-amber-700">
 
                       <Sparkles className="h-3.5 w-3.5" />
@@ -454,7 +618,6 @@ export default function Home() {
                       unlock voice features.
                     </p>
 
-                    {/* Upgrade */}
                     <button
                       type="button"
                       onClick={() => {
@@ -469,7 +632,6 @@ export default function Home() {
                       <LockKeyhole className="h-4 w-4" />
                     </button>
 
-                    {/* Back */}
                     <button
                       type="button"
                       onClick={() =>
@@ -546,6 +708,7 @@ export default function Home() {
       {/* ======================================================
           BOTTOM NAVIGATION
           ====================================================== */}
+
       <nav
         className="fixed bottom-0 inset-x-0 w-full bg-white/95 backdrop-blur-md border-t border-stone-200 z-30 shadow-lg"
         data-purpose="mobile-bottom-nav"

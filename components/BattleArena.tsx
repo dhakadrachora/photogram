@@ -1,1440 +1,1167 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import Image from 'next/image';
 import {
   Swords,
+  Flame,
   Trophy,
-  Clock,
-  MessageCircle,
-  Send,
-  Loader2,
   RefreshCw,
-  AlertCircle,
+  CheckCircle2,
+  Lock,
+  LogIn,
+  Vote,
+  Clock,
+  ShieldCheck,
+  Crown,
+  Users,
+  MessageCircle,
 } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js';
 
-type BattleOption = {
-  id: string;
-  name?: string | null;
-  label?: string | null;
-  tagline?: string | null;
-  emoji?: string | null;
-  imageUrl?: string | null;
-  image_url?: string | null;
-  votes?: number | null;
-};
+import {
+  User,
+  BattleEvent,
+  AppTab,
+} from '@/types';
 
-type Battle = {
-  id: string;
-  title?: string | null;
-  description?: string | null;
-  question?: string | null;
+import { isSiteAdmin } from '@/lib/admin-auth';
 
-  options?: BattleOption[] | null;
-
-  optionA?: BattleOption | null;
-  optionB?: BattleOption | null;
-
-  startsAt?: string | number | null;
-  starts_at?: string | number | null;
-
-  endsAt?: string | number | null;
-  ends_at?: string | number | null;
-
-  status?: string | null;
-  published?: boolean;
-
-  winnerOptionId?: string | null;
-  winner_option_id?: string | null;
-};
-
-type BattleComment = {
-  id: string;
-  battle_id?: string;
-  battleId?: string;
-  user_id?: string;
-  userId?: string;
-  user_name?: string;
-  userName?: string;
-  message: string;
-  created_at?: string;
-  createdAt?: string;
-};
-
-type BattleArenaProps = {
-  currentUser?: {
-    id?: string;
-    email?: string | null;
-    name?: string | null;
-    [key: string]: any;
-  } | null;
-
-  onOpenAuth?: () => void;
+interface BattleArenaProps {
+  currentUser: User | null;
+  onOpenAuth: () => void;
   selectedOpponent?: string;
+  onUpdateUser?: (updater: (prev: User) => User) => void;
+  onNavigateTab?: (tab: AppTab) => void;
+}
 
-  onUpdateUser?: (
-    updater: ((previous: any) => any) | Partial<any>
-  ) => void;
-
-  onNavigateTab?: (tab: any) => void;
-
-  userEmail?: string | null;
-  currentUserEmail?: string | null;
+type VoteFeedback = {
+  battleId: string;
+  message: string;
+  type: 'success' | 'error';
 };
 
-const SUPABASE_URL =
-  process.env.NEXT_PUBLIC_SUPABASE_URL ||
-  'https://zlngcbefvdtbihndaeun.supabase.co';
-
-const SUPABASE_KEY =
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  '';
-
-const supabase = createClient(
-  SUPABASE_URL,
-  SUPABASE_KEY
-);
-
-/* ---------------------------------------------------------
-   NORMALIZATION
---------------------------------------------------------- */
-
-function normalizeOption(
-  option: any,
-  fallbackId: string
-): BattleOption {
-  return {
-    id: String(option?.id || fallbackId),
-
-    name:
-      option?.name ??
-      option?.label ??
-      '',
-
-    label:
-      option?.label ??
-      option?.name ??
-      '',
-
-    tagline:
-      option?.tagline ??
-      '',
-
-    emoji:
-      option?.emoji ??
-      '',
-
-    imageUrl:
-      option?.imageUrl ??
-      option?.image_url ??
-      option?.image ??
-      option?.photoUrl ??
-      option?.photo_url ??
-      '',
-
-    image_url:
-      option?.image_url ??
-      option?.imageUrl ??
-      option?.image ??
-      option?.photoUrl ??
-      option?.photo_url ??
-      '',
-
-    votes:
-      Number(option?.votes ?? 0),
-  };
-}
-
-function getOptions(
-  battle: Battle | null
-): BattleOption[] {
-  if (!battle) return [];
-
-  if (
-    Array.isArray(battle.options) &&
-    battle.options.length > 0
-  ) {
-    return battle.options
-      .slice(0, 2)
-      .map((option, index) =>
-        normalizeOption(
-          option,
-          index === 0 ? 'option_a' : 'option_b'
-        )
-      );
+function formatRemaining(ms: number): string {
+  if (ms <= 0) {
+    return '00:00:00';
   }
 
-  const result: BattleOption[] = [];
-
-  if (battle.optionA) {
-    result.push(
-      normalizeOption(
-        battle.optionA,
-        'option_a'
-      )
-    );
-  }
-
-  if (battle.optionB) {
-    result.push(
-      normalizeOption(
-        battle.optionB,
-        'option_b'
-      )
-    );
-  }
-
-  return result.slice(0, 2);
-}
-
-function getOptionName(
-  option: BattleOption
-) {
-  return (
-    option.name ||
-    option.label ||
-    'Participant'
-  );
-}
-
-function getOptionImage(
-  option: BattleOption
-) {
-  const url =
-    option.imageUrl ||
-    option.image_url ||
-    '';
-
-  return typeof url === 'string'
-    ? url.trim()
-    : '';
-}
-
-function getEndTime(
-  battle: Battle | null
-): number | null {
-  if (!battle) return null;
-
-  const value =
-    battle.endsAt ??
-    battle.ends_at;
-
-  if (!value) return null;
-
-  if (typeof value === 'number') {
-    return Number.isFinite(value)
-      ? value
-      : null;
-  }
-
-  const time =
-    new Date(value).getTime();
-
-  return Number.isFinite(time)
-    ? time
-    : null;
-}
-
-function formatTime(
-  milliseconds: number
-) {
-  const seconds = Math.max(
-    0,
-    Math.floor(milliseconds / 1000)
-  );
-
-  const days = Math.floor(
-    seconds / 86400
-  );
-
-  const hours = Math.floor(
-    (seconds % 86400) / 3600
-  );
-
-  const minutes = Math.floor(
-    (seconds % 3600) / 60
-  );
-
-  const remainingSeconds =
-    seconds % 60;
+  const totalSeconds = Math.floor(ms / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
 
   if (days > 0) {
-    return `${days}d ${String(hours).padStart(
-      2,
-      '0'
-    )}:${String(minutes).padStart(
-      2,
-      '0'
-    )}:${String(remainingSeconds).padStart(
-      2,
-      '0'
-    )}`;
+    return `${days}d ${String(hours).padStart(2, '0')}h ${String(
+      minutes
+    ).padStart(2, '0')}m`;
   }
 
-  return `${String(hours).padStart(
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(
     2,
     '0'
-  )}:${String(minutes).padStart(
-    2,
-    '0'
-  )}:${String(remainingSeconds).padStart(
-    2,
-    '0'
-  )}`;
+  )}:${String(seconds).padStart(2, '0')}`;
 }
 
-/* ---------------------------------------------------------
-   COMPONENT
---------------------------------------------------------- */
+function getBattleStatus(battle: BattleEvent, now: number) {
+  if (battle.isEnded || battle.status === 'closed') {
+    return 'closed' as const;
+  }
+
+  if (battle.startsAt && now < battle.startsAt) {
+    return 'upcoming' as const;
+  }
+
+  if (battle.endsAt <= now) {
+    return 'closed' as const;
+  }
+
+  return 'active' as const;
+}
+
+function getWinnerLabel(battle: BattleEvent): string | null {
+  if (!battle.winnerOptionId) {
+    return null;
+  }
+
+  if (battle.winnerOptionId === battle.optionA.id) {
+    return battle.optionA.label;
+  }
+
+  if (battle.winnerOptionId === battle.optionB.id) {
+    return battle.optionB.label;
+  }
+
+  return null;
+}
+
+function getImageUrl(imageUrl?: string) {
+  if (!imageUrl || !imageUrl.trim()) {
+    return null;
+  }
+
+  return imageUrl.trim();
+}
+
+function BattleOptionImage({
+  imageUrl,
+  alt,
+}: {
+  imageUrl?: string;
+  alt: string;
+}) {
+  const src = getImageUrl(imageUrl);
+
+  if (!src) {
+    return (
+      <div className="flex h-full min-h-[220px] w-full items-center justify-center bg-zinc-900 text-6xl">
+        🏆
+      </div>
+    );
+  }
+
+  return (
+    <Image
+      src={src}
+      alt={alt}
+      fill
+      sizes="(max-width: 768px) 100vw, 50vw"
+      className="object-cover"
+      unoptimized
+    />
+  );
+}
 
 export function BattleArena({
   currentUser,
   onOpenAuth,
   selectedOpponent,
-  userEmail,
-  currentUserEmail,
+  onUpdateUser,
+  onNavigateTab,
 }: BattleArenaProps) {
-  const email =
-    currentUserEmail ||
-    userEmail ||
-    currentUser?.email ||
-    null;
+  const isAdmin = isSiteAdmin(currentUser?.email);
 
-  const [battle, setBattle] =
-    useState<Battle | null>(null);
-
-  const [comments, setComments] =
-    useState<BattleComment[]>([]);
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [refreshing, setRefreshing] =
-    useState(false);
-
-  const [remaining, setRemaining] =
-    useState(0);
-
-  const [selectedOption, setSelectedOption] =
-    useState<string | null>(null);
-
-  const [hasVoted, setHasVoted] =
-    useState(false);
-
-  const [voting, setVoting] =
-    useState(false);
-
-  const [voteError, setVoteError] =
-    useState('');
-
-  const [comment, setComment] =
-    useState('');
-
-  const [sendingComment, setSendingComment] =
-    useState(false);
-
-  const [commentError, setCommentError] =
-    useState('');
-
-  const [userId, setUserId] =
-    useState<string | null>(
-      currentUser?.id
-        ? String(currentUser.id)
-        : null
-    );
-
-  const options = useMemo(
-    () => getOptions(battle),
-    [battle]
+  const [activeArenaTab, setActiveArenaTab] = useState<'events' | '1v1'>(
+    'events'
   );
 
-  const totalVotes = useMemo(
-    () =>
-      options.reduce(
-        (sum, option) =>
-          sum +
-          Number(option.votes || 0),
-        0
-      ),
-    [options]
-  );
+  const [battleEvents, setBattleEvents] = useState<BattleEvent[]>([]);
+  const [isLoadingBattles, setIsLoadingBattles] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const winnerId =
-    battle?.winnerOptionId ||
-    battle?.winner_option_id ||
-    null;
+  const [now, setNow] = useState(Date.now());
 
-  const winner =
-    winnerId
-      ? options.find(
-          option =>
-            option.id === winnerId
-        )
-      : null;
+  const [votingBattleId, setVotingBattleId] = useState<string | null>(null);
 
-  const finished =
-    battle?.status === 'completed' ||
-    battle?.status === 'closed' ||
-    remaining <= 0;
+  const [voteFeedback, setVoteFeedback] =
+    useState<VoteFeedback | null>(null);
 
-  /* -------------------------------------------------------
-     AUTH TOKEN
-  ------------------------------------------------------- */
+  const [selectedBattle, setSelectedBattle] =
+    useState<BattleEvent | null>(null);
 
-  async function getToken() {
-    const {
-      data: { session },
-    } =
-      await supabase.auth.getSession();
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-    return (
-      session?.access_token || null
-    );
-  }
+  const opponentName =
+    selectedOpponent || 'Dhoti Aale AI Champion';
 
-  /* -------------------------------------------------------
-     LOAD BATTLE
-  ------------------------------------------------------- */
+  /*
+   * IMPORTANT:
+   * This component intentionally does NOT import createClient()
+   * and does NOT create a Supabase browser client.
+   *
+   * All battle data goes through our API routes.
+   */
 
-  async function loadBattle(
-    refresh = false
-  ) {
-    try {
-      if (refresh) {
-        setRefreshing(true);
+  const loadBattles = useCallback(
+    async (showLoader = false) => {
+      if (showLoader) {
+        setIsRefreshing(true);
       }
 
-      const response =
-        await fetch(
-          '/api/battle',
+      try {
+        setErrorMessage(null);
+
+        const emailParam = currentUser?.email
+          ? `?email=${encodeURIComponent(currentUser.email)}`
+          : '';
+
+        const response = await fetch(
+          `/api/battle/vote${emailParam}`,
           {
             method: 'GET',
             cache: 'no-store',
             headers: {
-              Accept:
-                'application/json',
+              Accept: 'application/json',
             },
           }
         );
 
-      if (!response.ok) {
-        throw new Error(
-          `Battle API failed: ${response.status}`
+        const data = await response.json().catch(() => null);
+
+        if (!response.ok) {
+          throw new Error(
+            data?.error || 'Battle data load nahi ho saka.'
+          );
+        }
+
+        if (Array.isArray(data?.battles)) {
+          setBattleEvents(data.battles);
+        } else {
+          setBattleEvents([]);
+        }
+      } catch (error) {
+        console.error('Battle load error:', error);
+
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : 'Battle data load nahi ho saka.'
         );
+      } finally {
+        setIsLoadingBattles(false);
+        setIsRefreshing(false);
       }
+    },
+    [currentUser?.email]
+  );
 
-      const data =
-        await response.json();
+  useEffect(() => {
+    let cancelled = false;
 
-      let result: Battle | null =
-        null;
+    async function initialLoad() {
+      try {
+        setIsLoadingBattles(true);
 
-      if (data?.battle) {
-        result = data.battle;
-      }
+        const emailParam = currentUser?.email
+          ? `?email=${encodeURIComponent(currentUser.email)}`
+          : '';
 
-      if (
-        !result &&
-        Array.isArray(data?.battles)
-      ) {
-        result =
-          data.battles.find(
-            (item: Battle) =>
-              item?.published !== false
-          ) || null;
-      }
-
-      if (
-        !result &&
-        Array.isArray(data)
-      ) {
-        result =
-          data.find(
-            (item: Battle) =>
-              item?.published !== false
-          ) || null;
-      }
-
-      if (result) {
-        console.log(
-          'COMMUNITY BATTLE:',
-          result
-        );
-
-        console.log(
-          'OPTION A:',
-          result.optionA
-        );
-
-        console.log(
-          'OPTION B:',
-          result.optionB
-        );
-      }
-
-      setBattle(result);
-    } catch (error) {
-      console.error(
-        'Battle load error:',
-        error
-      );
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }
-
-  /* -------------------------------------------------------
-     COMMENTS
-  ------------------------------------------------------- */
-
-  async function loadComments(
-    battleId: string
-  ) {
-    try {
-      const response =
-        await fetch(
-          `/api/battle/comments?battleId=${encodeURIComponent(
-            battleId
-          )}`,
+        const response = await fetch(
+          `/api/battle/vote${emailParam}`,
           {
+            method: 'GET',
             cache: 'no-store',
-          }
-        );
-
-      if (!response.ok) return;
-
-      const data =
-        await response.json();
-
-      const list =
-        Array.isArray(data)
-          ? data
-          : Array.isArray(data?.comments)
-          ? data.comments
-          : [];
-
-      setComments(
-        list.filter(
-          (item: BattleComment) =>
-            item?.id
-        )
-      );
-    } catch (error) {
-      console.error(
-        'Comments error:',
-        error
-      );
-    }
-  }
-
-  /* -------------------------------------------------------
-     VOTE STATUS
-  ------------------------------------------------------- */
-
-  async function loadVoteStatus(
-    battleId: string
-  ) {
-    if (!email) return;
-
-    const token =
-      await getToken();
-
-    if (!token) return;
-
-    try {
-      const response =
-        await fetch(
-          `/api/battle/vote?battleId=${encodeURIComponent(
-            battleId
-          )}&status=true`,
-          {
             headers: {
-              Authorization:
-                `Bearer ${token}`,
+              Accept: 'application/json',
             },
-            cache: 'no-store',
           }
         );
 
-      if (!response.ok) return;
+        const data = await response.json().catch(() => null);
 
-      const data =
-        await response.json();
-
-      if (
-        typeof data?.hasVoted ===
-        'boolean'
-      ) {
-        setHasVoted(
-          data.hasVoted
-        );
-      }
-
-      if (data?.optionId) {
-        setSelectedOption(
-          String(data.optionId)
-        );
-      }
-    } catch (error) {
-      console.error(
-        'Vote status error:',
-        error
-      );
-    }
-  }
-
-  /* -------------------------------------------------------
-     INITIAL LOAD
-  ------------------------------------------------------- */
-
-  useEffect(() => {
-    void loadBattle();
-
-    async function loadUser() {
-      const {
-        data: { user },
-      } =
-        await supabase.auth.getUser();
-
-      if (user?.id) {
-        setUserId(
-          String(user.id)
-        );
-      }
-    }
-
-    void loadUser();
-  }, []);
-
-  useEffect(() => {
-    if (!battle?.id) return;
-
-    void loadComments(
-      battle.id
-    );
-
-    void loadVoteStatus(
-      battle.id
-    );
-  }, [battle?.id, email]);
-
-  /* -------------------------------------------------------
-     TIMER
-  ------------------------------------------------------- */
-
-  useEffect(() => {
-    if (!battle) return;
-
-    const updateTimer = () => {
-      const end =
-        getEndTime(battle);
-
-      if (end === null) {
-        setRemaining(0);
-        return;
-      }
-
-      setRemaining(
-        Math.max(
-          0,
-          end - Date.now()
-        )
-      );
-    };
-
-    updateTimer();
-
-    const timer =
-      window.setInterval(
-        updateTimer,
-        1000
-      );
-
-    return () => {
-      window.clearInterval(
-        timer
-      );
-    };
-  }, [battle]);
-
-  /* -------------------------------------------------------
-     REALTIME COMMENTS
-  ------------------------------------------------------- */
-
-  useEffect(() => {
-    if (!battle?.id) return;
-
-    const channel =
-      supabase
-        .channel(
-          `battle-comments-${battle.id}`
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'battle_comments',
-            filter:
-              `battle_id=eq.${battle.id}`,
-          },
-          payload => {
-            const incoming =
-              payload.new as BattleComment;
-
-            setComments(old => {
-              if (
-                old.some(
-                  item =>
-                    item.id ===
-                    incoming.id
-                )
-              ) {
-                return old;
-              }
-
-              return [
-                ...old,
-                incoming,
-              ];
-            });
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: 'DELETE',
-            schema: 'public',
-            table: 'battle_comments',
-            filter:
-              `battle_id=eq.${battle.id}`,
-          },
-          payload => {
-            const deleted =
-              payload.old as BattleComment;
-
-            setComments(old =>
-              old.filter(
-                item =>
-                  item.id !==
-                  deleted.id
-              )
+        if (!cancelled) {
+          if (response.ok && Array.isArray(data?.battles)) {
+            setBattleEvents(data.battles);
+            setErrorMessage(null);
+          } else {
+            setBattleEvents([]);
+            setErrorMessage(
+              data?.error || 'Battle data load nahi ho saka.'
             );
           }
-        )
-        .subscribe();
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Battle initial load error:', error);
+
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : 'Battle data load nahi ho saka.'
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingBattles(false);
+        }
+      }
+    }
+
+    initialLoad();
 
     return () => {
-      void supabase.removeChannel(
-        channel
-      );
+      cancelled = true;
     };
-  }, [battle?.id]);
+  }, [currentUser?.email]);
 
-  /* -------------------------------------------------------
-     VOTE
-  ------------------------------------------------------- */
+  /*
+   * Server timestamp countdown.
+   * This only updates the UI timer.
+   * Actual voting/expiry is enforced by the server.
+   */
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
 
-  async function vote(
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  /*
+   * Refresh once when a battle timer reaches zero.
+   * This does NOT create or modify any battle.
+   */
+  useEffect(() => {
+    const hasExpiredActiveBattle = battleEvents.some((battle) => {
+      const status = getBattleStatus(battle, now);
+      return (
+        status === 'closed' &&
+        !battle.isEnded &&
+        battle.status !== 'closed'
+      );
+    });
+
+    if (!hasExpiredActiveBattle) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      loadBattles(false);
+    }, 500);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [battleEvents, now, loadBattles]);
+
+  const voteForBattle = async (
+    battleId: string,
     optionId: string
-  ) {
-    setVoteError('');
-
-    if (!email) {
-      setVoteError(
-        'Vote karne ke liye login karo.'
-      );
-      onOpenAuth?.();
+  ) => {
+    if (!currentUser) {
+      onOpenAuth();
       return;
     }
 
-    if (!battle?.id) return;
-
-    if (finished) {
-      setVoteError(
-        'Voting close ho chuki hai.'
-      );
+    if (votingBattleId) {
       return;
     }
 
-    if (hasVoted) {
-      setVoteError(
-        'Aap already vote kar chuke ho.'
-      );
-      return;
-    }
-
-    const token =
-      await getToken();
-
-    if (!token) {
-      setVoteError(
-        'Login session expire ho gaya.'
-      );
-      return;
-    }
+    setVotingBattleId(battleId);
+    setVoteFeedback(null);
 
     try {
-      setVoting(true);
+      const response = await fetch('/api/battle/vote', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          battleId,
+          optionId,
+        }),
+      });
 
-      const response =
-        await fetch(
-          '/api/battle/vote',
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type':
-                'application/json',
-              Authorization:
-                `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              battleId:
-                battle.id,
-              optionId,
-            }),
-          }
-        );
-
-      const data =
-        await response
-          .json()
-          .catch(() => ({}));
+      const data = await response.json().catch(() => null);
 
       if (!response.ok) {
         throw new Error(
-          data?.error ||
-            'Vote submit nahi hua.'
+          data?.error || 'Vote submit nahi ho saka.'
         );
       }
 
-      setHasVoted(true);
-      setSelectedOption(
-        optionId
-      );
+      setVoteFeedback({
+        battleId,
+        message: data?.message || 'Vote successfully submit ho gaya.',
+        type: 'success',
+      });
 
-      await loadBattle();
-    } catch (error: any) {
-      setVoteError(
-        error?.message ||
-          'Vote submit nahi hua.'
-      );
-    } finally {
-      setVoting(false);
-    }
-  }
-
-  /* -------------------------------------------------------
-     COMMENT
-  ------------------------------------------------------- */
-
-  async function sendComment() {
-    setCommentError('');
-
-    if (!email) {
-      setCommentError(
-        'Comment karne ke liye login karo.'
-      );
-      onOpenAuth?.();
-      return;
-    }
-
-    if (!battle?.id) return;
-
-    if (finished) {
-      setCommentError(
-        'Battle khatam ho chuki hai.'
-      );
-      return;
-    }
-
-    const message =
-      comment.trim();
-
-    if (!message) return;
-
-    if (message.length > 500) {
-      setCommentError(
-        'Maximum 500 characters allowed.'
-      );
-      return;
-    }
-
-    const token =
-      await getToken();
-
-    if (!token) {
-      setCommentError(
-        'Login session expire ho gaya.'
-      );
-      return;
-    }
-
-    try {
-      setSendingComment(true);
-
-      const response =
-        await fetch(
-          '/api/battle/comments',
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type':
-                'application/json',
-              Authorization:
-                `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              battleId:
-                battle.id,
-              message,
-            }),
-          }
-        );
-
-      const data =
-        await response
-          .json()
-          .catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(
-          data?.error ||
-            'Comment send nahi hua.'
+      if (data?.battle) {
+        setBattleEvents((previous) =>
+          previous.map((battle) =>
+            battle.id === battleId
+              ? data.battle
+              : battle
+          )
         );
       }
 
-      if (data?.comment) {
-        setComments(old => {
-          if (
-            old.some(
-              item =>
-                item.id ===
-                data.comment.id
-            )
-          ) {
-            return old;
-          }
+      /*
+       * Server response ko primary source rakha gaya hai.
+       * Extra refresh se latest real vote count bhi mil jata hai.
+       */
+      await loadBattles(false);
 
-          return [
-            ...old,
-            data.comment,
-          ];
-        });
+      if (onUpdateUser) {
+        onUpdateUser((previous) => ({
+          ...previous,
+          battles: (previous.battles || 0) + 1,
+        }));
       }
-
-      setComment('');
-    } catch (error: any) {
-      setCommentError(
-        error?.message ||
-          'Comment send nahi hua.'
-      );
-    } finally {
-      setSendingComment(false);
-    }
-  }
-
-  /* -------------------------------------------------------
-     DELETE COMMENT
-  ------------------------------------------------------- */
-
-  async function deleteComment(
-    commentId: string
-  ) {
-    const token =
-      await getToken();
-
-    if (!token) return;
-
-    try {
-      const response =
-        await fetch(
-          `/api/battle/comments?id=${encodeURIComponent(
-            commentId
-          )}`,
-          {
-            method: 'DELETE',
-            headers: {
-              Authorization:
-                `Bearer ${token}`,
-            },
-          }
-        );
-
-      if (!response.ok) return;
-
-      setComments(old =>
-        old.filter(
-          item =>
-            item.id !==
-            commentId
-        )
-      );
     } catch (error) {
-      console.error(
-        'Delete comment error:',
-        error
-      );
+      console.error('Battle vote error:', error);
+
+      setVoteFeedback({
+        battleId,
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Vote submit nahi ho saka.',
+        type: 'error',
+      });
+    } finally {
+      setVotingBattleId(null);
     }
-  }
+  };
 
-  /* -------------------------------------------------------
-     UI
-  ------------------------------------------------------- */
+  const visibleBattles = useMemo(() => {
+    return battleEvents.filter((battle) => {
+      if (isAdmin) {
+        return true;
+      }
 
-  if (loading) {
+      return battle.published !== false;
+    });
+  }, [battleEvents, isAdmin]);
+
+  const activeBattles = useMemo(() => {
+    return visibleBattles.filter(
+      (battle) => getBattleStatus(battle, now) === 'active'
+    );
+  }, [visibleBattles, now]);
+
+  const upcomingBattles = useMemo(() => {
+    return visibleBattles.filter(
+      (battle) => getBattleStatus(battle, now) === 'upcoming'
+    );
+  }, [visibleBattles, now]);
+
+  const closedBattles = useMemo(() => {
+    return visibleBattles.filter(
+      (battle) => getBattleStatus(battle, now) === 'closed'
+    );
+  }, [visibleBattles, now]);
+
+  const renderBattleCard = (battle: BattleEvent) => {
+    const status = getBattleStatus(battle, now);
+
+    const totalVotes =
+      typeof battle.totalVotes === 'number'
+        ? battle.totalVotes
+        : battle.optionA.votes + battle.optionB.votes;
+
+    const optionAVotes = battle.optionA.votes || 0;
+    const optionBVotes = battle.optionB.votes || 0;
+
+    const optionAPercent =
+      totalVotes > 0
+        ? Math.round((optionAVotes / totalVotes) * 100)
+        : 0;
+
+    const optionBPercent =
+      totalVotes > 0
+        ? 100 - optionAPercent
+        : 0;
+
+    const winnerLabel = getWinnerLabel(battle);
+
+    const remaining =
+      status === 'active'
+        ? Math.max(0, battle.endsAt - now)
+        : 0;
+
+    const canVote =
+      Boolean(currentUser) &&
+      status === 'active' &&
+      !battle.userVotedOptionId &&
+      votingBattleId === null;
+
     return (
-      <div className="flex min-h-[300px] items-center justify-center rounded-3xl border border-white/10 bg-black/20">
-        <div className="flex items-center gap-3 text-white/70">
-          <Loader2 className="h-6 w-6 animate-spin" />
-          <span>
-            Battle loading...
-          </span>
+      <article
+        key={battle.id}
+        className="overflow-hidden rounded-3xl border border-white/10 bg-zinc-950 shadow-2xl"
+      >
+        {/* Header */}
+        <div className="border-b border-white/10 bg-gradient-to-r from-orange-600/20 via-red-600/10 to-purple-600/20 p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-orange-500/15 px-3 py-1 text-xs font-semibold text-orange-300">
+                  {battle.category}
+                </span>
+
+                {status === 'active' && (
+                  <span className="flex items-center gap-1 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-300">
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+                    LIVE
+                  </span>
+                )}
+
+                {status === 'upcoming' && (
+                  <span className="rounded-full bg-blue-500/15 px-3 py-1 text-xs font-semibold text-blue-300">
+                    UPCOMING
+                  </span>
+                )}
+
+                {status === 'closed' && (
+                  <span className="flex items-center gap-1 rounded-full bg-zinc-500/15 px-3 py-1 text-xs font-semibold text-zinc-300">
+                    <Lock size={13} />
+                    CLOSED
+                  </span>
+                )}
+              </div>
+
+              <h3 className="text-xl font-black text-white sm:text-2xl">
+                {battle.title}
+              </h3>
+
+              {battle.description && (
+                <p className="mt-2 max-w-2xl text-sm text-zinc-400">
+                  {battle.description}
+                </p>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-center">
+              <div className="flex items-center justify-center gap-2 text-xs text-zinc-400">
+                <Vote size={14} />
+                TOTAL VOTES
+              </div>
+
+              <div className="mt-1 text-2xl font-black text-white">
+                {totalVotes}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Timer */}
+        {status === 'active' && (
+          <div className="flex items-center justify-center gap-2 border-b border-white/10 bg-red-500/5 px-4 py-3 text-sm font-bold text-red-300">
+            <Clock size={16} />
+            Voting closes in {formatRemaining(remaining)}
+          </div>
+        )}
+
+        {status === 'upcoming' && battle.startsAt && (
+          <div className="flex items-center justify-center gap-2 border-b border-white/10 bg-blue-500/5 px-4 py-3 text-sm font-bold text-blue-300">
+            <Clock size={16} />
+            Battle starts soon
+          </div>
+        )}
+
+        {/* Options */}
+        <div className="grid gap-4 p-4 md:grid-cols-2 md:p-6">
+          {/* Option A */}
+          <div
+            className={`overflow-hidden rounded-2xl border ${
+              battle.userVotedOptionId === battle.optionA.id
+                ? 'border-emerald-400/60 bg-emerald-500/5'
+                : 'border-white/10 bg-white/[0.03]'
+            }`}
+          >
+            <div className="relative min-h-[220px] overflow-hidden">
+              <BattleOptionImage
+                imageUrl={battle.optionA.imageUrl}
+                alt={battle.optionA.label}
+              />
+
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/10 to-transparent" />
+
+              <div className="absolute bottom-4 left-4 right-4">
+                <div className="mb-1 text-3xl">
+                  {battle.optionA.emoji || '🔥'}
+                </div>
+
+                <h4 className="text-xl font-black text-white">
+                  {battle.optionA.label}
+                </h4>
+
+                {battle.optionA.tagline && (
+                  <p className="mt-1 text-sm text-zinc-300">
+                    {battle.optionA.tagline}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="p-4">
+              <div className="mb-3 flex items-center justify-between text-sm">
+                <span className="font-semibold text-zinc-300">
+                  {optionAVotes} votes
+                </span>
+
+                <span className="font-black text-orange-300">
+                  {optionAPercent}%
+                </span>
+              </div>
+
+              <div className="mb-4 h-2 overflow-hidden rounded-full bg-zinc-800">
+                <div
+                  className="h-full rounded-full bg-orange-500 transition-all duration-500"
+                  style={{
+                    width: `${optionAPercent}%`,
+                  }}
+                />
+              </div>
+
+              {status === 'active' && (
+                <button
+                  type="button"
+                  disabled={!canVote}
+                  onClick={() =>
+                    voteForBattle(
+                      battle.id,
+                      battle.optionA.id
+                    )
+                  }
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-3 font-bold text-white transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {battle.userVotedOptionId === battle.optionA.id ? (
+                    <>
+                      <CheckCircle2 size={18} />
+                      Your Vote
+                    </>
+                  ) : votingBattleId === battle.id ? (
+                    <>
+                      <RefreshCw
+                        size={18}
+                        className="animate-spin"
+                      />
+                      Voting...
+                    </>
+                  ) : (
+                    <>
+                      <Vote size={18} />
+                      Vote A
+                    </>
+                  )}
+                </button>
+              )}
+
+              {status === 'closed' &&
+                battle.winnerOptionId ===
+                  battle.optionA.id && (
+                  <div className="flex items-center justify-center gap-2 rounded-xl bg-yellow-500/10 px-4 py-3 font-bold text-yellow-300">
+                    <Trophy size={18} />
+                    Winner
+                  </div>
+                )}
+            </div>
+          </div>
+
+          {/* VS */}
+          <div className="relative md:hidden">
+            <div className="flex items-center gap-3">
+              <div className="h-px flex-1 bg-white/10" />
+              <div className="rounded-full border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-black text-red-300">
+                VS
+              </div>
+              <div className="h-px flex-1 bg-white/10" />
+            </div>
+          </div>
+
+          {/* Option B */}
+          <div
+            className={`overflow-hidden rounded-2xl border ${
+              battle.userVotedOptionId === battle.optionB.id
+                ? 'border-emerald-400/60 bg-emerald-500/5'
+                : 'border-white/10 bg-white/[0.03]'
+            }`}
+          >
+            <div className="relative min-h-[220px] overflow-hidden">
+              <BattleOptionImage
+                imageUrl={battle.optionB.imageUrl}
+                alt={battle.optionB.label}
+              />
+
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/10 to-transparent" />
+
+              <div className="absolute bottom-4 left-4 right-4">
+                <div className="mb-1 text-3xl">
+                  {battle.optionB.emoji || '⚡'}
+                </div>
+
+                <h4 className="text-xl font-black text-white">
+                  {battle.optionB.label}
+                </h4>
+
+                {battle.optionB.tagline && (
+                  <p className="mt-1 text-sm text-zinc-300">
+                    {battle.optionB.tagline}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="p-4">
+              <div className="mb-3 flex items-center justify-between text-sm">
+                <span className="font-semibold text-zinc-300">
+                  {optionBVotes} votes
+                </span>
+
+                <span className="font-black text-purple-300">
+                  {optionBPercent}%
+                </span>
+              </div>
+
+              <div className="mb-4 h-2 overflow-hidden rounded-full bg-zinc-800">
+                <div
+                  className="h-full rounded-full bg-purple-500 transition-all duration-500"
+                  style={{
+                    width: `${optionBPercent}%`,
+                  }}
+                />
+              </div>
+
+              {status === 'active' && (
+                <button
+                  type="button"
+                  disabled={!canVote}
+                  onClick={() =>
+                    voteForBattle(
+                      battle.id,
+                      battle.optionB.id
+                    )
+                  }
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-purple-500 px-4 py-3 font-bold text-white transition hover:bg-purple-400 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {battle.userVotedOptionId === battle.optionB.id ? (
+                    <>
+                      <CheckCircle2 size={18} />
+                      Your Vote
+                    </>
+                  ) : votingBattleId === battle.id ? (
+                    <>
+                      <RefreshCw
+                        size={18}
+                        className="animate-spin"
+                      />
+                      Voting...
+                    </>
+                  ) : (
+                    <>
+                      <Vote size={18} />
+                      Vote B
+                    </>
+                  )}
+                </button>
+              )}
+
+              {status === 'closed' &&
+                battle.winnerOptionId ===
+                  battle.optionB.id && (
+                  <div className="flex items-center justify-center gap-2 rounded-xl bg-yellow-500/10 px-4 py-3 font-bold text-yellow-300">
+                    <Trophy size={18} />
+                    Winner
+                  </div>
+                )}
+            </div>
+          </div>
+        </div>
+
+        {/* Desktop VS */}
+        <div className="hidden items-center justify-center md:flex">
+          <div className="absolute" />
+        </div>
+
+        {/* Result */}
+        {status === 'closed' && (
+          <div className="mx-4 mb-4 rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-5 text-center md:mx-6 md:mb-6">
+            {winnerLabel ? (
+              <>
+                <div className="mb-2 flex items-center justify-center gap-2 text-yellow-300">
+                  <Trophy size={22} />
+                  <span className="font-black">
+                    BATTLE RESULT
+                  </span>
+                </div>
+
+                <div className="text-2xl font-black text-white">
+                  🏆 {winnerLabel}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="mb-2 text-3xl">
+                  🤝
+                </div>
+
+                <div className="text-xl font-black text-white">
+                  Battle Result
+                </div>
+
+                <p className="mt-1 text-sm text-zinc-400">
+                  Result calculate ho raha hai.
+                </p>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* User vote message */}
+        {battle.userVotedOptionId && (
+          <div className="mx-4 mb-4 flex items-center justify-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-sm font-semibold text-emerald-300 md:mx-6">
+            <CheckCircle2 size={17} />
+            Aapka vote already recorded hai.
+          </div>
+        )}
+
+        {/* Feedback */}
+        {voteFeedback?.battleId === battle.id && (
+          <div
+            className={`mx-4 mb-4 rounded-xl border px-4 py-3 text-center text-sm font-semibold md:mx-6 ${
+              voteFeedback.type === 'success'
+                ? 'border-emerald-500/20 bg-emerald-500/5 text-emerald-300'
+                : 'border-red-500/20 bg-red-500/5 text-red-300'
+            }`}
+          >
+            {voteFeedback.message}
+          </div>
+        )}
+      </article>
+    );
+  };
+
+  return (
+    <section className="w-full">
+      {/* Hero */}
+      <div className="mb-6 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-red-950 via-zinc-950 to-purple-950 p-6 shadow-2xl md:p-8">
+        <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <span className="flex items-center gap-2 rounded-full bg-red-500/10 px-3 py-1 text-xs font-bold text-red-300">
+                <Swords size={14} />
+                DHOTI BATTLE ARENA
+              </span>
+
+              {isAdmin && (
+                <span className="flex items-center gap-1 rounded-full bg-yellow-500/10 px-3 py-1 text-xs font-bold text-yellow-300">
+                  <Crown size={14} />
+                  ADMIN
+                </span>
+              )}
+            </div>
+
+            <h2 className="text-3xl font-black tracking-tight text-white md:text-5xl">
+              Community Battle
+            </h2>
+
+            <p className="mt-3 max-w-2xl text-zinc-400">
+              Dhoti ke real community battles dekho aur active
+              battle me apna vote do.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-center">
+              <Flame
+                className="mx-auto mb-2 text-orange-400"
+                size={22}
+              />
+              <div className="text-xl font-black text-white">
+                {activeBattles.length}
+              </div>
+              <div className="text-[11px] text-zinc-500">
+                LIVE
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-center">
+              <Clock
+                className="mx-auto mb-2 text-blue-400"
+                size={22}
+              />
+              <div className="text-xl font-black text-white">
+                {upcomingBattles.length}
+              </div>
+              <div className="text-[11px] text-zinc-500">
+                UPCOMING
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-center">
+              <Trophy
+                className="mx-auto mb-2 text-yellow-400"
+                size={22}
+              />
+              <div className="text-xl font-black text-white">
+                {closedBattles.length}
+              </div>
+              <div className="text-[11px] text-zinc-500">
+                RESULTS
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-    );
-  }
 
-  if (!battle) {
-    return (
-      <div className="flex min-h-[300px] flex-col items-center justify-center rounded-3xl border border-white/10 bg-black/20 p-8 text-center">
-        <Swords className="mb-4 h-12 w-12 text-white/30" />
-
-        <h2 className="text-xl font-bold text-white">
-          No active battle
-        </h2>
-
-        <p className="mt-2 text-sm text-white/40">
-          Abhi koi Community Battle available nahi hai.
-        </p>
+      {/* Tabs */}
+      <div className="mb-6 flex rounded-2xl border border-white/10 bg-zinc-950 p-1">
+        <button
+          type="button"
+          onClick={() => setActiveArenaTab('events')}
+          className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition ${
+            activeArenaTab === 'events'
+              ? 'bg-red-500 text-white'
+              : 'text-zinc-400 hover:bg-white/5 hover:text-white'
+          }`}
+        >
+          <Swords size={17} />
+          Community Battles
+        </button>
 
         <button
           type="button"
-          onClick={() =>
-            void loadBattle(true)
-          }
-          disabled={refreshing}
-          className="mt-5 flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15 disabled:opacity-50"
+          onClick={() => setActiveArenaTab('1v1')}
+          className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition ${
+            activeArenaTab === '1v1'
+              ? 'bg-red-500 text-white'
+              : 'text-zinc-400 hover:bg-white/5 hover:text-white'
+          }`}
         >
-          <RefreshCw
-            className={
-              refreshing
-                ? 'h-4 w-4 animate-spin'
-                : 'h-4 w-4'
-            }
-          />
-          Refresh
+          <Flame size={17} />
+          1v1 AI Battle
         </button>
       </div>
-    );
-  }
 
-  return (
-    <div className="w-full overflow-hidden rounded-3xl border border-white/10 bg-black/20">
-
-      {/* HEADER */}
-      <div className="border-b border-white/10 p-5 sm:p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-red-400">
-              <Swords className="h-4 w-4" />
-              Community Battle
+      {activeArenaTab === 'events' ? (
+        <>
+          {/* Toolbar */}
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm text-zinc-400">
+              <Users size={17} />
+              Real community battles
             </div>
 
-            <h2 className="text-2xl font-black text-white">
-              {battle.title ||
-                battle.question ||
-                'Community Battle'}
-            </h2>
-
-            {battle.description && (
-              <p className="mt-2 text-sm text-white/50">
-                {battle.description}
-              </p>
-            )}
-
-            {selectedOpponent && (
-              <p className="mt-2 text-xs text-white/30">
-                Opponent: {selectedOpponent}
-              </p>
-            )}
-          </div>
-
-          <button
-            type="button"
-            onClick={() =>
-              void loadBattle(true)
-            }
-            disabled={refreshing}
-            className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10 disabled:opacity-50"
-          >
-            <RefreshCw
-              className={
-                refreshing
-                  ? 'h-4 w-4 animate-spin'
-                  : 'h-4 w-4'
-              }
-            />
-            Refresh
-          </button>
-        </div>
-      </div>
-
-      {/* TIMER */}
-      <div className="border-b border-white/10 bg-white/[0.02] p-5 text-center">
-        {finished ? (
-          <div className="text-yellow-300">
-            <Trophy className="mx-auto mb-2 h-7 w-7" />
-            <div className="font-bold">
-              Battle Finished
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="mb-1 flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-wider text-white/40">
-              <Clock className="h-4 w-4" />
-              Time Remaining
-            </div>
-
-            <div className="font-mono text-3xl font-black text-white sm:text-4xl">
-              {formatTime(remaining)}
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* OPTIONS */}
-      <div className="grid gap-5 p-5 sm:grid-cols-2 sm:p-6">
-        {options.map(option => {
-          const votes =
-            Number(option.votes || 0);
-
-          const percentage =
-            totalVotes > 0
-              ? Math.round(
-                  (votes /
-                    totalVotes) *
-                    100
-                )
-              : 0;
-
-          const selected =
-            selectedOption ===
-            option.id;
-
-          const isWinner =
-            winner?.id ===
-            option.id;
-
-          const image =
-            getOptionImage(option);
-
-          return (
-            <div
-              key={option.id}
-              className={`overflow-hidden rounded-3xl border ${
-                isWinner
-                  ? 'border-yellow-400/50 bg-yellow-400/10'
-                  : selected
-                  ? 'border-red-400/50 bg-red-400/10'
-                  : 'border-white/10 bg-white/[0.03]'
-              }`}
+            <button
+              type="button"
+              onClick={() => loadBattles(true)}
+              disabled={isRefreshing}
+              className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-bold text-zinc-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
             >
-
-              {/* IMAGE */}
-              <div className="aspect-[16/10] bg-white/5">
-                {image ? (
-                  <img
-                    src={image}
-                    alt={getOptionName(option)}
-                    loading="eager"
-                    className="h-full w-full object-cover"
-                    onError={event => {
-                      console.error(
-                        'Battle image failed:',
-                        image
-                      );
-
-                      event.currentTarget.style.display =
-                        'none';
-                    }}
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center text-white/20">
-                    <UsersIcon />
-                  </div>
-                )}
-              </div>
-
-              <div className="p-5">
-
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-xl font-black text-white">
-                      {getOptionName(option)}
-                    </h3>
-
-                    {option.tagline && (
-                      <p className="mt-1 text-xs text-white/40">
-                        {option.tagline}
-                      </p>
-                    )}
-                  </div>
-
-                  {isWinner && (
-                    <Trophy className="h-5 w-5 shrink-0 text-yellow-400" />
-                  )}
-                </div>
-
-                <div className="mt-4">
-                  <div className="mb-2 flex justify-between text-xs text-white/50">
-                    <span>
-                      {votes} votes
-                    </span>
-
-                    <span>
-                      {percentage}%
-                    </span>
-                  </div>
-
-                  <div className="h-2 overflow-hidden rounded-full bg-white/10">
-                    <div
-                      className="h-full rounded-full bg-red-500 transition-all"
-                      style={{
-                        width:
-                          `${percentage}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {!finished && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      void vote(
-                        option.id
-                      )
-                    }
-                    disabled={
-                      voting ||
-                      hasVoted
-                    }
-                    className="mt-5 w-full rounded-xl bg-red-500 px-4 py-3 font-bold text-white hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {voting &&
-                    selected
-                      ? 'Voting...'
-                      : hasVoted
-                      ? 'Already Voted'
-                      : 'Vote'}
-                  </button>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* ERROR */}
-      {voteError && (
-        <div className="mx-5 mb-5 flex items-center gap-2 rounded-xl border border-red-400/20 bg-red-400/10 p-3 text-sm text-red-300 sm:mx-6">
-          <AlertCircle className="h-4 w-4" />
-          {voteError}
-        </div>
-      )}
-
-      {/* RESULT */}
-      {finished && (
-        <div className="border-y border-white/10 bg-yellow-400/5 p-6 text-center">
-          <Trophy className="mx-auto mb-3 h-10 w-10 text-yellow-400" />
-
-          {winner ? (
-            <>
-              <div className="text-xs font-bold uppercase tracking-wider text-yellow-400">
-                Winner
-              </div>
-
-              <h3 className="mt-1 text-3xl font-black text-white">
-                {getOptionName(winner)}
-              </h3>
-
-              {getOptionImage(
-                winner
-              ) && (
-                <img
-                  src={getOptionImage(
-                    winner
-                  )}
-                  alt={getOptionName(winner)}
-                  className="mx-auto mt-5 max-h-[350px] max-w-md rounded-2xl object-cover"
-                />
-              )}
-            </>
-          ) : (
-            <h3 className="text-2xl font-black text-white">
-              It&apos;s a Draw!
-            </h3>
-          )}
-        </div>
-      )}
-
-      {/* COMMENTS */}
-      <div className="p-5 sm:p-6">
-        <div className="mb-4 flex items-center gap-2">
-          <MessageCircle className="h-5 w-5 text-white/60" />
-
-          <h3 className="font-black text-white">
-            Comments
-          </h3>
-
-          <span className="text-xs text-white/30">
-            ({comments.length})
-          </span>
-        </div>
-
-        <div className="max-h-[350px] space-y-3 overflow-y-auto">
-          {comments.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-sm text-white/30">
-              No comments yet.
-            </div>
-          ) : (
-            comments.map(item => {
-              const itemUserId =
-                item.userId ||
-                item.user_id;
-
-              const own =
-                !!userId &&
-                !!itemUserId &&
-                String(userId) ===
-                  String(itemUserId);
-
-              return (
-                <div
-                  key={item.id}
-                  className="rounded-xl border border-white/10 bg-white/[0.03] p-4"
-                >
-                  <div className="flex justify-between gap-3">
-                    <div className="text-sm font-bold text-white">
-                      {item.userName ||
-                        item.user_name ||
-                        'User'}
-                    </div>
-
-                    {own && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          void deleteComment(
-                            item.id
-                          )
-                        }
-                        className="text-xs text-red-300"
-                      >
-                        Delete
-                      </button>
-                    )}
-                  </div>
-
-                  <p className="mt-2 whitespace-pre-wrap break-words text-sm text-white/60">
-                    {item.message}
-                  </p>
-                </div>
-              );
-            })
-          )}
-        </div>
-
-        {!finished && email && (
-          <div className="mt-5">
-            <div className="flex gap-2">
-              <input
-                value={comment}
-                onChange={event =>
-                  setComment(
-                    event.target.value
-                  )
+              <RefreshCw
+                size={16}
+                className={
+                  isRefreshing ? 'animate-spin' : ''
                 }
-                onKeyDown={event => {
-                  if (
-                    event.key ===
-                    'Enter'
-                  ) {
-                    event.preventDefault();
-                    void sendComment();
-                  }
-                }}
-                maxLength={500}
-                placeholder="Write a comment..."
-                className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30"
               />
+              Refresh
+            </button>
+          </div>
+
+          {/* Login notice */}
+          {!currentUser && (
+            <div className="mb-5 flex flex-col gap-4 rounded-2xl border border-orange-500/20 bg-orange-500/5 p-5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <Lock className="mt-0.5 text-orange-400" size={20} />
+
+                <div>
+                  <div className="font-bold text-white">
+                    Vote karne ke liye login required hai
+                  </div>
+
+                  <div className="mt-1 text-sm text-zinc-400">
+                    Battle public dekh sakte ho, lekin vote sirf
+                    logged-in user de sakta hai.
+                  </div>
+                </div>
+              </div>
 
               <button
                 type="button"
-                onClick={() =>
-                  void sendComment()
-                }
-                disabled={
-                  sendingComment ||
-                  !comment.trim()
-                }
-                className="flex items-center gap-2 rounded-xl bg-red-500 px-4 py-3 font-bold text-white disabled:opacity-50"
+                onClick={onOpenAuth}
+                className="flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-orange-400"
               >
-                {sendingComment ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
+                <LogIn size={16} />
+                Login
+              </button>
+            </div>
+          )}
 
-                <span className="hidden sm:inline">
-                  Send
-                </span>
+          {/* Error */}
+          {errorMessage && (
+            <div className="mb-5 rounded-2xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-300">
+              {errorMessage}
+            </div>
+          )}
+
+          {/* Loading */}
+          {isLoadingBattles ? (
+            <div className="grid gap-5">
+              {[1, 2].map((item) => (
+                <div
+                  key={item}
+                  className="h-[500px] animate-pulse rounded-3xl border border-white/10 bg-zinc-950"
+                />
+              ))}
+            </div>
+          ) : visibleBattles.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-white/10 bg-zinc-950 p-10 text-center">
+              <div className="mb-4 text-5xl">⚔️</div>
+
+              <h3 className="text-xl font-black text-white">
+                Abhi koi battle nahi hai
+              </h3>
+
+              <p className="mx-auto mt-2 max-w-md text-sm text-zinc-500">
+                Super Admin jab battle publish karega tab
+                yahan automatically show hoga.
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-6">
+              {visibleBattles.map(renderBattleCard)}
+            </div>
+          )}
+
+          {/* Info */}
+          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-white/10 bg-zinc-950 p-4">
+              <ShieldCheck
+                className="mb-2 text-emerald-400"
+                size={20}
+              />
+              <div className="font-bold text-white">
+                One vote per battle
+              </div>
+              <div className="mt-1 text-xs text-zinc-500">
+                Duplicate voting server-side blocked hai.
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-zinc-950 p-4">
+              <Clock
+                className="mb-2 text-orange-400"
+                size={20}
+              />
+              <div className="font-bold text-white">
+                Real countdown
+              </div>
+              <div className="mt-1 text-xs text-zinc-500">
+                Voting server ke start/end time ke according close
+                hoti hai.
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-zinc-950 p-4">
+              <Trophy
+                className="mb-2 text-yellow-400"
+                size={20}
+              />
+              <div className="font-bold text-white">
+                Real result
+              </div>
+              <div className="mt-1 text-xs text-zinc-500">
+                Winner real vote count se calculate hota hai.
+              </div>
+            </div>
+          </div>
+        </>
+      ) : (
+        /* 1v1 */
+        <div className="rounded-3xl border border-white/10 bg-zinc-950 p-6 md:p-10">
+          <div className="mx-auto max-w-2xl text-center">
+            <div className="mb-4 text-6xl">🤖⚔️</div>
+
+            <h3 className="text-3xl font-black text-white">
+              1v1 AI Battle
+            </h3>
+
+            <p className="mt-3 text-zinc-400">
+              {opponentName} ke saath AI battle mode.
+            </p>
+
+            <div className="mt-8 grid gap-4 sm:grid-cols-3">
+              <button
+                type="button"
+                className="rounded-2xl border border-red-500/20 bg-red-500/5 p-5 text-left transition hover:bg-red-500/10"
+              >
+                <Flame className="mb-3 text-red-400" />
+                <div className="font-black text-white">
+                  Rap
+                </div>
+                <div className="mt-1 text-xs text-zinc-500">
+                  Desi rap battle
+                </div>
+              </button>
+
+              <button
+                type="button"
+                className="rounded-2xl border border-orange-500/20 bg-orange-500/5 p-5 text-left transition hover:bg-orange-500/10"
+              >
+                <Swords className="mb-3 text-orange-400" />
+                <div className="font-black text-white">
+                  Roast
+                </div>
+                <div className="mt-1 text-xs text-zinc-500">
+                  Fun roast battle
+                </div>
+              </button>
+
+              <button
+                type="button"
+                className="rounded-2xl border border-purple-500/20 bg-purple-500/5 p-5 text-left transition hover:bg-purple-500/10"
+              >
+                <MessageCircle className="mb-3 text-purple-400" />
+                <div className="font-black text-white">
+                  Wit
+                </div>
+                <div className="mt-1 text-xs text-zinc-500">
+                  Smart punchlines
+                </div>
               </button>
             </div>
 
-            {commentError && (
-              <p className="mt-2 text-xs text-red-300">
-                {commentError}
-              </p>
+            {!currentUser ? (
+              <button
+                type="button"
+                onClick={onOpenAuth}
+                className="mt-8 flex w-full items-center justify-center gap-2 rounded-2xl bg-red-500 px-5 py-4 font-black text-white hover:bg-red-400"
+              >
+                <LogIn size={18} />
+                Login to Start Battle
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  if (onNavigateTab) {
+                    onNavigateTab('ai');
+                  }
+                }}
+                className="mt-8 flex w-full items-center justify-center gap-2 rounded-2xl bg-red-500 px-5 py-4 font-black text-white hover:bg-red-400"
+              >
+                <Swords size={18} />
+                Open AI Battle
+              </button>
             )}
           </div>
-        )}
+        </div>
+      )}
 
-        {!email && (
-          <button
-            type="button"
-            onClick={() =>
-              onOpenAuth?.()
-            }
-            className="mt-5 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-white hover:bg-white/10"
+      {/* Selected battle modal */}
+      {selectedBattle && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setSelectedBattle(null)}
+        >
+          <div
+            className="w-full max-w-2xl rounded-3xl border border-white/10 bg-zinc-950 p-6"
+            onClick={(event) => event.stopPropagation()}
           >
-            Login to comment
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
+            <div className="mb-5 flex items-center justify-between">
+              <h3 className="text-xl font-black text-white">
+                {selectedBattle.title}
+              </h3>
 
-function UsersIcon() {
-  return (
-    <svg
-      width="48"
-      height="48"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      className="text-white/20"
-    >
-      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-    </svg>
+              <button
+                type="button"
+                onClick={() => setSelectedBattle(null)}
+                className="rounded-xl bg-white/5 px-3 py-2 text-zinc-400 hover:bg-white/10 hover:text-white"
+              >
+                Close
+              </button>
+            </div>
+
+            {renderBattleCard(selectedBattle)}
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 

@@ -24,7 +24,7 @@ import {
   Building,
   UserCheck
 } from 'lucide-react';
-import { User, AppTab, NewsItem, CommunityUpdate } from '@/types';
+import { User, AppTab, NewsItem, CommunityUpdate, PresenceUser } from '@/types';
 import { SoundEffects } from '@/lib/audio/sound-effects';
 import { isSiteAdmin } from '@/lib/admin-auth';
 import { PWAInstallButton } from './PWAInstallButton';
@@ -44,13 +44,16 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
   // Dynamic news / announcements
   const [newsList, setNewsList] = useState<NewsItem[]>([]);
   const [updatesList, setUpdatesList] = useState<CommunityUpdate[]>([]);
-  const [onlineCount, setOnlineCount] = useState(142);
+  const [onlineUsers, setOnlineUsers] = useState<PresenceUser[]>([]);
+  const onlineCount = onlineUsers.length;
 
   useEffect(() => {
     let isSubscribed = true;
+    let presenceTimer: ReturnType<typeof setInterval> | null = null;
+
     async function loadData() {
       try {
-        const res = await fetch('/api/content?type=all');
+        const res = await fetch('/api/content?type=all', { cache: 'no-store' });
         const data = await res.json();
         if (isSubscribed && data) {
           if (Array.isArray(data.news)) setNewsList(data.news);
@@ -60,55 +63,40 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
         console.warn('Could not load content', e);
       }
     }
-    loadData();
 
-    // Natural fluctuation in online count
-    const timer = setInterval(() => {
-      setOnlineCount((prev) => Math.min(168, Math.max(135, prev + Math.floor(Math.random() * 5) - 2)));
-    }, 8000);
+    async function loadPresence() {
+      try {
+        const res = await fetch('/api/presence', {
+          method: 'GET',
+          cache: 'no-store',
+          headers: { Accept: 'application/json' },
+        });
+        const data = await res.json().catch(() => null);
+        if (isSubscribed && res.ok && Array.isArray(data?.users)) {
+          setOnlineUsers(data.users);
+        }
+      } catch (e) {
+        console.warn('Could not load online users', e);
+      }
+    }
+
+    void loadData();
+    void loadPresence();
+
+    // app/page.tsx owns the authenticated heartbeat.
+    // LandingPage only reads the public online list.
+    presenceTimer = setInterval(() => void loadPresence(), 5000);
 
     return () => {
       isSubscribed = false;
-      clearInterval(timer);
+      if (presenceTimer) clearInterval(presenceTimer);
     };
   }, []);
 
-  // Default village directory data
-  const villagePeople = [
-    {
-      name: 'Kailash Ji Dhakad',
-      role: 'Gram Vikas Lead & Coordinator 👑',
-      tag: 'Community Elder',
-      phone: '+91 98290 XXXXX',
-      ward: 'Ward No. 3, Dhoti',
-      badge: 'Patron',
-      isFounder: false,
-    },
-    {
-      name: 'Mukesh Ji Dhakad',
-      role: 'Gram Panchayat Representative',
-      tag: 'Panchayat Member',
-      phone: '+91 94142 XXXXX',
-      ward: 'Ward No. 1, Dhoti',
-      badge: 'Gram Panchayat',
-    },
-    {
-      name: 'Sunil Kumar Nagar',
-      role: 'Agriculture & Krishi Coordinator',
-      tag: 'Farmer Advisory',
-      phone: '+91 97843 XXXXX',
-      ward: 'Near Dhoti Bada Talab',
-      badge: 'Kisan Mitra',
-    },
-    {
-      name: 'Dharmendra Patidar',
-      role: 'Youth Sports & Battle Head',
-      tag: 'Cricket & Kabaddi Club',
-      phone: '+91 98291 XXXXX',
-      ward: 'Station Road, Dhoti',
-      badge: 'Yuva Sangh',
-    },
-  ];
+  // Only real active users are shown. No hard-coded resident names.
+  const visiblePeople = onlineUsers.filter(
+    (person) => person.userId !== 'dhoti_aale_ai_official'
+  );
 
   return (
     <div className="w-full flex flex-col bg-stone-50 text-stone-800 antialiased selection:bg-amber-200">
@@ -286,11 +274,16 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
             {/* User Profile Avatars Cluster */}
             <div className="mt-3 pt-2 border-t border-stone-100 flex items-center justify-between">
               <div className="flex -space-x-2 overflow-hidden">
-                <span className="inline-block h-6 w-6 rounded-full ring-2 ring-white bg-amber-200 text-[10px] flex items-center justify-center font-bold text-amber-900">RP</span>
-                <span className="inline-block h-6 w-6 rounded-full ring-2 ring-white bg-emerald-200 text-[10px] flex items-center justify-center font-bold text-emerald-900">DK</span>
-                <span className="inline-block h-6 w-6 rounded-full ring-2 ring-white bg-blue-200 text-[10px] flex items-center justify-center font-bold text-blue-900">MS</span>
+                {visiblePeople.slice(0, 3).map((person) => (
+                  <div key={person.userId} className="inline-block h-6 w-6 rounded-full ring-2 ring-white bg-stone-200 overflow-hidden text-[10px] flex items-center justify-center font-bold text-stone-700" title={person.userName}>
+                    {person.userAvatar ? (
+                      <img src={person.userAvatar} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      person.userName.charAt(0).toUpperCase()
+                    )}
+                  </div>
+                ))}
               </div>
-              <span className="text-[10px] font-semibold text-[#2D7D46]">{onlineCount}+ ऑनलाइन</span>
             </div>
           </article>
 
@@ -368,10 +361,21 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
             </div>
             <div className="mt-3 pt-2 border-t border-stone-100 flex items-center justify-between">
               <div className="flex items-center -space-x-1.5">
-                <div className="w-5 h-5 rounded-full bg-stone-300 border border-white flex items-center justify-center text-[9px] font-bold text-stone-700">RD</div>
-                <div className="w-5 h-5 rounded-full bg-amber-400 border border-white flex items-center justify-center text-[9px] font-bold text-amber-950">MD</div>
+                {visiblePeople.slice(0, 3).map((person) => (
+                  <div
+                    key={person.userId}
+                    className="relative w-5 h-5 rounded-full bg-stone-200 border border-white overflow-hidden flex items-center justify-center text-[9px] font-bold text-stone-700"
+                    title={person.userName}
+                  >
+                    {person.userAvatar ? (
+                      <img src={person.userAvatar} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      person.userName.charAt(0).toUpperCase()
+                    )}
+                  </div>
+                ))}
               </div>
-              <span className="text-[10px] text-stone-600 font-medium">सदस्य सूची</span>
+              <span className="text-[10px] text-stone-600 font-medium">{onlineCount} सदस्य ऑनलाइन</span>
             </div>
           </article>
 
@@ -513,26 +517,55 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
             </div>
 
             <div className="mt-4 space-y-3">
-              {villagePeople.map((person, idx) => (
-                <div key={idx} className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200/80 flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-amber-400 to-orange-500 text-stone-950 font-black flex items-center justify-center text-sm shrink-0">
-                    {person.isFounder ? <Crown className="h-5 w-5" /> : person.name.charAt(0)}
+              <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200/80 flex items-start gap-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-amber-400 to-orange-500 text-stone-950 font-black flex items-center justify-center text-sm shrink-0">
+                  <Bot className="h-5 w-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <h4 className="text-sm font-bold text-stone-900 truncate">Dhoti Aale AI</h4>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-bold">AI Assistant</span>
+                  </div>
+                  <p className="text-xs text-stone-600 font-medium">Digital Village AI Assistant</p>
+                  <div className="mt-1 flex items-center gap-2 text-[11px] text-emerald-600">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <span>Online</span>
+                  </div>
+                </div>
+              </div>
+
+              {visiblePeople.map((person) => (
+                <div key={person.userId} className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200/80 flex items-start gap-3">
+                  <div className="relative w-10 h-10 rounded-full overflow-hidden bg-stone-200 border border-stone-200 shrink-0 flex items-center justify-center">
+                    {person.userAvatar ? (
+                      <img src={person.userAvatar} alt={person.userName} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-sm font-black text-stone-700">{person.userName.charAt(0).toUpperCase()}</span>
+                    )}
+                    <span className="absolute right-0 bottom-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-sm font-bold text-stone-900 truncate">{person.name}</h4>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-bold">
-                        {person.badge}
-                      </span>
+                    <div className="flex items-center justify-between gap-2">
+                      <h4 className="text-sm font-bold text-stone-900 truncate">{person.userName}</h4>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold shrink-0">Online</span>
                     </div>
-                    <p className="text-xs text-stone-600 font-medium">{person.role}</p>
-                    <div className="mt-1 flex items-center gap-2 text-[11px] text-stone-500">
-                      <MapPin className="h-3 w-3 text-stone-400" />
-                      <span>{person.ward}</span>
+                    <p className="text-xs text-stone-600 font-medium truncate">{person.userBadge || 'Dhoti Resident'}</p>
+                    <div className="mt-1 flex items-center gap-2 text-[11px] text-emerald-600">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      <span>अभी ऑनलाइन</span>
+                      {person.isAdmin && <Crown className="h-3 w-3 text-amber-500" />}
                     </div>
                   </div>
                 </div>
               ))}
+
+              {visiblePeople.length === 0 && (
+                <div className="rounded-2xl border border-dashed border-stone-200 bg-stone-50 p-6 text-center">
+                  <Users className="mx-auto mb-2 h-8 w-8 text-stone-300" />
+                  <p className="text-sm font-semibold text-stone-700">अभी कोई दूसरा user online नहीं है</p>
+                  <p className="mt-1 text-[11px] text-stone-500">Online होते ही उनका real account name यहाँ दिखेगा.</p>
+                </div>
+              )}
             </div>
 
             <button

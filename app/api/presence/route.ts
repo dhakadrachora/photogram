@@ -1,136 +1,330 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { contentStore } from '@/lib/content-store';
+import { createClient } from '@supabase/supabase-js';
 import { isSiteAdmin } from '@/lib/admin-auth';
 import { PresenceUser } from '@/types';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
-const INACTIVITY_TIMEOUT_MS = 35000; // 35 seconds timeout for real active user heartbeat
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  'https://zlngcbefvdtbihndaeun.supabase.co';
 
-function getCleanActiveUsers(): PresenceUser[] {
-  const now = Date.now();
-  const activeList: PresenceUser[] = [];
+const SUPABASE_ANON_KEY =
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  'sb_publishable_JxGddMQ5KqRFTANuZG2TGg_I05TTskS';
 
-  for (const [userId, u] of contentStore.activePresence.entries()) {
-    // Explicitly exclude AI and guest IDs from human online count
-    if (
-      userId === 'dhoti_aale_ai_official' ||
-      u.userId === 'dhoti_aale_ai_official' ||
-      userId.startsWith('guest_')
-    ) {
-      contentStore.activePresence.delete(userId);
-      continue;
-    }
+const INACTIVITY_TIMEOUT_MS = 35_000;
 
-    if (now - u.lastActive > INACTIVITY_TIMEOUT_MS) {
-      contentStore.activePresence.delete(userId);
-    } else {
-      activeList.push(u);
-    }
-  }
-
-  // Sort: Admin first, then recently active
-  return activeList.sort((a, b) => {
-    if (a.isAdmin && !b.isAdmin) return -1;
-    if (!a.isAdmin && b.isAdmin) return 1;
-    return b.lastActive - a.lastActive;
+function response(data: unknown, status = 200) {
+  return NextResponse.json(data, {
+    status,
+    headers: {
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+    },
   });
 }
 
+function getBearerToken(req: NextRequest): string {
+  const header = req.headers.get('authorization') || '';
+
+  if (!header.toLowerCase().startsWith('bearer ')) {
+    return '';
+  }
+
+  return header.slice(7).trim();
+}
+
+function createUserClient(accessToken: string) {
+  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+    global: {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    },
+  });
+}
+
+function createPublicClient() {
+  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+}
+
+function mapPresenceRow(row: any): PresenceUser {
+  return {
+    userId: String(row.user_id),
+    userName: String(row.user_name || 'Dhoti Resident'),
+    userAvatar: String(row.user_avatar || ''),
+    userBadge: row.user_badge
+      ? String(row.user_badge)
+      : 'Dhoti Resident',
+    isVerified: Boolean(row.is_verified),
+    isAdmin: Boolean(row.is_admin),
+    lastActive: new Date(row.last_active).getTime(),
+  };
+}
+
+async function getActiveUsers(client: any): Promise<PresenceUser[]> {
+  const cutoff = new Date(
+    Date.now() - INACTIVITY_TIMEOUT_MS
+  ).toISOString();
+
+  const { data, error } = await client
+    .from('presence_users')
+    .select(
+      'user_id,user_name,user_avatar,user_badge,is_verified,is_admin,last_active'
+    )
+    .gte('last_active', cutoff)
+    .order('is_admin', {
+      ascending: false,
+    })
+    .order('last_active', {
+      ascending: false,
+    });
+
+  if (error || !Array.isArray(data)) {
+    return [];
+  }
+
+  return data
+    .map(mapPresenceRow)
+    .filter(
+      (user) =>
+        user.userId !== 'dhoti_aale_ai_official' &&
+        !user.userId.startsWith('guest_')
+    );
+}
+
+async function authenticate(req: NextRequest) {
+  const token = getBearerToken(req);
+
+  if (!token) {
+    return {
+      client: null,
+      user: null,
+    };
+  }
+
+  const client = createUserClient(token);
+
+  const {
+    data: { user },
+    error,
+  } = await client.auth.getUser(token);
+
+  if (error || !user) {
+    return {
+      client: null,
+      user: null,
+    };
+  }
+
+  return {
+    client,
+    user,
+  };
+}
+
+/*
+|--------------------------------------------------------------------------
+| GET
+|--------------------------------------------------------------------------
+| Anyone can read currently active users.
+*/
 export async function GET() {
-  const users = getCleanActiveUsers();
-  return NextResponse.json(
-    {
+  try {
+    const client = createPublicClient();
+
+    const users = await getActiveUsers(client);
+
+    return response({
       success: true,
       count: users.length,
       users,
       timeoutMs: INACTIVITY_TIMEOUT_MS,
-    },
-    {
-      headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate',
-      },
-    }
-  );
-}
-
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json().catch(() => ({}));
-    const { userId, userName, userAvatar, userBadge } = body;
-
-    const emailHeader = req.headers.get('x-user-email') || body.userEmail || '';
-    const cleanEmail = emailHeader.toLowerCase().trim();
-
-    if (!userId || typeof userId !== 'string' || userId.trim() === '') {
-      return NextResponse.json({ error: 'Valid userId is required for presence.' }, { status: 400 });
-    }
-
-    const trimmedId = userId.trim();
-    if (
-      trimmedId === 'dhoti_aale_ai_official' ||
-      trimmedId.startsWith('guest_') ||
-      !cleanEmail ||
-      !cleanEmail.includes('@')
-    ) {
-      const users = getCleanActiveUsers();
-      return NextResponse.json({ success: true, count: users.length, users });
-    }
-
-    const isAdmin = isSiteAdmin(cleanEmail);
-
-    // Verify verified status server-side (users cannot fake this)
-    const isVerified =
-      contentStore.verifiedUsers.has(trimmedId) ||
-      contentStore.verifiedUsers.has(cleanEmail) ||
-      isAdmin;
-
-    const presenceRecord: PresenceUser = {
-      userId: trimmedId,
-      userName: (userName || (isAdmin ? 'Rohit Dhakad (Admin)' : 'Dhoti Resident')).toString().trim(),
-      userAvatar: (userAvatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${trimmedId}`).toString(),
-      userBadge: isAdmin ? 'Site Owner & Admin 👑' : (userBadge || 'Resident').toString(),
-      isVerified,
-      isAdmin,
-      lastActive: Date.now(),
-    };
-
-    // Store in Map to deduplicate by userId automatically
-    contentStore.activePresence.set(trimmedId, presenceRecord);
-
-    const users = getCleanActiveUsers();
-
-    return NextResponse.json(
+    });
+  } catch (error: any) {
+    return response(
       {
-        success: true,
-        count: users.length,
-        users,
-        current: presenceRecord,
+        success: false,
+        error: error?.message || 'Failed to load presence.',
+        users: [],
+        count: 0,
       },
-      {
-        headers: {
-          'Cache-Control': 'no-store, no-cache, must-revalidate',
-        },
-      }
-    );
-  } catch (err: any) {
-    return NextResponse.json(
-      { error: 'Failed to process presence heartbeat', details: err?.message },
-      { status: 500 }
+      500
     );
   }
 }
 
+/*
+|--------------------------------------------------------------------------
+| POST
+|--------------------------------------------------------------------------
+| Only a real authenticated Supabase user can create/update presence.
+| User identity is taken from Supabase Auth, NOT from request body.
+*/
+export async function POST(req: NextRequest) {
+  try {
+    const { client, user } = await authenticate(req);
+
+    if (!client || !user) {
+      return response(
+        {
+          success: false,
+          error: 'Authentication required.',
+        },
+        401
+      );
+    }
+
+    const body = await req.json().catch(() => ({}));
+
+    const email = String(user.email || '')
+      .trim()
+      .toLowerCase();
+
+    const isAdmin = isSiteAdmin(email);
+
+    /*
+     * Read the actual profile from public.users.
+     * Do NOT trust the name/avatar sent by browser.
+     */
+    const { data: profile } = await client
+      .from('users')
+      .select('name,avatar,badge,is_verified')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    const metadata = user.user_metadata || {};
+
+    const userName = String(
+      profile?.name ||
+        metadata.full_name ||
+        metadata.name ||
+        email.split('@')[0] ||
+        'Dhoti Resident'
+    ).trim();
+
+    const userAvatar = String(
+      profile?.avatar ||
+        metadata.avatar_url ||
+        metadata.picture ||
+        ''
+    ).trim();
+
+    const userBadge = isAdmin
+      ? 'Site Owner & Admin 👑'
+      : String(
+          profile?.badge ||
+            'Dhoti Resident'
+        ).trim();
+
+    const isVerified =
+      Boolean(profile?.is_verified) ||
+      isAdmin;
+
+    const { error: upsertError } = await client
+      .from('presence_users')
+      .upsert(
+        {
+          user_id: user.id,
+          user_name: userName,
+          user_avatar: userAvatar,
+          user_badge: userBadge,
+          is_verified: isVerified,
+          is_admin: isAdmin,
+          last_active: new Date().toISOString(),
+        },
+        {
+          onConflict: 'user_id',
+        }
+      );
+
+    if (upsertError) {
+      return response(
+        {
+          success: false,
+          error: upsertError.message,
+        },
+        500
+      );
+    }
+
+    const users = await getActiveUsers(client);
+
+    return response({
+      success: true,
+      count: users.length,
+      users,
+    });
+  } catch (error: any) {
+    return response(
+      {
+        success: false,
+        error:
+          error?.message ||
+          'Failed to update presence.',
+      },
+      500
+    );
+  }
+}
+
+/*
+|--------------------------------------------------------------------------
+| DELETE
+|--------------------------------------------------------------------------
+| Removes the currently authenticated user's presence.
+*/
 export async function DELETE(req: NextRequest) {
   try {
-    const body = await req.json().catch(() => ({}));
-    const { userId } = body;
-    if (userId) {
-      contentStore.activePresence.delete(userId.toString().trim());
+    const { client, user } = await authenticate(req);
+
+    if (!client || !user) {
+      return response(
+        {
+          success: false,
+          error: 'Authentication required.',
+        },
+        401
+      );
     }
-    const users = getCleanActiveUsers();
-    return NextResponse.json({ success: true, count: users.length, users });
-  } catch {
-    return NextResponse.json({ success: true, count: contentStore.activePresence.size });
+
+    const { error } = await client
+      .from('presence_users')
+      .delete()
+      .eq('user_id', user.id);
+
+    if (error) {
+      return response(
+        {
+          success: false,
+          error: error.message,
+        },
+        500
+      );
+    }
+
+    return response({
+      success: true,
+    });
+  } catch (error: any) {
+    return response(
+      {
+        success: false,
+        error:
+          error?.message ||
+          'Failed to remove presence.',
+      },
+      500
+    );
   }
 }
