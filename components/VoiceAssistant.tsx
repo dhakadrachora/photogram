@@ -6,7 +6,6 @@ import { LiveSession, selectMaleVoice } from '@/lib/audio/live-session';
 import { AudioVisualizer } from './AudioVisualizer';
 import {
   Mic,
-  MicOff,
   Volume2,
   Radio,
   Send,
@@ -17,7 +16,6 @@ import {
   Lock,
   LogIn,
   ShieldCheck,
-  Headphones,
 } from 'lucide-react';
 
 interface VoiceAssistantProps {
@@ -26,49 +24,143 @@ interface VoiceAssistantProps {
   onOpenAuth: () => void;
 }
 
-export function VoiceAssistant({ currentUser, onNavigateTab, onOpenAuth }: VoiceAssistantProps) {
-  const [voiceState, setVoiceState] = useState<VoiceState>('disconnected');
+export function VoiceAssistant({
+  currentUser,
+  onNavigateTab,
+  onOpenAuth,
+}: VoiceAssistantProps) {
+  const [voiceState, setVoiceState] =
+    useState<VoiceState>('disconnected');
+
   const [audioLevel, setAudioLevel] = useState<number>(0);
   const [userTranscript, setUserTranscript] = useState<string>('');
+
   const [assistantTranscript, setAssistantTranscript] = useState<string>(
     'राम राम भाईसाहब! (RAM RAM BHAISAB!) मैं हूँ DHOTI AALE — आपका अपना देसी AI वॉइस मैन। आज गाँव ढोटी में क्या नया अपडेट है, अखाड़े में कौन आगे है और किसकी जीत की संभावना है — सब पूछो!'
   );
-  const [recentTool, setRecentTool] = useState<ToolCall | null>(null);
-  const [manualInput, setManualInput] = useState<string>('');
-  const [chatHistory, setChatHistory] = useState<{ sender: 'user' | 'assistant'; text: string; time: string }[]>([
+
+  const [recentTool, setRecentTool] =
+    useState<ToolCall | null>(null);
+
+  const [manualInput, setManualInput] =
+    useState<string>('');
+
+  const [chatHistory, setChatHistory] = useState<
+    {
+      sender: 'user' | 'assistant';
+      text: string;
+      time: string;
+    }[]
+  >([
     {
       sender: 'assistant',
       text: 'राम राम भाईसाहब! (RAM RAM BHAISAB!) मैं हूँ DHOTI AALE। गाँव ढोटी की हर ताज़ा खबर, चौपाल का हाल और अखाड़े में कौन आगे है और कौन जीतेगा — पूरी जानकारी मेरे पास है। हुक्म करो भाईसाहब!',
       time: 'Just now',
     },
   ]);
-  const [isTextChatOpen, setIsTextChatOpen] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const liveSessionRef = useRef<LiveSession | null>(null);
+  const [isTextChatOpen, setIsTextChatOpen] =
+    useState(false);
+
+  const [errorMessage, setErrorMessage] =
+    useState<string | null>(null);
+
+  const liveSessionRef =
+    useRef<LiveSession | null>(null);
+
+  const errorTimerRef =
+    useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const toolTimerRef =
+    useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /*
+   * ---------------------------------------------------------
+   * Error helper
+   * ---------------------------------------------------------
+   */
+
+  const showError = (message: string) => {
+    setErrorMessage(message);
+
+    if (errorTimerRef.current) {
+      clearTimeout(errorTimerRef.current);
+    }
+
+    errorTimerRef.current = setTimeout(() => {
+      setErrorMessage(null);
+    }, 7000);
+  };
+
+  /*
+   * ---------------------------------------------------------
+   * Greeting audio
+   * ---------------------------------------------------------
+   */
 
   const playGreetingAudio = () => {
-    const greetingText = 'राम राम भाईसाहब! (RAM RAM BHAISAB!) मैं हूँ DHOTI AALE — आपका अपना देसी AI साथी। ढोटी गाँव की हर ताज़ा खबर, चौपाल का हाल और अखाड़े में कौन आगे है — सब कुछ है मेरे पास! कहो भाईसाहब क्या सेवा करें आपकी?';
+    const greetingText =
+      'राम राम भाईसाहब! (RAM RAM BHAISAB!) मैं हूँ DHOTI AALE — आपका अपना देसी AI साथी। ढोटी गाँव की हर ताज़ा खबर, चौपाल का हाल और अखाड़े में कौन आगे है — सब कुछ है मेरे पास! कहो भाईसाहब क्या सेवा करें आपकी?';
+
     setAssistantTranscript(greetingText);
-    if (liveSessionRef.current) {
-      liveSessionRef.current.sendVoiceMessage(greetingText);
-    } else if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+
+    const session = liveSessionRef.current;
+
+    if (session && currentUser) {
+      try {
+        session.sendVoiceMessage(greetingText);
+        return;
+      } catch {
+        // Fall back to browser speech below.
+      }
+    }
+
+    if (
+      typeof window === 'undefined' ||
+      !('speechSynthesis' in window)
+    ) {
+      showError('इस browser में voice playback available नहीं है।');
+      return;
+    }
+
+    try {
       window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(greetingText);
-      const voices = window.speechSynthesis.getVoices();
-      const maleVoice = selectMaleVoice(voices);
+
+      const utterance =
+        new SpeechSynthesisUtterance(greetingText);
+
+      const voices =
+        window.speechSynthesis.getVoices();
+
+      const maleVoice =
+        selectMaleVoice(voices);
+
       if (maleVoice) {
         utterance.voice = maleVoice;
         utterance.lang = maleVoice.lang || 'hi-IN';
       } else {
         utterance.lang = 'hi-IN';
       }
-      utterance.pitch = 0.82; // Deep masculine tone
+
+      utterance.pitch = 0.82;
       utterance.rate = 0.98;
-      utterance.volume = 1.0;
+      utterance.volume = 1;
+
       window.speechSynthesis.speak(utterance);
+    } catch {
+      showError('Voice playback शुरू नहीं हो पाया।');
     }
   };
+
+  /*
+   * ---------------------------------------------------------
+   * Create LiveSession ONCE
+   * ---------------------------------------------------------
+   *
+   * Important:
+   * currentUser email बदलने पर नया session create नहीं करते।
+   * Existing session को setUserEmail() से update करते हैं।
+   */
 
   useEffect(() => {
     const session = new LiveSession(
@@ -76,133 +168,396 @@ export function VoiceAssistant({ currentUser, onNavigateTab, onOpenAuth }: Voice
         onStateChange: (state) => {
           setVoiceState(state);
         },
+
         onAudioLevel: (level) => {
           setAudioLevel(level);
         },
+
         onTranscript: (userText, assistantText) => {
-          if (userText) setUserTranscript(userText);
+          if (userText) {
+            setUserTranscript(userText);
+          }
+
           if (assistantText) {
             setAssistantTranscript(assistantText);
-            const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            const time = new Date().toLocaleTimeString(
+              [],
+              {
+                hour: '2-digit',
+                minute: '2-digit',
+              }
+            );
+
             if (userText) {
               setChatHistory((prev) => [
                 ...prev.slice(-10),
-                { sender: 'user', text: userText, time },
-                { sender: 'assistant', text: assistantText, time },
+                {
+                  sender: 'user',
+                  text: userText,
+                  time,
+                },
+                {
+                  sender: 'assistant',
+                  text: assistantText,
+                  time,
+                },
               ]);
             } else {
-              setChatHistory((prev) => [...prev.slice(-10), { sender: 'assistant', text: assistantText, time }]);
+              setChatHistory((prev) => [
+                ...prev.slice(-10),
+                {
+                  sender: 'assistant',
+                  text: assistantText,
+                  time,
+                },
+              ]);
             }
           }
         },
+
         onToolCall: (tool) => {
           setRecentTool(tool);
-          setTimeout(() => setRecentTool(null), 5000);
+
+          if (toolTimerRef.current) {
+            clearTimeout(toolTimerRef.current);
+          }
+
+          toolTimerRef.current = setTimeout(() => {
+            setRecentTool(null);
+          }, 5000);
+
           if (tool.name === 'startBattle') {
             setTimeout(() => {
               onNavigateTab('battle');
             }, 1500);
-          } else if (tool.name === 'navigateTab' && tool.args?.tab) {
-            let targetTab = String(tool.args.tab).toLowerCase();
-            if (targetTab === 'chat') targetTab = 'worldchat';
-            if (['home', 'worldchat', 'battle', 'assistant', 'profile', 'admin'].includes(targetTab)) {
-              onNavigateTab(targetTab as AppTab);
+
+            return;
+          }
+
+          if (
+            tool.name === 'navigateTab' &&
+            tool.args?.tab
+          ) {
+            let targetTab =
+              String(tool.args.tab).toLowerCase();
+
+            if (targetTab === 'chat') {
+              targetTab = 'worldchat';
+            }
+
+            if (
+              [
+                'home',
+                'worldchat',
+                'battle',
+                'assistant',
+                'profile',
+                'admin',
+              ].includes(targetTab)
+            ) {
+              onNavigateTab(
+                targetTab as AppTab
+              );
             }
           }
         },
+
         onError: (err) => {
-          setErrorMessage(err);
-          setTimeout(() => setErrorMessage(null), 6000);
+          showError(
+            err ||
+              'Voice connection में समस्या आ गई।'
+          );
         },
       },
+
       currentUser?.email || null
     );
 
     liveSessionRef.current = session;
 
     return () => {
-      session.disconnect();
-    };
-  }, [onNavigateTab, currentUser?.email]);
+      try {
+        session.disconnect();
+      } catch {
+        // Ignore cleanup errors.
+      }
 
-  // Sync user email whenever user logs in or logs out
+      liveSessionRef.current = null;
+
+      if (errorTimerRef.current) {
+        clearTimeout(errorTimerRef.current);
+      }
+
+      if (toolTimerRef.current) {
+        clearTimeout(toolTimerRef.current);
+      }
+    };
+  }, [onNavigateTab]);
+
+  /*
+   * ---------------------------------------------------------
+   * Keep authenticated user synced with LiveSession
+   * ---------------------------------------------------------
+   */
+
   useEffect(() => {
-    if (liveSessionRef.current) {
-      liveSessionRef.current.setUserEmail(currentUser?.email || null);
+    const session = liveSessionRef.current;
+
+    if (!session) {
+      return;
     }
-  }, [currentUser]);
+
+    session.setUserEmail(
+      currentUser?.email || null
+    );
+
+    /*
+     * If user logs out while voice is active,
+     * disconnect the authenticated voice session.
+     */
+    if (!currentUser && voiceState !== 'disconnected') {
+      try {
+        session.disconnect();
+      } catch {
+        // Ignore disconnect errors.
+      }
+
+      setVoiceState('disconnected');
+      setAudioLevel(0);
+    }
+  }, [currentUser, voiceState]);
+
+  /*
+   * ---------------------------------------------------------
+   * Voice connection
+   * ---------------------------------------------------------
+   */
 
   const toggleConnection = async () => {
     setErrorMessage(null);
 
-    if (!liveSessionRef.current) return;
-    liveSessionRef.current.setUserEmail(currentUser?.email || 'guest@dhoti-aale.local');
+    const session = liveSessionRef.current;
 
+    if (!session) {
+      showError(
+        'Voice system अभी तैयार नहीं है। कृपया दोबारा प्रयास करें।'
+      );
+      return;
+    }
+
+    /*
+     * Voice is LOGIN ONLY.
+     * Never use a fake guest email.
+     */
+    if (!currentUser) {
+      showError(
+        'Voice Assistant इस्तेमाल करने के लिए पहले Sign In करें।'
+      );
+
+      onOpenAuth();
+      return;
+    }
+
+    /*
+     * Connect
+     */
     if (voiceState === 'disconnected') {
       try {
-        await liveSessionRef.current.connect();
-      } catch (err: any) {
-        setErrorMessage('Microphone permission required for voice interaction.');
+        session.setUserEmail(currentUser.email);
+
+        await session.connect();
+
+        setErrorMessage(null);
+      } catch (error: unknown) {
+        console.error(
+          '[VoiceAssistant] connect failed:',
+          error
+        );
+
+        const message =
+          error instanceof Error
+            ? error.message
+            : String(error || '');
+
+        if (
+          /permission|denied|notallowed|microphone/i.test(
+            message
+          )
+        ) {
+          showError(
+            'Microphone permission दें और फिर दोबारा प्रयास करें।'
+          );
+        } else if (
+          /timeout|timed out|time out/i.test(
+            message
+          )
+        ) {
+          showError(
+            'Voice connection में timeout हुआ। Internet/API connection check करके फिर प्रयास करें।'
+          );
+        } else {
+          showError(
+            'Voice connection शुरू नहीं हो पाया। कृपया फिर प्रयास करें।'
+          );
+        }
       }
-    } else {
-      liveSessionRef.current.disconnect();
+
+      return;
     }
+
+    /*
+     * Disconnect
+     */
+    try {
+      session.disconnect();
+    } catch (error) {
+      console.error(
+        '[VoiceAssistant] disconnect failed:',
+        error
+      );
+    }
+
+    setVoiceState('disconnected');
+    setAudioLevel(0);
   };
+
+  /*
+   * ---------------------------------------------------------
+   * Interrupt AI speech
+   * ---------------------------------------------------------
+   */
 
   const handleInterrupt = () => {
-    if (liveSessionRef.current) {
-      liveSessionRef.current.interrupt();
+    const session = liveSessionRef.current;
+
+    if (!session) {
+      return;
+    }
+
+    try {
+      session.interrupt();
+    } catch (error) {
+      console.error(
+        '[VoiceAssistant] interrupt failed:',
+        error
+      );
     }
   };
 
-  // Text Chat: PUBLIC ACCESS, NO LOGIN REQUIRED
+  /*
+   * ---------------------------------------------------------
+   * Public text chat
+   * ---------------------------------------------------------
+   */
+
   const handleSendPrompt = (textToSend: string) => {
-    if (!textToSend.trim()) return;
+    const text = textToSend.trim();
+
+    if (!text) {
+      return;
+    }
+
     setErrorMessage(null);
-    setUserTranscript(textToSend);
+    setUserTranscript(text);
     setManualInput('');
 
-    if (liveSessionRef.current) {
-      // Process as public text chat without login restriction
-      liveSessionRef.current.processUserInput(textToSend, false);
+    const session = liveSessionRef.current;
+
+    if (!session) {
+      showError(
+        'AI chat अभी तैयार नहीं है। कृपया थोड़ी देर बाद प्रयास करें।'
+      );
+      return;
+    }
+
+    try {
+      /*
+       * Text chat remains public.
+       * Voice authentication is handled separately.
+       */
+      session.processUserInput(text, false);
+    } catch (error) {
+      console.error(
+        '[VoiceAssistant] text chat failed:',
+        error
+      );
+
+      showError(
+        'AI से जवाब लेने में समस्या आई। कृपया फिर प्रयास करें।'
+      );
     }
   };
 
   const quickPrompts = [
-    { label: '📢 आज क्या अपडेट है?', prompt: 'राम राम भाईसाहब! आज गाँव ढोटी में क्या-क्या नया अपडेट और ताज़ा खबर है?' },
-    { label: '⚔️ अखाड़े में कौन आगे है और कौन जीतेगा?', prompt: 'अखाड़े में कौन-कौन बैटल में है, अभी वोटों में आगे कौन चल रहा है और किसकी जीतने की संभावना है?' },
-    { label: '🍕 Chole Bhature vs Pizza में कौन जीतेगा?', prompt: 'Chole Bhature vs Pizza मुकाबले में अभी कौन आगे है और वोटों के हिसाब से किसकी जीत की संभावना है?' },
-    { label: '🚜 Village Flow vs City Trap?', prompt: 'Village Desi Flow vs City Trap रैप बैटल में कौन आगे चल रहा है और कौन बाज़ी मारेगा?' },
-    { label: '🪙 धोती सिक्के (Coins) कैसे कमाएं?', prompt: 'धोती सिक्के (Dhoti Coins) कैसे कमाएं और गाँव में इसका क्या फायदा है?' },
-    { label: '📯 अखाड़े का ढोल बजाओ!', prompt: 'अखाड़े में जश्न का ढोल बजाओ और बिगुल फूँको!' },
-    { label: '🔥 कड़क देसी रोस्ट या शायरी!', prompt: 'भाईसाहब मुझे एक जोरदार चौपाल की देसी शायरी या हल्का रोस्ट सुनाओ!' },
+    {
+      label: '📢 आज क्या अपडेट है?',
+      prompt:
+        'राम राम भाईसाहब! आज गाँव ढोटी में क्या-क्या नया अपडेट और ताज़ा खबर है?',
+    },
+    {
+      label: '⚔️ अखाड़े में कौन आगे है और कौन जीतेगा?',
+      prompt:
+        'अखाड़े में कौन-कौन बैटल में है, अभी वोटों में आगे कौन चल रहा है और किसकी जीतने की संभावना है?',
+    },
+    {
+      label: '🍕 Chole Bhature vs Pizza में कौन जीतेगा?',
+      prompt:
+        'Chole Bhature vs Pizza मुकाबले में अभी कौन आगे है और वोटों के हिसाब से किसकी जीत की संभावना है?',
+    },
+    {
+      label: '🚜 Village Flow vs City Trap?',
+      prompt:
+        'Village Desi Flow vs City Trap रैप बैटल में कौन आगे चल रहा है और कौन बाज़ी मारेगा?',
+    },
+    {
+      label: '🪙 धोती सिक्के (Coins) कैसे कमाएं?',
+      prompt:
+        'धोती सिक्के (Dhoti Coins) कैसे कमाएं और गाँव में इसका क्या फायदा है?',
+    },
+    {
+      label: '📯 अखाड़े का ढोल बजाओ!',
+      prompt:
+        'अखाड़े में जश्न का ढोल बजाओ और बिगुल फूँको!',
+    },
+    {
+      label: '🔥 कड़क देसी रोस्ट या शायरी!',
+      prompt:
+        'भाईसाहब मुझे एक जोरदार चौपाल की देसी शायरी या हल्का रोस्ट सुनाओ!',
+    },
   ];
 
   return (
     <div className="relative min-h-[calc(100vh-4rem)] w-full flex flex-col justify-between p-3 sm:p-6 max-w-5xl mx-auto">
-      {/* Background ambient lighting */}
+      {/* Background */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-br from-amber-500/15 via-orange-600/10 to-transparent rounded-full blur-3xl pointer-events-none" />
 
-      {/* Top Status & Access Mode Indicators */}
+      {/* Top Status */}
       <div className="relative z-10 flex flex-col items-center text-center pt-2">
         <div className="flex flex-wrap items-center justify-center gap-2 mb-2">
-          {/* Public Text Chat Indicator */}
+          {/* Public text chat */}
           <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 border border-emerald-500/30 text-emerald-300 text-[11px] font-bold shadow-sm">
             <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>टेक्स्ट चैट: 100% फ्री व पब्लिक (No Login)</span>
+            <span>
+              टेक्स्ट चैट: 100% फ्री व पब्लिक (No Login)
+            </span>
           </div>
 
-          {/* Voice Mode Indicator */}
+          {/* Voice status */}
           <div className="inline-flex items-center gap-1.5 rounded-full bg-slate-900/90 px-3 py-1 border border-slate-700 text-slate-300 text-[11px] font-bold shadow-sm">
             {currentUser ? (
               <>
                 <ShieldCheck className="h-3.5 w-3.5 text-amber-400" />
-                <span className="text-amber-300">वॉइस मोड: अनलॉक्ड 🎙️</span>
+                <span className="text-amber-300">
+                  वॉइस मोड: अनलॉक्ड 🎙️
+                </span>
               </>
             ) : (
               <>
                 <Lock className="h-3.5 w-3.5 text-slate-400" />
-                <span>टू-वे वॉइस मोड: गूगल लॉगिन आवश्यक</span>
+                <span>
+                  टू-वे वॉइस मोड: लॉगिन आवश्यक
+                </span>
               </>
             )}
           </div>
@@ -210,28 +565,37 @@ export function VoiceAssistant({ currentUser, onNavigateTab, onOpenAuth }: Voice
 
         <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white flex items-center gap-2">
           <span>DHOTI AALE</span>
-          <span className="text-amber-400 text-base sm:text-2xl font-bold font-sans">देसी AI वॉइस मैन</span>
+          <span className="text-amber-400 text-base sm:text-2xl font-bold font-sans">
+            देसी AI वॉइस मैन
+          </span>
         </h1>
+
         <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-lg">
-          &ldquo;राम राम भाईसाहब!&rdquo; गाँव ढोटी की हर ताज़ा खबर, अखाड़े के मुकाबले, आगे कौन है और कौन जीतेगा — पूरी जानकारी उपलब्ध है
+          &ldquo;राम राम भाईसाहब!&rdquo; गाँव ढोटी की हर
+          ताज़ा खबर, अखाड़े के मुकाबले, आगे कौन है और
+          कौन जीतेगा — पूरी जानकारी उपलब्ध है
         </p>
 
-        {/* Live tool execution feedback banner */}
+        {/* Tool feedback */}
         {recentTool && (
           <div className="mt-3 inline-flex items-center gap-2 rounded-xl bg-amber-500/20 border border-amber-400 px-3.5 py-1.5 text-xs text-amber-200 font-semibold animate-in slide-in-from-top-2">
             <Zap className="h-4 w-4 text-amber-400 animate-spin" />
+
             <span>
-              Tool Executed: <strong>{recentTool.name}</strong>{' '}
+              Tool Executed:{' '}
+              <strong>{recentTool.name}</strong>{' '}
               {JSON.stringify(recentTool.args)}
             </span>
           </div>
         )}
 
-        {/* Error notification */}
+        {/* Error */}
         {errorMessage && (
           <div className="mt-3 inline-flex items-center gap-2 rounded-xl bg-red-500/20 border border-red-500/40 px-3.5 py-1.5 text-xs text-red-200 animate-in shake">
             <AlertCircle className="h-4 w-4 text-red-400 shrink-0" />
+
             <span>{errorMessage}</span>
+
             {!currentUser && (
               <button
                 onClick={onOpenAuth}
@@ -244,12 +608,14 @@ export function VoiceAssistant({ currentUser, onNavigateTab, onOpenAuth }: Voice
         )}
       </div>
 
-      {/* Central Visualizer & Mic Area */}
+      {/* Main */}
       <div className="relative z-10 flex flex-col items-center justify-center my-auto py-5">
-        {/* Dynamic Waveform Visualizer */}
-        <AudioVisualizer state={voiceState} audioLevel={audioLevel} />
+        <AudioVisualizer
+          state={voiceState}
+          audioLevel={audioLevel}
+        />
 
-        {/* Central Power/Mic Button */}
+        {/* Mic */}
         <div className="relative mt-2 flex flex-col items-center">
           <button
             id="central-mic-toggle-btn"
@@ -260,20 +626,30 @@ export function VoiceAssistant({ currentUser, onNavigateTab, onOpenAuth }: Voice
                 : voiceState === 'speaking'
                 ? 'bg-gradient-to-tr from-orange-600 via-amber-500 to-amber-300 text-slate-950 ring-8 ring-orange-500/40 animate-pulse'
                 : voiceState === 'connecting'
-                ? 'bg-blue-600 text-white ring-8 ring-blue-500/30 animate-spin'
+                ? 'bg-blue-600 text-white ring-8 ring-blue-500/30 animate-pulse'
                 : 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 hover:from-amber-950/40 hover:to-slate-800 text-amber-400 hover:text-amber-300 border-2 border-amber-500/50 hover:border-amber-400 hover:shadow-amber-500/20'
             }`}
-            title="DHOTI AALE से देसी मर्द की आवाज़ में बात करें"
+            title={
+              currentUser
+                ? 'DHOTI AALE से देसी आवाज़ में बात करें'
+                : 'Voice के लिए पहले Sign In करें'
+            }
+            aria-label={
+              currentUser
+                ? 'Start voice assistant'
+                : 'Sign in for voice assistant'
+            }
           >
             {voiceState === 'listening' ? (
               <Mic className="h-10 w-10 sm:h-12 sm:w-12 animate-bounce" />
             ) : voiceState === 'speaking' ? (
               <Volume2 className="h-10 w-10 sm:h-12 sm:w-12 animate-pulse" />
             ) : voiceState === 'connecting' ? (
-              <Radio className="h-10 w-10 sm:h-12 sm:w-12 animate-spin" />
+              <Radio className="h-10 w-10 sm:h-12 sm:w-12 animate-pulse" />
             ) : (
               <div className="flex flex-col items-center">
-                <Mic className="h-8 w-8 sm:h-10 sm:w-10 text-amber-400 group-hover:scale-110 transition-transform" />
+                <Mic className="h-8 w-8 sm:h-10 sm:w-10 text-amber-400" />
+
                 <span className="text-[9px] font-extrabold uppercase text-amber-300/90 mt-1 tracking-wider">
                   बोलें
                 </span>
@@ -281,7 +657,7 @@ export function VoiceAssistant({ currentUser, onNavigateTab, onOpenAuth }: Voice
             )}
           </button>
 
-          {/* State Tag */}
+          {/* State */}
           <div className="mt-4 flex items-center gap-2">
             <span
               className={`h-2.5 w-2.5 rounded-full ${
@@ -290,33 +666,39 @@ export function VoiceAssistant({ currentUser, onNavigateTab, onOpenAuth }: Voice
                   : voiceState === 'speaking'
                   ? 'bg-orange-400 animate-pulse'
                   : voiceState === 'connecting'
-                  ? 'bg-blue-400 animate-spin'
+                  ? 'bg-blue-400 animate-pulse'
                   : 'bg-amber-400'
               }`}
             />
+
             <span className="text-xs sm:text-sm font-bold uppercase tracking-widest text-slate-300">
               {voiceState === 'listening'
                 ? 'सुन रहा हूँ भाईसाहब...'
                 : voiceState === 'speaking'
-                ? 'DHOTI AALE बोल रहा है (मर्द की आवाज़)'
+                ? 'DHOTI AALE बोल रहा है'
                 : voiceState === 'connecting'
                 ? 'कनेक्ट हो रहा है...'
-                : 'बोलने के लिए माइक दबाएं (पुरुष आवाज़)'}
+                : currentUser
+                ? 'बोलने के लिए माइक दबाएं'
+                : 'Voice के लिए Sign In करें'}
             </span>
           </div>
 
-          {/* Prompt login button if user is not authenticated */}
-          {!currentUser && voiceState === 'disconnected' && (
-            <button
-              onClick={onOpenAuth}
-              className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 hover:bg-amber-500/20 px-3.5 py-1 text-xs font-bold text-amber-300 border border-amber-500/30 transition-all hover:scale-105"
-            >
-              <LogIn className="h-3.5 w-3.5" />
-              <span>Sign in to earn Dhoti Coins & rank</span>
-            </button>
-          )}
+          {/* Login */}
+          {!currentUser &&
+            voiceState === 'disconnected' && (
+              <button
+                onClick={onOpenAuth}
+                className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 hover:bg-amber-500/20 px-3.5 py-1 text-xs font-bold text-amber-300 border border-amber-500/30 transition-all hover:scale-105"
+              >
+                <LogIn className="h-3.5 w-3.5" />
+                <span>
+                  Sign In करके Voice इस्तेमाल करें
+                </span>
+              </button>
+            )}
 
-          {/* Interrupt Action Button when AI is speaking */}
+          {/* Interrupt */}
           {voiceState === 'speaking' && (
             <button
               onClick={handleInterrupt}
@@ -327,13 +709,17 @@ export function VoiceAssistant({ currentUser, onNavigateTab, onOpenAuth }: Voice
           )}
         </div>
 
-        {/* Real-time Subtitles / Spoken Response Card */}
+        {/* Transcript */}
         <div className="mt-6 w-full max-w-xl rounded-2xl bg-slate-900/80 border border-slate-800 p-4 sm:p-5 shadow-xl backdrop-blur-md">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <span className="flex h-2 w-2 rounded-full bg-amber-400 animate-ping" />
-              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-300">DHOTI AALE (AI वॉइस मैन)</span>
+
+              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-300">
+                DHOTI AALE (AI वॉइस मैन)
+              </span>
             </div>
+
             <button
               onClick={playGreetingAudio}
               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 text-[11px] font-bold border border-amber-500/30 transition-all hover:scale-105 active:scale-95"
@@ -346,13 +732,18 @@ export function VoiceAssistant({ currentUser, onNavigateTab, onOpenAuth }: Voice
 
           {userTranscript && (
             <div className="mb-2 text-xs text-amber-400/80 font-medium">
-              You said: <span className="text-slate-200">&ldquo;{userTranscript}&rdquo;</span>
+              You said:{' '}
+              <span className="text-slate-200">
+                &ldquo;{userTranscript}&rdquo;
+              </span>
             </div>
           )}
+
           <div className="flex items-start gap-3">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-400 font-black text-xs">
               AI
             </div>
+
             <p className="text-sm sm:text-base font-medium text-slate-100 leading-relaxed">
               {assistantTranscript}
             </p>
@@ -360,15 +751,16 @@ export function VoiceAssistant({ currentUser, onNavigateTab, onOpenAuth }: Voice
         </div>
       </div>
 
-      {/* Bottom Controls & Quick Prompts (PUBLIC TEXT CHAT - NO LOGIN REQUIRED) */}
+      {/* Quick prompts */}
       <div className="relative z-10 flex flex-col items-center gap-3 pt-3">
-        {/* Quick Conversation Starter Chips */}
         <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 max-w-2xl">
           {quickPrompts.map((item, idx) => (
             <button
               key={idx}
               id={`quick-prompt-${idx}`}
-              onClick={() => handleSendPrompt(item.prompt)}
+              onClick={() =>
+                handleSendPrompt(item.prompt)
+              }
               className="rounded-full bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-amber-500/40 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:text-amber-300 transition-all active:scale-95 shadow-sm"
             >
               {item.label}
@@ -376,23 +768,30 @@ export function VoiceAssistant({ currentUser, onNavigateTab, onOpenAuth }: Voice
           ))}
         </div>
 
-        {/* Public Text Input & Mode Switcher Bar */}
+        {/* Text input */}
         <div className="w-full max-w-xl flex items-center gap-2">
           <div className="relative flex-1">
             <input
               id="voice-manual-text-input"
               type="text"
-              placeholder="Type anything in Hinglish / English (Public text chat, no login needed)..."
+              placeholder="Type anything in Hinglish / English..."
               value={manualInput}
-              onChange={(e) => setManualInput(e.target.value)}
+              onChange={(e) =>
+                setManualInput(e.target.value)
+              }
               onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSendPrompt(manualInput);
+                if (e.key === 'Enter') {
+                  handleSendPrompt(manualInput);
+                }
               }}
               className="w-full rounded-2xl bg-slate-900/90 border border-slate-800 px-4 py-3 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/60 shadow-inner"
             />
+
             <button
               id="voice-text-send-btn"
-              onClick={() => handleSendPrompt(manualInput)}
+              onClick={() =>
+                handleSendPrompt(manualInput)
+              }
               className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl bg-amber-500 hover:bg-amber-400 p-2 text-slate-950 transition-colors shadow-md"
               title="Send text message"
             >
@@ -402,7 +801,11 @@ export function VoiceAssistant({ currentUser, onNavigateTab, onOpenAuth }: Voice
 
           <button
             id="toggle-chat-drawer-btn"
-            onClick={() => setIsTextChatOpen(!isTextChatOpen)}
+            onClick={() =>
+              setIsTextChatOpen(
+                !isTextChatOpen
+              )
+            }
             className={`rounded-2xl p-3 border transition-colors ${
               isTextChatOpen
                 ? 'bg-amber-500 text-slate-950 border-amber-400'
@@ -415,17 +818,23 @@ export function VoiceAssistant({ currentUser, onNavigateTab, onOpenAuth }: Voice
         </div>
       </div>
 
-      {/* Floating Chat History Drawer Modal */}
+      {/* Chat history */}
       {isTextChatOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
           <div className="relative w-full max-w-lg rounded-3xl bg-slate-900 border border-slate-700 p-5 shadow-2xl flex flex-col h-[480px]">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-amber-400" />
-                <h3 className="font-bold text-white text-sm">Dhoti aale AI Chat History</h3>
+
+                <h3 className="font-bold text-white text-sm">
+                  Dhoti aale AI Chat History
+                </h3>
               </div>
+
               <button
-                onClick={() => setIsTextChatOpen(false)}
+                onClick={() =>
+                  setIsTextChatOpen(false)
+                }
                 className="text-slate-400 hover:text-white text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-800"
               >
                 Close
@@ -436,7 +845,11 @@ export function VoiceAssistant({ currentUser, onNavigateTab, onOpenAuth }: Voice
               {chatHistory.map((item, idx) => (
                 <div
                   key={idx}
-                  className={`flex flex-col ${item.sender === 'user' ? 'items-end' : 'items-start'}`}
+                  className={`flex flex-col ${
+                    item.sender === 'user'
+                      ? 'items-end'
+                      : 'items-start'
+                  }`}
                 >
                   <div
                     className={`max-w-[85%] rounded-2xl p-3 text-xs sm:text-sm ${
@@ -447,7 +860,10 @@ export function VoiceAssistant({ currentUser, onNavigateTab, onOpenAuth }: Voice
                   >
                     {item.text}
                   </div>
-                  <span className="text-[10px] text-slate-500 px-1 mt-0.5">{item.time}</span>
+
+                  <span className="text-[10px] text-slate-500 px-1 mt-0.5">
+                    {item.time}
+                  </span>
                 </div>
               ))}
             </div>
@@ -455,16 +871,23 @@ export function VoiceAssistant({ currentUser, onNavigateTab, onOpenAuth }: Voice
             <div className="pt-2 border-t border-slate-800 flex gap-2">
               <input
                 type="text"
-                placeholder="Reply to Dhoti AI (no login needed)..."
+                placeholder="Reply to Dhoti AI..."
                 value={manualInput}
-                onChange={(e) => setManualInput(e.target.value)}
+                onChange={(e) =>
+                  setManualInput(e.target.value)
+                }
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleSendPrompt(manualInput);
+                  if (e.key === 'Enter') {
+                    handleSendPrompt(manualInput);
+                  }
                 }}
                 className="flex-1 rounded-xl bg-slate-800 border border-slate-700 px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
               />
+
               <button
-                onClick={() => handleSendPrompt(manualInput)}
+                onClick={() =>
+                  handleSendPrompt(manualInput)
+                }
                 className="rounded-xl bg-amber-500 px-3 py-2 text-xs font-bold text-slate-950"
               >
                 Send

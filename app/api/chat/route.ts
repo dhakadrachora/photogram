@@ -1,6 +1,7 @@
+// app/api/chat/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import { isSiteAdmin } from '@/lib/admin-auth';
-import { contentStore } from '@/lib/content-store';
 import {
   fetchSupabaseChatMessages,
   insertSupabaseChatMessage,
@@ -13,137 +14,419 @@ import { ChatMessage } from '@/types';
 import { processDhotiAiWorldChatMessage } from '@/lib/dhoti-ai-chat';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
-const MESSAGE_EXPIRATION_MS = 24 * 60 * 60 * 1000; // 24 Hours
+/*
+ * WORLD CHAT RULE
+ * Every message expires after 10 minutes.
+ */
+const MESSAGE_EXPIRATION_MS = 10 * 60 * 1000;
 
-export async function GET() {
-  const cutoffTime = Date.now() - MESSAGE_EXPIRATION_MS;
+/* -------------------------------------------------------------------------- */
+/* Helpers                                                                    */
+/* -------------------------------------------------------------------------- */
 
-  // Clean memory store of expired messages
-  contentStore.chatMessages = contentStore.chatMessages.filter(
-    (m) => m.timestamp >= cutoffTime
-  );
+function noStoreHeaders() {
+  return {
+    'Cache-Control':
+      'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+    Pragma: 'no-cache',
+    Expires: '0',
+  };
+}
 
-  let messages = contentStore.chatMessages;
-
-  if (isSupabaseConfigured()) {
-    // Asynchronously cleanup expired messages in Supabase database
-    cleanupExpiredSupabaseChatMessages().catch(() => {});
-
-    const sbMessages = await fetchSupabaseChatMessages();
-    if (sbMessages && sbMessages.length > 0) {
-      // Ensure verified flags are preserved and filter by 24h
-      messages = sbMessages
-        .filter((m) => m.timestamp >= cutoffTime)
-        .map((m) => ({
-          ...m,
-          isVerified:
-            m.isVerified ||
-            m.userId === 'dhoti_aale_ai_official' ||
-            m.userName === 'DHOTI AALE AI' ||
-            contentStore.verifiedUsers.has(m.userId) ||
-            (m.userBadge?.includes('Site Owner') ?? false),
-        }));
-      contentStore.chatMessages = messages;
-    }
-  }
-
-  return NextResponse.json({
-    channel: 'Dhoti aale World Chat',
-    status: 'online',
-    requiresAuth: true,
-    messages,
-    rules: [
-      'Google authentication required to post',
-      'Desi swag & respectful banter',
-      'No abuse, spam or offensive content',
-    ],
+function response(data: unknown, status = 200) {
+  return NextResponse.json(data, {
+    status,
+    headers: noStoreHeaders(),
   });
 }
 
+/* -------------------------------------------------------------------------- */
+/* Authentication                                                             */
+/* -------------------------------------------------------------------------- */
+
+async function getAuthenticatedUser(req: NextRequest) {
+  if (!isSupabaseConfigured()) {
+    return {
+      user: null,
+      profile: null,
+      error: 'Supabase is not configured.',
+    };
+  }
+
+  const authorization = req.headers.get('authorization');
+
+  if (!authorization) {
+    return {
+      user: null,
+      profile: null,
+      error: 'Login required.',
+    };
+  }
+
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
+
+  if (!match) {
+    return {
+      user: null,
+      profile: null,
+      error: 'Invalid authorization token.',
+    };
+  }
+
+  const accessToken = match[1]?.trim();
+
+  if (!accessToken) {
+    return {
+      user: null,
+      profile: null,
+      error: 'Invalid authorization token.',
+    };
+  }
+
+  try {
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser(accessToken);
+
+    if (error || !user) {
+      return {
+        user: null,
+        profile: null,
+        error: 'Your login session has expired. Please login again.',
+      };
+    }
+
+    /*
+     * Load profile from public.users.
+     * Chat identity comes from the authenticated Supabase user,
+     * not from client-supplied x-user-id/x-user-email headers.
+     */
+    let profile: any = null;
+
+    try {
+      const { data } = await supabase
+        .from('users')
+        .select(
+          'id,name,email,avatar,badge,role,is_admin,is_verified,is_blocked,chat_blocked'
+        )
+        .eq('id', user.id)
+        .maybeSingle();
+
+      profile = data || null;
+    } catch (error) {
+      console.warn('Could not load chat user profile:', error);
+    }
+
+    return {
+      user,
+      profile,
+      error: null,
+    };
+  } catch (error) {
+    console.error('World Chat authentication error:', error);
+
+    return {
+      user: null,
+      profile: null,
+      error: 'Authentication failed.',
+    };
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* GET - Load World Chat                                                      */
+/* -------------------------------------------------------------------------- */
+
+export async function GET(req: NextRequest) {
+  try {
+    if (!isSupabaseConfigured()) {
+      return response(
+        {
+          error: 'World Chat database is not configured.',
+          code: 'SUPABASE_NOT_CONFIGURED',
+        },
+        500
+      );
+    }
+
+    /*
+     * Login is required to use World Chat.
+     */
+    const auth = await getAuthenticatedUser(req);
+
+    if (!auth.user) {
+      return response(
+        {
+          error: auth.error || 'Login required.',
+          code: 'LOGIN_REQUIRED',
+          requiresAuth: true,
+        },
+        401
+      );
+    }
+
+    /*
+     * Blocked users cannot access World Chat.
+     */
+    if (
+      auth.profile?.is_blocked === true ||
+      auth.profile?.chat_blocked === true
+    ) {
+      return response(
+        {
+          error: 'Your World Chat access has been blocked.',
+          code: 'CHAT_BLOCKED',
+        },
+        403
+      );
+    }
+
+    /*
+     * IMPORTANT:
+     * Remove expired messages before returning history.
+     *
+     * This is a safety cleanup.
+     */
+    try {
+      await cleanupExpiredSupabaseChatMessages();
+    } catch (error) {
+      console.warn('World Chat expiry cleanup warning:', error);
+    }
+
+    const cutoffTime = Date.now() - MESSAGE_EXPIRATION_MS;
+
+    const dbMessages = await fetchSupabaseChatMessages();
+
+    const messages = (dbMessages || [])
+      .filter((message: any) => {
+        const timestamp = Number(message.timestamp || 0);
+        return timestamp >= cutoffTime;
+      })
+      .map((message: any) => ({
+        ...message,
+
+        /*
+         * Only server-controlled users can be marked verified/admin.
+         */
+        isVerified:
+          Boolean(message.isVerified) ||
+          message.userId === 'dhoti_aale_ai_official' ||
+          message.userName === 'DHOTI AALE AI' ||
+          message.userBadge?.includes('Site Owner'),
+      }))
+      .sort(
+        (a: any, b: any) =>
+          Number(a.timestamp || 0) - Number(b.timestamp || 0)
+      );
+
+    return response({
+      success: true,
+      channel: 'Dhoti aale World Chat',
+      status: 'online',
+      requiresAuth: true,
+      expiresAfterMinutes: 10,
+      messages,
+      serverTime: Date.now(),
+      rules: [
+        'Login required to post',
+        'Messages automatically expire after 10 minutes',
+        'Respectful chat only',
+        'No abuse, spam or offensive content',
+      ],
+    });
+  } catch (error: any) {
+    console.error('World Chat GET error:', error);
+
+    return response(
+      {
+        error: error?.message || 'Failed to load World Chat.',
+        code: 'CHAT_LOAD_FAILED',
+      },
+      500
+    );
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* POST - Send World Chat Message                                             */
+/* -------------------------------------------------------------------------- */
+
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json().catch(() => ({}));
-    const { user, text, sticker, id: providedId } = body;
-
-    const userEmail = (req.headers.get('x-user-email') || user?.email || '').toLowerCase().trim();
-    const userId = (req.headers.get('x-user-id') || user?.id || '').toString().trim();
-
-    // Strict Server-Side Authentication Enforcement
-    if (!userEmail || !userEmail.includes('@') || !userId) {
-      return NextResponse.json(
+    if (!isSupabaseConfigured()) {
+      return response(
         {
-          error: 'Unauthorized: Only authenticated Google users can enter and send World Chat messages.',
+          error: 'World Chat database is not configured.',
+          code: 'SUPABASE_NOT_CONFIGURED',
+        },
+        500
+      );
+    }
+
+    const auth = await getAuthenticatedUser(req);
+
+    if (!auth.user) {
+      return response(
+        {
+          error: auth.error || 'Login required.',
           code: 'LOGIN_REQUIRED',
         },
+        401
+      );
+    }
+
+    /*
+     * Blocked user check.
+     */
+    if (
+      auth.profile?.is_blocked === true ||
+      auth.profile?.chat_blocked === true
+    ) {
+      return response(
         {
-          status: 401,
-          headers: {
-            'Cache-Control': 'no-store, no-cache, must-revalidate',
-          },
-        }
+          error: 'Your World Chat access has been blocked.',
+          code: 'CHAT_BLOCKED',
+        },
+        403
       );
     }
 
-    if (!text && !sticker) {
-      return NextResponse.json(
-        { error: 'Message text or sticker is required' },
-        { status: 400 }
+    const body = await req.json().catch(() => ({}));
+
+    const rawText =
+      typeof body?.text === 'string' ? body.text.trim() : '';
+
+    const rawSticker =
+      typeof body?.sticker === 'string' ? body.sticker.trim() : '';
+
+    if (!rawText && !rawSticker) {
+      return response(
+        {
+          error: 'Message text or sticker is required.',
+          code: 'EMPTY_MESSAGE',
+        },
+        400
       );
     }
 
-    // Role check & verification status
+    /*
+     * Basic message size protection.
+     */
+    if (rawText.length > 1000) {
+      return response(
+        {
+          error: 'Message is too long. Maximum 1000 characters.',
+          code: 'MESSAGE_TOO_LONG',
+        },
+        400
+      );
+    }
+
+    if (rawSticker.length > 500) {
+      return response(
+        {
+          error: 'Invalid sticker.',
+          code: 'INVALID_STICKER',
+        },
+        400
+      );
+    }
+
+    const userId = auth.user.id;
+
+    const userEmail =
+      auth.user.email?.toLowerCase().trim() || '';
+
     const isOwner = isSiteAdmin(userEmail);
+
+    /*
+     * Identity comes ONLY from Supabase Auth + public.users.
+     * Client cannot choose another user's ID/email.
+     */
+    let sanitizedName =
+      auth.profile?.name?.trim() ||
+      auth.user.user_metadata?.name?.trim() ||
+      'Dhoti Resident';
+
+    let avatar =
+      auth.profile?.avatar ||
+      auth.user.user_metadata?.avatar_url ||
+      `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(
+        userId
+      )}`;
+
+    const badge =
+      isOwner
+        ? 'Site Owner & Admin 👑'
+        : auth.profile?.badge || 'Dhoti Resident';
+
     const isVerified =
       isOwner ||
-      contentStore.verifiedUsers.has(userId) ||
-      contentStore.verifiedUsers.has(userEmail);
+      Boolean(auth.profile?.is_verified);
 
-    // Strict Anti-Impersonation Protection: Users cannot disguise as DHOTI AALE AI
-    let sanitizedName = (user?.name || (isOwner ? 'Site Admin 👑' : 'Dhoti Resident')).toString().trim();
+    /*
+     * Prevent impersonation.
+     */
+    const lowerName = sanitizedName.toLowerCase();
+
     if (
-      sanitizedName.toLowerCase() === 'dhoti aale ai' ||
-      sanitizedName.toLowerCase() === 'dhoti ai' ||
+      lowerName === 'dhoti aale ai' ||
+      lowerName === 'dhoti ai' ||
       userId === 'dhoti_aale_ai_official'
     ) {
-      sanitizedName = isOwner ? 'Site Admin 👑' : 'Dhoti Resident';
+      sanitizedName = isOwner
+        ? 'Site Admin 👑'
+        : 'Dhoti Resident';
+
+      avatar = isOwner
+        ? 'https://api.dicebear.com/7.x/bottts/svg?seed=dhoti-admin'
+        : avatar;
     }
 
+    const now = Date.now();
+
     const newMsg: ChatMessage = {
-      id: providedId || `msg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      userId: userId,
+      id: `msg_${crypto.randomUUID()}`,
+      userId,
       userName: sanitizedName,
-      userAvatar: user?.avatar || (isOwner ? 'https://api.dicebear.com/7.x/bottts/svg?seed=dhoti-admin' : `https://api.dicebear.com/7.x/bottts/svg?seed=${userId}`),
-      userBadge: isOwner ? 'Site Owner & Admin 👑' : (user?.badge || 'Dhoti Resident'),
-      text: (text || '').toString().trim(),
-      timestamp: Date.now(),
-      sticker: sticker ? sticker.toString().trim() : undefined,
-      isAi: false, // User messages are never AI
+      userAvatar: avatar,
+      userBadge: badge,
+      text: rawText,
+      timestamp: now,
+      sticker: rawSticker || undefined,
+      isAi: false,
       isVerified,
     };
 
-    // Store in memory
-    contentStore.chatMessages.push(newMsg);
-    if (contentStore.chatMessages.length > 100) {
-      contentStore.chatMessages = contentStore.chatMessages.slice(-100);
-    }
+    /*
+     * IMPORTANT:
+     * Do NOT store user messages in contentStore.
+     * Supabase is the single source of truth.
+     */
+    await insertSupabaseChatMessage(newMsg);
 
-    // Persist to Supabase Database
-    if (isSupabaseConfigured()) {
-      await insertSupabaseChatMessage(newMsg);
-    }
-
-    // Process DHOTI AALE AI participation (Controlled AI participant)
+    /*
+     * Controlled DHOTI AALE AI participation.
+     */
     let aiResponse: ChatMessage | null = null;
+
     try {
       aiResponse = await processDhotiAiWorldChatMessage(newMsg);
-    } catch (aiErr) {
-      console.warn('AI World Chat processing notice:', aiErr);
+    } catch (aiError) {
+      console.warn(
+        'DHOTI AALE AI World Chat processing warning:',
+        aiError
+      );
     }
 
-    return NextResponse.json({
+    return response({
       success: true,
-      deliveredAt: newMsg.timestamp,
+      deliveredAt: now,
+      expiresAt: now + MESSAGE_EXPIRATION_MS,
+      expiresAfterMinutes: 10,
       message: newMsg,
       aiMessage: aiResponse,
       sender: {
@@ -154,79 +437,133 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error: any) {
-    return NextResponse.json(
-      { error: 'Failed to process chat message', details: error?.message },
-      { status: 500 }
+    console.error('World Chat POST error:', error);
+
+    return response(
+      {
+        error:
+          error?.message ||
+          'Failed to send World Chat message.',
+        code: 'CHAT_SEND_FAILED',
+      },
+      500
     );
   }
 }
 
-// DELETE: Users can delete their own messages, Admin can moderate any message
+/* -------------------------------------------------------------------------- */
+/* DELETE - Own Message / Admin Message                                      */
+/* -------------------------------------------------------------------------- */
+
 export async function DELETE(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const messageId = searchParams.get('id');
+  try {
+    if (!isSupabaseConfigured()) {
+      return response(
+        {
+          error: 'World Chat database is not configured.',
+        },
+        500
+      );
+    }
 
-  if (!messageId) {
-    return NextResponse.json({ error: 'Message ID is required' }, { status: 400 });
-  }
+    const { searchParams } = new URL(req.url);
+    const messageId = searchParams.get('id')?.trim();
 
-  const userEmail = (req.headers.get('x-user-email') || '').toLowerCase().trim();
-  const userId = (req.headers.get('x-user-id') || '').toString().trim();
-  const isAdmin = isSiteAdmin(userEmail);
+    if (!messageId) {
+      return response(
+        {
+          error: 'Message ID is required.',
+        },
+        400
+      );
+    }
 
-  if (!userId && !isAdmin) {
-    return NextResponse.json(
-      { error: 'Unauthorized: Authentication required.' },
-      { status: 401 }
+    const auth = await getAuthenticatedUser(req);
+
+    if (!auth.user) {
+      return response(
+        {
+          error: auth.error || 'Login required.',
+          code: 'LOGIN_REQUIRED',
+        },
+        401
+      );
+    }
+
+    const userId = auth.user.id;
+    const userEmail =
+      auth.user.email?.toLowerCase().trim() || '';
+
+    const isAdmin = isSiteAdmin(userEmail);
+
+    /*
+     * Get message owner directly from Supabase.
+     */
+    const { data: dbMessage, error: findError } = await supabase
+      .from('chat_messages')
+      .select('id,user_id')
+      .eq('id', messageId)
+      .maybeSingle();
+
+    if (findError) {
+      console.error(
+        'World Chat message lookup error:',
+        findError
+      );
+
+      return response(
+        {
+          error: findError.message,
+        },
+        500
+      );
+    }
+
+    if (!dbMessage) {
+      return response(
+        {
+          error: 'Message not found.',
+          code: 'MESSAGE_NOT_FOUND',
+        },
+        404
+      );
+    }
+
+    const isOwner =
+      String(dbMessage.user_id) === String(userId);
+
+    /*
+     * Normal user can delete only own message.
+     * Super Admin can delete any message.
+     */
+    if (!isOwner && !isAdmin) {
+      return response(
+        {
+          error:
+            'You can delete only your own messages.',
+          code: 'DELETE_NOT_ALLOWED',
+        },
+        403
+      );
+    }
+
+    await deleteSupabaseChatMessage(messageId);
+
+    return response({
+      success: true,
+      deletedId: messageId,
+    });
+  } catch (error: any) {
+    console.error('World Chat DELETE error:', error);
+
+    return response(
+      {
+        error:
+          error?.message ||
+          'Failed to delete World Chat message.',
+        code: 'CHAT_DELETE_FAILED',
+      },
+      500
     );
   }
-
-  // Find message author
-  let messageOwnerId: string | null = null;
-  const storeMsg = contentStore.chatMessages.find((m) => m.id === messageId);
-  if (storeMsg) {
-    messageOwnerId = storeMsg.userId;
-  } else if (isSupabaseConfigured()) {
-    try {
-      const { data: dbMsg } = await supabase
-        .from('chat_messages')
-        .select('user_id')
-        .eq('id', messageId)
-        .maybeSingle();
-      if (dbMsg) {
-        messageOwnerId = dbMsg.user_id;
-      }
-    } catch {
-      // ignore
-    }
-  }
-
-  const isOwner = Boolean(userId && messageOwnerId && userId === messageOwnerId);
-
-  if (!isOwner && !isAdmin) {
-    return NextResponse.json(
-      { error: 'Unauthorized: You can delete only your own messages.' },
-      { status: 403 }
-    );
-  }
-
-  // Remove from memory store
-  const prevCount = contentStore.chatMessages.length;
-  contentStore.chatMessages = contentStore.chatMessages.filter((m) => m.id !== messageId);
-  const deleted = contentStore.chatMessages.length < prevCount;
-
-  // Remove from Supabase
-  if (isSupabaseConfigured()) {
-    try {
-      await deleteSupabaseChatMessage(messageId);
-    } catch (e) {
-      console.warn('Could not delete message from Supabase:', e);
-    }
-  }
-
-  return NextResponse.json({
-    success: true,
-    deletedId: messageId,
-    remainingCount: contentStore.chatMessages.length,
-  });
 }

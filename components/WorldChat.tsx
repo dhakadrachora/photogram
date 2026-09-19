@@ -6,6 +6,7 @@ import { User, ChatMessage, PresenceUser } from '@/types';
 import { SoundEffects } from '@/lib/audio/sound-effects';
 import { VerifiedTick } from '@/components/VerifiedTick';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+
 import {
   Send,
   Users,
@@ -16,7 +17,6 @@ import {
   ShieldCheck,
   Sparkles,
   RefreshCw,
-  MessageSquare,
   Bot,
 } from 'lucide-react';
 
@@ -26,28 +26,85 @@ interface WorldChatProps {
   onStartBattleInvite: (opponentName: string) => void;
 }
 
-function makeTempMsgId() {
-  return `msg_user_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+const MESSAGE_EXPIRATION_MS = 10 * 60 * 1000;
+
+function getMessageTimestamp(message: ChatMessage) {
+  return Number(message.timestamp || 0);
 }
 
-function getNowTimestamp() {
-  return Date.now();
+function sortMessages(messages: ChatMessage[]) {
+  return [...messages].sort(
+    (a, b) => getMessageTimestamp(a) - getMessageTimestamp(b)
+  );
 }
 
-export function WorldChat({ currentUser, onOpenAuth, onStartBattleInvite }: WorldChatProps) {
+function removeExpiredMessages(messages: ChatMessage[]) {
+  const cutoff = Date.now() - MESSAGE_EXPIRATION_MS;
+
+  return messages.filter(
+    (message) => getMessageTimestamp(message) >= cutoff
+  );
+}
+
+function mergeMessages(
+  current: ChatMessage[],
+  incoming: ChatMessage[]
+) {
+  const map = new Map<string, ChatMessage>();
+
+  for (const message of current) {
+    map.set(message.id, message);
+  }
+
+  for (const message of incoming) {
+    map.set(message.id, message);
+  }
+
+  return sortMessages(removeExpiredMessages(Array.from(map.values())));
+}
+
+function mapRealtimeMessage(record: any): ChatMessage {
+  return {
+    id: String(record.id),
+    userId: String(record.user_id || ''),
+    userName: record.user_name || 'Dhoti Resident',
+    userAvatar:
+      record.user_avatar ||
+      'https://api.dicebear.com/7.x/bottts/svg?seed=dhoti',
+    userBadge: record.user_badge || 'Dhoti Resident',
+    text: record.text || '',
+    timestamp: record.created_at
+      ? new Date(record.created_at).getTime()
+      : Date.now(),
+    sticker: record.sticker || undefined,
+    isAi: Boolean(record.is_ai),
+    isVerified:
+      Boolean(record.is_verified) ||
+      record.user_id === 'dhoti_aale_ai_official' ||
+      record.user_name === 'DHOTI AALE AI' ||
+      String(record.user_badge || '').includes('Site Owner'),
+  };
+}
+
+export function WorldChat({
+  currentUser,
+  onOpenAuth,
+  onStartBattleInvite,
+}: WorldChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [showStickers, setShowStickers] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  // Real-time live presence data (backed by server heartbeat & DB)
   const [onlineUsers, setOnlineUsers] = useState<PresenceUser[]>([]);
   const [onlineCount, setOnlineCount] = useState<number>(0);
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
 
-  const chatBottomRef = useRef<HTMLDivElement>(null);
-  const isInitialLoadRef = useRef(true);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+  const shouldAutoScrollRef = useRef(true);
+  const initialLoadRef = useRef(true);
+  const expiryTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const quickStickers = [
     'Systumm Hang! 🚜',
@@ -58,281 +115,549 @@ export function WorldChat({ currentUser, onOpenAuth, onStartBattleInvite }: Worl
     'Swag 100% ✨',
   ];
 
-  // Auto-scroll to latest message
-  useEffect(() => {
-    if (isInitialLoadRef.current && messages.length > 0) {
-      chatBottomRef.current?.scrollIntoView({ behavior: 'auto' });
-      isInitialLoadRef.current = false;
-    } else {
-      chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages]);
+  /*
+   * ------------------------------------------------------------
+   * AUTH TOKEN
+   * ------------------------------------------------------------
+   */
 
-  // Fetch messages from server API
+  const getAccessToken = useCallback(async () => {
+    if (!isSupabaseConfigured()) return null;
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    return session?.access_token || null;
+  }, []);
+
+  /*
+   * ------------------------------------------------------------
+   * SCROLL
+   * ------------------------------------------------------------
+   */
+
+  const isNearBottom = useCallback(() => {
+    const container = chatScrollRef.current;
+
+    if (!container) return true;
+
+    const distanceFromBottom =
+      container.scrollHeight -
+      container.scrollTop -
+      container.clientHeight;
+
+    return distanceFromBottom < 120;
+  }, []);
+
+  const scrollToBottom = useCallback(
+    (behavior: ScrollBehavior = 'smooth') => {
+      const container = chatScrollRef.current;
+
+      if (!container) return;
+
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior,
+      });
+    },
+    []
+  );
+
+  const handleChatScroll = useCallback(() => {
+    shouldAutoScrollRef.current = isNearBottom();
+  }, [isNearBottom]);
+
+  /*
+   * ------------------------------------------------------------
+   * MESSAGE EXPIRY
+   * ------------------------------------------------------------
+   */
+
+  const removeExpiredFromUI = useCallback(() => {
+    setMessages((previous) => {
+      const cleaned = removeExpiredMessages(previous);
+
+      if (cleaned.length === previous.length) {
+        return previous;
+      }
+
+      return cleaned;
+    });
+  }, []);
+
+  /*
+   * ------------------------------------------------------------
+   * FETCH CHAT
+   * ------------------------------------------------------------
+   */
+
   const fetchMessages = useCallback(async () => {
-    try {
-      const res = await fetch('/api/chat', { cache: 'no-store' });
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data.messages)) {
-          setMessages(data.messages);
-        }
-      }
-    } catch (err) {
-      console.warn('Could not fetch chat messages:', err);
-    } finally {
-      setIsLoadingMessages(false);
-    }
-  }, []);
-
-  // Fetch Real Live User Count & Presence from /api/presence
-  const fetchPresence = useCallback(async () => {
-    try {
-      const res = await fetch('/api/presence', { cache: 'no-store' });
-      if (res.ok) {
-        const data = await res.json();
-        if (typeof data.count === 'number') {
-          setOnlineCount(data.count);
-          setOnlineUsers(data.users || []);
-        }
-      }
-    } catch (err) {
-      console.warn('Could not fetch presence count:', err);
-    }
-  }, []);
-
-  // Send Heartbeat to register real active presence
-  const sendPresenceHeartbeat = useCallback(async () => {
     if (!currentUser) {
-      // Guest: just poll presence count
-      void fetchPresence();
+      setMessages([]);
+      setIsLoadingMessages(false);
       return;
     }
 
     try {
+      const accessToken = await getAccessToken();
+
+      if (!accessToken) {
+        setMessages([]);
+        setAuthError('Please login again to enter World Chat.');
+        setIsLoadingMessages(false);
+        return;
+      }
+
+      const res = await fetch('/api/chat', {
+        method: 'GET',
+        cache: 'no-store',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (res.status === 401) {
+        setAuthError(
+          'Your login session expired. Please login again.'
+        );
+        setMessages([]);
+        setIsLoadingMessages(false);
+        return;
+      }
+
+      if (res.status === 403) {
+        setAuthError(
+          data?.error || 'Your World Chat access is blocked.'
+        );
+        setMessages([]);
+        setIsLoadingMessages(false);
+        return;
+      }
+
+      if (!res.ok) {
+        throw new Error(
+          data?.error || 'Could not load World Chat.'
+        );
+      }
+
+      if (Array.isArray(data.messages)) {
+        setMessages((previous) => {
+          const merged = mergeMessages(
+            previous,
+            data.messages
+          );
+
+          return merged;
+        });
+      }
+
+      setAuthError(null);
+    } catch (error) {
+      console.warn('World Chat fetch error:', error);
+    } finally {
+      setIsLoadingMessages(false);
+    }
+  }, [currentUser, getAccessToken]);
+
+  /*
+   * ------------------------------------------------------------
+   * PRESENCE
+   * ------------------------------------------------------------
+   *
+   * Presence is kept separate from World Chat.
+   * It will be secured properly in the presence API.
+   */
+
+  const fetchPresence = useCallback(async () => {
+    try {
+      const res = await fetch('/api/presence', {
+        cache: 'no-store',
+      });
+
+      if (!res.ok) return;
+
+      const data = await res.json();
+
+      if (typeof data.count === 'number') {
+        setOnlineCount(Math.max(0, data.count));
+        setOnlineUsers(
+          Array.isArray(data.users) ? data.users : []
+        );
+      }
+    } catch (error) {
+      console.warn('Presence fetch error:', error);
+    }
+  }, []);
+
+  const sendPresenceHeartbeat = useCallback(async () => {
+    if (!currentUser) {
+      await fetchPresence();
+      return;
+    }
+
+    try {
+      const accessToken = await getAccessToken();
+
+      if (!accessToken) {
+        await fetchPresence();
+        return;
+      }
+
       const res = await fetch('/api/presence', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-user-email': currentUser.email,
-          'x-user-id': currentUser.id,
+          Authorization: `Bearer ${accessToken}`,
         },
-        body: JSON.stringify({
-          userId: currentUser.id,
-          userName: currentUser.name,
-          userAvatar: currentUser.avatar,
-          userBadge: currentUser.badge,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (typeof data.count === 'number') {
-          setOnlineCount(data.count);
-          setOnlineUsers(data.users || []);
-        }
-      }
-    } catch (err) {
-      console.warn('Presence heartbeat error:', err);
-    }
-  }, [currentUser, fetchPresence]);
-
-  // Initial setup & periodic polling for real-time synchronization
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadInitialData = async () => {
-      try {
-        const [chatRes, presRes] = await Promise.all([
-          fetch('/api/chat', { cache: 'no-store' }),
-          fetch('/api/presence', { cache: 'no-store' }),
-        ]);
-        if (!isMounted) return;
-        if (chatRes.ok) {
-          const chatData = await chatRes.json();
-          if (Array.isArray(chatData.messages)) {
-            setMessages(chatData.messages);
-          }
-        }
-        if (presRes.ok) {
-          const presData = await presRes.json();
-          if (typeof presData.count === 'number') {
-            setOnlineCount(presData.count);
-            setOnlineUsers(presData.users || []);
-          }
-        }
-      } catch (err) {
-        console.warn('Initial load error:', err);
-      } finally {
-        if (isMounted) setIsLoadingMessages(false);
-      }
-    };
-
-    void loadInitialData();
-
-    // Heartbeat every 15 seconds for active users
-    const presenceInterval = setInterval(() => {
-      void sendPresenceHeartbeat();
-    }, 15000);
-
-    // Chat polling every 3 seconds
-    const chatInterval = setInterval(() => {
-      void fetchMessages();
-    }, 3000);
-
-    // Supabase Realtime subscription if configured
-    let channel: any = null;
-    if (isSupabaseConfigured()) {
-      try {
-        channel = supabase
-          .channel('public:chat_messages')
-          .on(
-            'postgres_changes',
-            { event: 'INSERT', schema: 'public', table: 'chat_messages' },
-            (payload) => {
-              const newRecord = payload.new;
-              if (newRecord && newRecord.id) {
-                const incomingMsg: ChatMessage = {
-                  id: newRecord.id,
-                  userId: newRecord.user_id,
-                  userName: newRecord.user_name,
-                  userAvatar: newRecord.user_avatar,
-                  userBadge: newRecord.user_badge,
-                  text: newRecord.text,
-                  timestamp: newRecord.created_at ? new Date(newRecord.created_at).getTime() : getNowTimestamp(),
-                  sticker: newRecord.sticker || undefined,
-                  isAi: Boolean(newRecord.is_ai),
-                  isVerified:
-                    Boolean(newRecord.is_verified) ||
-                    newRecord.user_id === 'dhoti_aale_ai_official' ||
-                    newRecord.user_name === 'DHOTI AALE AI',
-                };
-                setMessages((prev) => {
-                  if (prev.some((m) => m.id === incomingMsg.id)) return prev;
-                  return [...prev, incomingMsg];
-                });
-              }
-            }
-          )
-          .subscribe();
-      } catch (err) {
-        console.warn('Supabase realtime subscription notice:', err);
-      }
-    }
-
-    // Cleanup on unmount
-    return () => {
-      isMounted = false;
-      clearInterval(presenceInterval);
-      clearInterval(chatInterval);
-      if (channel) {
-        supabase.removeChannel(channel);
-      }
-      if (currentUser) {
-        void fetch('/api/presence', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: currentUser.id }),
-          keepalive: true,
-        }).catch(() => {});
-      }
-    };
-  }, [currentUser, fetchMessages, sendPresenceHeartbeat]);
-
-  // Send Chat Message Handler
-  const handleSendMessage = async (textToSend: string, stickerText?: string) => {
-    if (!currentUser) {
-      onOpenAuth();
-      return;
-    }
-    const trimmed = textToSend.trim();
-    if (!trimmed && !stickerText) return;
-
-    setAuthError(null);
-    SoundEffects.playBell();
-
-    const tempId = makeTempMsgId();
-    const optimisticMsg: ChatMessage = {
-      id: tempId,
-      userId: currentUser.id,
-      userName: currentUser.name,
-      userAvatar: currentUser.avatar,
-      userBadge: currentUser.badge,
-      text: trimmed,
-      timestamp: getNowTimestamp(),
-      sticker: stickerText,
-      isAi: false,
-      isVerified: currentUser.isVerified || currentUser.email === 'rohitdhakaddhoti143@gmail.com',
-    };
-
-    setMessages((prev) => [...prev, optimisticMsg]);
-    setInputMessage('');
-    setShowStickers(false);
-
-    // Check if AI might be thinking
-    const triggersAi =
-      trimmed.toLowerCase().includes('dhoti aale ai') ||
-      trimmed.toLowerCase().includes('dhoti ai') ||
-      trimmed.toLowerCase().includes('@dhoti') ||
-      /\bai\b/i.test(trimmed);
-
-    if (triggersAi) {
-      setIsSending(true);
-    }
-
-    try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-email': currentUser.email,
-          'x-user-id': currentUser.id,
-        },
-        body: JSON.stringify({
-          user: currentUser,
-          text: trimmed,
-          sticker: stickerText,
-          id: tempId,
-        }),
+        body: JSON.stringify({}),
       });
 
       if (!res.ok) {
-        if (res.status === 401) {
-          setAuthError('Authentication required to post. Please sign in again.');
-          onOpenAuth();
-          setIsSending(false);
-          return;
-        }
+        await fetchPresence();
+        return;
       }
 
       const data = await res.json();
 
-      // If server returned DHOTI AALE AI reply
-      if (data.aiMessage) {
-        setTimeout(() => {
-          setMessages((prev) => {
-            if (prev.some((m) => m.id === data.aiMessage.id)) return prev;
-            return [...prev, data.aiMessage];
-          });
-          setIsSending(false);
-          SoundEffects.playWhistle();
-        }, 700);
-      } else {
-        setIsSending(false);
+      if (typeof data.count === 'number') {
+        setOnlineCount(Math.max(0, data.count));
+        setOnlineUsers(
+          Array.isArray(data.users) ? data.users : []
+        );
       }
-    } catch (err: any) {
-      console.warn('Error delivering chat message:', err);
+    } catch (error) {
+      console.warn('Presence heartbeat error:', error);
+      await fetchPresence();
+    }
+  }, [currentUser, fetchPresence, getAccessToken]);
+
+  /*
+   * ------------------------------------------------------------
+   * INITIAL LOAD + REALTIME
+   * ------------------------------------------------------------
+   */
+
+  useEffect(() => {
+    let mounted = true;
+
+    if (!currentUser) {
+      setMessages([]);
+      setOnlineUsers([]);
+      setOnlineCount(0);
+      setIsLoadingMessages(false);
+      return;
+    }
+
+    const load = async () => {
+      if (!mounted) return;
+
+      await Promise.all([
+        fetchMessages(),
+        fetchPresence(),
+      ]);
+    };
+
+    void load();
+
+    /*
+     * Presence heartbeat.
+     */
+    const presenceInterval = setInterval(() => {
+      void sendPresenceHeartbeat();
+    }, 15000);
+
+    /*
+     * Remove messages from UI every second.
+     *
+     * Database cleanup is handled separately by Supabase cleanup.
+     */
+    expiryTimerRef.current = setInterval(() => {
+      removeExpiredFromUI();
+    }, 1000);
+
+    /*
+     * Supabase Realtime.
+     *
+     * INSERT = new message
+     * DELETE = deleted message
+     */
+    let channel: any = null;
+
+    if (isSupabaseConfigured()) {
+      try {
+        channel = supabase
+          .channel('world-chat-realtime')
+          .on(
+            'postgres_changes',
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'chat_messages',
+            },
+            (payload) => {
+              if (!mounted || !payload.new) return;
+
+              const incomingMessage = mapRealtimeMessage(
+                payload.new
+              );
+
+              setMessages((previous) => {
+                const merged = mergeMessages(
+                  previous,
+                  [incomingMessage]
+                );
+
+                return merged;
+              });
+
+              /*
+               * Only auto-scroll if user was already near bottom.
+               */
+              if (shouldAutoScrollRef.current) {
+                requestAnimationFrame(() => {
+                  scrollToBottom('smooth');
+                });
+              }
+            }
+          )
+          .on(
+            'postgres_changes',
+            {
+              event: 'DELETE',
+              schema: 'public',
+              table: 'chat_messages',
+            },
+            (payload) => {
+              if (!mounted || !payload.old) return;
+
+              const deletedId = String(
+                payload.old.id || ''
+              );
+
+              if (!deletedId) return;
+
+              setMessages((previous) =>
+                previous.filter(
+                  (message) => message.id !== deletedId
+                )
+              );
+            }
+          )
+          .subscribe((status: string) => {
+            console.log(
+              'World Chat realtime status:',
+              status
+            );
+          });
+      } catch (error) {
+        console.warn(
+          'World Chat realtime setup error:',
+          error
+        );
+      }
+    }
+
+    return () => {
+      mounted = false;
+
+      clearInterval(presenceInterval);
+
+      if (expiryTimerRef.current) {
+        clearInterval(expiryTimerRef.current);
+        expiryTimerRef.current = null;
+      }
+
+      if (channel) {
+        void supabase.removeChannel(channel);
+      }
+
+      /*
+       * Do not send user identity in headers.
+       * Presence API should derive identity from Supabase session.
+       */
+      void fetch('/api/presence', {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${''}`,
+        },
+        keepalive: true,
+      }).catch(() => {});
+    };
+  }, [
+    currentUser,
+    fetchMessages,
+    fetchPresence,
+    sendPresenceHeartbeat,
+    removeExpiredFromUI,
+    scrollToBottom,
+  ]);
+
+  /*
+   * ------------------------------------------------------------
+   * AUTO SCROLL AFTER MESSAGE LIST CHANGES
+   * ------------------------------------------------------------
+   */
+
+  useEffect(() => {
+    if (messages.length === 0) return;
+
+    if (initialLoadRef.current) {
+      requestAnimationFrame(() => {
+        scrollToBottom('auto');
+      });
+
+      initialLoadRef.current = false;
+      shouldAutoScrollRef.current = true;
+      return;
+    }
+
+    if (shouldAutoScrollRef.current) {
+      requestAnimationFrame(() => {
+        scrollToBottom('smooth');
+      });
+    }
+  }, [messages, scrollToBottom]);
+
+  /*
+   * ------------------------------------------------------------
+   * SEND MESSAGE
+   * ------------------------------------------------------------
+   */
+
+  const handleSendMessage = async (
+    textToSend: string,
+    stickerText?: string
+  ) => {
+    if (!currentUser) {
+      onOpenAuth();
+      return;
+    }
+
+    const trimmed = textToSend.trim();
+
+    if (!trimmed && !stickerText) {
+      return;
+    }
+
+    setAuthError(null);
+    setIsSending(true);
+    SoundEffects.playBell();
+
+    try {
+      const accessToken = await getAccessToken();
+
+      if (!accessToken) {
+        setAuthError(
+          'Your login session expired. Please login again.'
+        );
+        setIsSending(false);
+        onOpenAuth();
+        return;
+      }
+
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          text: trimmed,
+          sticker: stickerText || undefined,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (res.status === 401) {
+        setAuthError(
+          'Authentication required. Please login again.'
+        );
+        setIsSending(false);
+        onOpenAuth();
+        return;
+      }
+
+      if (res.status === 403) {
+        setAuthError(
+          data?.error ||
+            'Your World Chat access has been blocked.'
+        );
+        setIsSending(false);
+        return;
+      }
+
+      if (!res.ok) {
+        throw new Error(
+          data?.error || 'Failed to send message.'
+        );
+      }
+
+      /*
+       * Server is the source of truth.
+       * Realtime will also deliver the message, but this prevents
+       * waiting for the realtime event.
+       */
+      if (data.message) {
+        setMessages((previous) =>
+          mergeMessages(previous, [data.message])
+        );
+      }
+
+      if (data.aiMessage) {
+        setMessages((previous) =>
+          mergeMessages(previous, [data.aiMessage])
+        );
+
+        SoundEffects.playWhistle();
+      }
+
+      setInputMessage('');
+      setShowStickers(false);
+      setAuthError(null);
+
+      shouldAutoScrollRef.current = true;
+
+      requestAnimationFrame(() => {
+        scrollToBottom('smooth');
+      });
+    } catch (error: any) {
+      console.warn(
+        'World Chat send error:',
+        error
+      );
+
+      setAuthError(
+        error?.message ||
+          'Message send failed. Please try again.'
+      );
+    } finally {
       setIsSending(false);
     }
   };
 
-  // Format real online user count text
-  // Strictly required examples: "1 user online", "10 users online", "25 users online"
-  const onlineCountText = `${onlineCount} ${onlineCount === 1 ? 'user online' : 'users online'}`;
+  /*
+   * ------------------------------------------------------------
+   * ONLINE COUNT
+   * ------------------------------------------------------------
+   */
+
+  const onlineCountText = `${onlineCount} ${
+    onlineCount === 1 ? 'user online' : 'users online'
+  }`;
+
+  /*
+   * ------------------------------------------------------------
+   * UI
+   * ------------------------------------------------------------
+   */
 
   return (
     <div className="relative min-h-[calc(100vh-4rem)] w-full flex flex-col p-3 sm:p-6 max-w-6xl mx-auto">
-      {/* Header with REAL LIVE USER COUNT */}
+      {/* HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-3">
         <div>
           <div className="flex items-center gap-3 flex-wrap">
@@ -340,13 +665,12 @@ export function WorldChat({ currentUser, onOpenAuth, onStartBattleInvite }: Worl
               Dhoti aale World Chat
             </h1>
 
-            {/* REAL ACTIVE USER COUNT DISPLAY */}
             <div
-              id="world-chat-live-users-badge"
-              className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shadow-sm"
-              title="Real-time authenticated active users currently in World Chat"
+              className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400"
+              title="Real active users"
             >
               <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse ring-4 ring-emerald-400/25" />
+
               <span className="text-xs font-bold tracking-wide">
                 {onlineCountText}
               </span>
@@ -354,25 +678,37 @@ export function WorldChat({ currentUser, onOpenAuth, onStartBattleInvite }: Worl
           </div>
 
           <p className="text-xs text-slate-400 mt-1 flex items-center gap-1.5">
-            <span>Public community choupal • banter, battle challenges & live discussion</span>
+            <span>
+              Public community choupal • banter, battle challenges
+              & live discussion
+            </span>
+
             <span className="text-slate-600">•</span>
-            <span className="text-amber-400/80 font-medium">Featuring official DHOTI AALE AI</span>
+
+            <span className="text-amber-400/80 font-medium">
+              Featuring official DHOTI AALE AI
+            </span>
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           {currentUser ? (
-            <div className="flex items-center gap-2 bg-slate-900 border border-emerald-500/30 rounded-2xl px-3 py-1.5 shadow-sm">
+            <div className="flex items-center gap-2 bg-slate-900 border border-emerald-500/30 rounded-2xl px-3 py-1.5">
               <ShieldCheck className="h-4 w-4 text-emerald-400" />
+
               <div className="text-left">
                 <div className="flex items-center gap-1">
                   <span className="text-[11px] font-bold text-white block leading-tight truncate max-w-[120px]">
                     {currentUser.name}
                   </span>
-                  {(currentUser.isVerified || currentUser.email === 'rohitdhakaddhoti143@gmail.com') && (
+
+                  {(currentUser.isVerified ||
+                    currentUser.email ===
+                      'rohitdhakaddhoti143@gmail.com') && (
                     <VerifiedTick size={12} />
                   )}
                 </div>
+
                 <span className="text-[9px] text-amber-400 font-semibold block leading-none">
                   {currentUser.badge}
                 </span>
@@ -390,67 +726,109 @@ export function WorldChat({ currentUser, onOpenAuth, onStartBattleInvite }: Worl
         </div>
       </div>
 
+      {/* AUTH ERROR */}
       {authError && (
-        <div className="my-2 rounded-xl bg-red-500/20 border border-red-500/40 p-2.5 text-xs text-red-300 flex items-center justify-between">
+        <div className="my-2 rounded-xl bg-red-500/20 border border-red-500/40 p-2.5 text-xs text-red-300 flex items-center justify-between gap-3">
           <span>{authError}</span>
-          <button onClick={onOpenAuth} className="underline font-bold text-white">
+
+          <button
+            onClick={onOpenAuth}
+            className="underline font-bold text-white shrink-0"
+          >
             Sign In
           </button>
         </div>
       )}
 
-      {/* Main Container */}
-      <div className="mt-4 flex-1 grid grid-cols-1 lg:grid-cols-4 gap-4 min-h-[520px]">
-        {/* Chat Feed Area */}
-        <div className="lg:col-span-3 flex flex-col rounded-3xl bg-slate-950/80 border border-slate-800 overflow-hidden shadow-2xl relative">
-          {/* Messages Container */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {isLoadingMessages && messages.length === 0 && (
-              <div className="flex items-center justify-center py-12 text-xs text-slate-400 gap-2">
-                <RefreshCw className="h-4 w-4 animate-spin text-amber-400" />
-                <span>Connecting to Dhoti aale World Chat...</span>
-              </div>
-            )}
+      {/* MAIN */}
+      <div className="mt-4 flex-1 grid grid-cols-1 lg:grid-cols-4 gap-4 min-h-0 lg:min-h-[520px]">
+        {/* CHAT */}
+        <div className="lg:col-span-3 min-h-0 flex flex-col rounded-3xl bg-slate-950/80 border border-slate-800 overflow-hidden shadow-2xl relative">
+          {/* IMPORTANT: FIXED/FLEXIBLE SCROLL AREA */}
+          <div
+            ref={chatScrollRef}
+            onScroll={handleChatScroll}
+            className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 space-y-4 overscroll-contain scroll-smooth"
+            style={{
+              WebkitOverflowScrolling: 'touch',
+            }}
+          >
+            {isLoadingMessages &&
+              messages.length === 0 && (
+                <div className="flex items-center justify-center py-12 text-xs text-slate-400 gap-2">
+                  <RefreshCw className="h-4 w-4 animate-spin text-amber-400" />
+
+                  <span>
+                    Connecting to Dhoti aale World Chat...
+                  </span>
+                </div>
+              )}
+
+            {!isLoadingMessages &&
+              messages.length === 0 &&
+              currentUser && (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <div className="h-14 w-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-3">
+                    <Bot className="h-7 w-7 text-amber-400" />
+                  </div>
+
+                  <p className="text-sm font-bold text-slate-300">
+                    World Chat is empty
+                  </p>
+
+                  <p className="text-xs text-slate-500 mt-1">
+                    Be the first to start the conversation.
+                  </p>
+                </div>
+              )}
 
             {messages.map((msg) => {
-              const isMe = Boolean(currentUser && msg.userId === currentUser.id);
-              const isAiParticipant = Boolean(
-                msg.isAi ||
-                msg.userId === 'dhoti_aale_ai_official' ||
-                msg.userName === 'DHOTI AALE AI'
+              const isMe = Boolean(
+                currentUser &&
+                  msg.userId === currentUser.id
               );
 
-              // Blue Verified Tick logic:
-              // 1. DHOTI AALE AI has the blue verified tick by default
-              // 2. Individual users granted by Admin have the blue tick
-              // 3. Admin has the verified badge
+              const isAiParticipant = Boolean(
+                msg.isAi ||
+                  msg.userId ===
+                    'dhoti_aale_ai_official' ||
+                  msg.userName === 'DHOTI AALE AI'
+              );
+
               const showVerifiedTick = Boolean(
                 isAiParticipant ||
-                msg.isVerified ||
-                (isMe && currentUser?.isVerified) ||
-                msg.userBadge?.includes('Site Owner')
+                  msg.isVerified ||
+                  (isMe && currentUser?.isVerified) ||
+                  msg.userBadge?.includes('Site Owner')
               );
 
               return (
                 <div
                   key={msg.id}
-                  className={`flex items-start gap-3 ${isMe ? 'flex-row-reverse' : ''}`}
+                  className={`flex items-start gap-3 ${
+                    isMe ? 'flex-row-reverse' : ''
+                  }`}
                 >
+                  {/* AVATAR */}
                   <div className="relative shrink-0">
                     <Image
-                      src={msg.userAvatar || 'https://api.dicebear.com/7.x/bottts/svg?seed=dhoti'}
+                      src={
+                        msg.userAvatar ||
+                        'https://api.dicebear.com/7.x/bottts/svg?seed=dhoti'
+                      }
                       alt={msg.userName}
                       width={36}
                       height={36}
                       referrerPolicy="no-referrer"
                       className={`h-9 w-9 rounded-full bg-slate-800 ring-2 ${
                         isAiParticipant
-                          ? 'ring-amber-500/70 shadow-md shadow-amber-500/20'
+                          ? 'ring-amber-500/70'
                           : showVerifiedTick
                           ? 'ring-sky-500/60'
                           : 'ring-slate-700'
                       }`}
                     />
+
                     {isAiParticipant && (
                       <span
                         className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-black text-slate-950 shadow"
@@ -461,12 +839,18 @@ export function WorldChat({ currentUser, onOpenAuth, onStartBattleInvite }: Worl
                     )}
                   </div>
 
-                  <div className={`flex flex-col max-w-[82%] ${isMe ? 'items-end' : 'items-start'}`}>
+                  {/* MESSAGE */}
+                  <div
+                    className={`flex flex-col max-w-[82%] ${
+                      isMe ? 'items-end' : 'items-start'
+                    }`}
+                  >
                     <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                       <span className="text-xs font-bold text-slate-200 flex items-center gap-1">
                         <span>{msg.userName}</span>
+
                         {showVerifiedTick && (
-                          <VerifiedTick size={14} className="ml-0.5" />
+                          <VerifiedTick size={14} />
                         )}
                       </span>
 
@@ -483,7 +867,9 @@ export function WorldChat({ currentUser, onOpenAuth, onStartBattleInvite }: Worl
                       </span>
 
                       <span className="text-[10px] text-slate-500">
-                        {new Date(msg.timestamp).toLocaleTimeString([], {
+                        {new Date(
+                          msg.timestamp
+                        ).toLocaleTimeString([], {
                           hour: '2-digit',
                           minute: '2-digit',
                         })}
@@ -491,15 +877,16 @@ export function WorldChat({ currentUser, onOpenAuth, onStartBattleInvite }: Worl
                     </div>
 
                     <div
-                      className={`rounded-2xl px-4 py-2.5 text-xs sm:text-sm leading-relaxed shadow-sm ${
+                      className={`rounded-2xl px-4 py-2.5 text-xs sm:text-sm leading-relaxed shadow-sm break-words whitespace-pre-wrap ${
                         isMe
                           ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-medium rounded-tr-none'
                           : isAiParticipant
-                          ? 'bg-amber-500/10 border border-amber-500/35 text-amber-100 rounded-tl-none ring-1 ring-amber-500/15'
+                          ? 'bg-amber-500/10 border border-amber-500/35 text-amber-100 rounded-tl-none'
                           : 'bg-slate-900 border border-slate-800 text-slate-100 rounded-tl-none'
                       }`}
                     >
                       {msg.text}
+
                       {msg.sticker && (
                         <div className="mt-1.5 inline-block rounded-xl bg-black/30 px-2.5 py-1 text-xs font-bold text-amber-300 border border-amber-500/30">
                           {msg.sticker}
@@ -507,16 +894,24 @@ export function WorldChat({ currentUser, onOpenAuth, onStartBattleInvite }: Worl
                       )}
                     </div>
 
-                    {/* Challenge button if not me, not AI, and logged in */}
-                    {!isMe && !isAiParticipant && currentUser && (
-                      <button
-                        onClick={() => onStartBattleInvite(msg.userName)}
-                        className="mt-1 flex items-center gap-1 text-[11px] font-bold text-orange-400 hover:text-orange-300 transition-colors"
-                      >
-                        <Swords className="h-3 w-3" />
-                        <span>Challenge to Battle</span>
-                      </button>
-                    )}
+                    {!isMe &&
+                      !isAiParticipant &&
+                      currentUser && (
+                        <button
+                          onClick={() =>
+                            onStartBattleInvite(
+                              msg.userName
+                            )
+                          }
+                          className="mt-1 flex items-center gap-1 text-[11px] font-bold text-orange-400 hover:text-orange-300"
+                        >
+                          <Swords className="h-3 w-3" />
+
+                          <span>
+                            Challenge to Battle
+                          </span>
+                        </button>
+                      )}
                   </div>
                 </div>
               );
@@ -524,24 +919,31 @@ export function WorldChat({ currentUser, onOpenAuth, onStartBattleInvite }: Worl
 
             {isSending && (
               <div className="flex items-center gap-2 text-xs text-amber-400 italic bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-2xl w-fit">
-                <Bot className="h-3.5 w-3.5 text-amber-400 animate-pulse" />
-                <span>DHOTI AALE AI is typing a friendly response...</span>
+                <Bot className="h-3.5 w-3.5 animate-pulse" />
+
+                <span>
+                  DHOTI AALE AI is typing...
+                </span>
               </div>
             )}
-            <div ref={chatBottomRef} />
           </div>
 
-          {/* Bottom Bar: Input if Authenticated, or Clear Login Gate if Not Authenticated */}
+          {/* INPUT */}
           {currentUser ? (
-            <div className="p-3 sm:p-4 bg-slate-900/90 border-t border-slate-800">
-              {/* Quick Stickers Picker */}
+            <div className="shrink-0 p-3 sm:p-4 bg-slate-900/90 border-t border-slate-800">
               {showStickers && (
-                <div className="mb-3 flex flex-wrap gap-1.5 p-2.5 bg-slate-800/90 rounded-2xl border border-slate-700 animate-in slide-in-from-bottom-2">
-                  {quickStickers.map((sticker, idx) => (
+                <div className="mb-3 flex flex-wrap gap-1.5 p-2.5 bg-slate-800/90 rounded-2xl border border-slate-700">
+                  {quickStickers.map((sticker) => (
                     <button
-                      key={idx}
-                      onClick={() => handleSendMessage('', sticker)}
-                      className="rounded-xl bg-slate-900 hover:bg-amber-500/20 border border-slate-700 hover:border-amber-500/40 px-3 py-1.5 text-xs font-bold text-amber-300 transition-colors"
+                      key={sticker}
+                      onClick={() =>
+                        void handleSendMessage(
+                          '',
+                          sticker
+                        )
+                      }
+                      disabled={isSending}
+                      className="rounded-xl bg-slate-900 hover:bg-amber-500/20 border border-slate-700 hover:border-amber-500/40 px-3 py-1.5 text-xs font-bold text-amber-300 transition-colors disabled:opacity-50"
                     >
                       {sticker}
                     </button>
@@ -552,8 +954,10 @@ export function WorldChat({ currentUser, onOpenAuth, onStartBattleInvite }: Worl
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowStickers(!showStickers)}
-                  className={`rounded-2xl p-2.5 sm:p-3 border transition-colors ${
+                  onClick={() =>
+                    setShowStickers(!showStickers)
+                  }
+                  className={`rounded-2xl p-2.5 sm:p-3 border ${
                     showStickers
                       ? 'bg-amber-500 text-slate-950 border-amber-400'
                       : 'bg-slate-800 text-slate-300 border-slate-700 hover:text-white'
@@ -567,20 +971,42 @@ export function WorldChat({ currentUser, onOpenAuth, onStartBattleInvite }: Worl
                   <input
                     id="world-chat-input"
                     type="text"
-                    placeholder="Type message in World Chat or talk to DHOTI AALE AI..."
+                    maxLength={1000}
+                    placeholder="Type message in World Chat..."
                     value={inputMessage}
-                    onChange={(e) => setInputMessage(e.target.value)}
+                    disabled={isSending}
+                    onChange={(e) =>
+                      setInputMessage(e.target.value)
+                    }
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleSendMessage(inputMessage);
+                      if (
+                        e.key === 'Enter' &&
+                        !e.shiftKey &&
+                        !isSending
+                      ) {
+                        e.preventDefault();
+
+                        void handleSendMessage(
+                          inputMessage
+                        );
+                      }
                     }}
-                    className="w-full rounded-2xl bg-slate-800 border border-slate-700 px-4 py-3 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/60"
+                    className="w-full rounded-2xl bg-slate-800 border border-slate-700 px-4 py-3 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/60 disabled:opacity-60"
                   />
                 </div>
 
                 <button
                   id="world-chat-send-btn"
-                  onClick={() => handleSendMessage(inputMessage)}
-                  className="rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 p-3 text-slate-950 font-bold shadow-md transition-transform active:scale-95"
+                  onClick={() =>
+                    void handleSendMessage(
+                      inputMessage
+                    )
+                  }
+                  disabled={
+                    isSending ||
+                    !inputMessage.trim()
+                  }
+                  className="rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 p-3 text-slate-950 font-bold shadow-md transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Send Message"
                 >
                   <Send className="h-4 w-4" />
@@ -588,55 +1014,55 @@ export function WorldChat({ currentUser, onOpenAuth, onStartBattleInvite }: Worl
               </div>
             </div>
           ) : (
-            /* Clear Google Login Gate Required by User Spec */
             <div
-              id="world-chat-login-required-gate"
-              className="p-6 bg-slate-900/98 border-t border-amber-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-2xl backdrop-blur-md"
+              className="shrink-0 p-6 bg-slate-900/98 border-t border-amber-500/30 flex flex-col sm:flex-row items-center justify-between gap-4"
             >
               <div className="flex items-center gap-3.5 text-center sm:text-left">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 shadow-inner">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
                   <Lock className="h-6 w-6" />
                 </div>
+
                 <div>
-                  <h4 className="text-sm sm:text-base font-black text-white flex items-center justify-center sm:justify-start gap-2">
+                  <h4 className="text-sm sm:text-base font-black text-white">
                     Login to join World Chat
-                    <span className="rounded-md bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-300">
-                      Auth Required
-                    </span>
                   </h4>
+
                   <p className="text-xs text-slate-400 mt-0.5">
-                    Only authenticated users can enter and send World Chat messages.
+                    Login required to view and send messages.
                   </p>
                 </div>
               </div>
 
               <button
-                id="world-chat-login-btn"
                 onClick={onOpenAuth}
-                className="flex items-center gap-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 px-6 py-3 text-xs sm:text-sm font-black shadow-xl transition-all hover:scale-105 active:scale-95 shrink-0"
+                className="flex items-center gap-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 px-6 py-3 text-xs sm:text-sm font-black shadow-xl"
               >
-                <LogIn className="h-4 w-4 text-slate-950" />
+                <LogIn className="h-4 w-4" />
+
                 <span>Login to join World Chat</span>
               </button>
             </div>
           )}
         </div>
 
-        {/* Sidebar: Real Live Active Users & DHOTI AALE AI */}
-        <div className="hidden lg:flex flex-col rounded-3xl bg-slate-950/80 border border-slate-800 p-4 shadow-xl">
+        {/* SIDEBAR */}
+        <div className="hidden lg:flex min-h-0 flex-col rounded-3xl bg-slate-950/80 border border-slate-800 p-4 shadow-xl">
           <div className="flex items-center justify-between pb-3 border-b border-slate-800">
             <div className="flex items-center gap-2">
               <Users className="h-4 w-4 text-amber-400" />
-              <h3 className="text-sm font-bold text-white">Active in Room</h3>
+
+              <h3 className="text-sm font-bold text-white">
+                Active in Room
+              </h3>
             </div>
-            {/* Real online count */}
+
             <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/30">
               {onlineCountText}
             </span>
           </div>
 
-          <div className="flex-1 overflow-y-auto py-3 space-y-2.5">
-            {/* OFFICIAL AI PARTICIPANT: DHOTI AALE AI (Always pinned with Blue Verified Tick) */}
+          <div className="flex-1 min-h-0 overflow-y-auto py-3 space-y-2.5">
+            {/* OFFICIAL AI */}
             <div className="p-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="relative">
@@ -648,53 +1074,74 @@ export function WorldChat({ currentUser, onOpenAuth, onStartBattleInvite }: Worl
                     referrerPolicy="no-referrer"
                     className="h-8 w-8 rounded-full bg-slate-800 ring-2 ring-amber-500/40"
                   />
-                  <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-slate-950"></span>
+
+                  <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-slate-950" />
                 </div>
+
                 <div className="min-w-0 text-left">
                   <div className="text-xs font-bold text-amber-300 flex items-center gap-1 truncate">
                     <span>DHOTI AALE AI</span>
+
                     <VerifiedTick size={13} />
                   </div>
-                  <div className="text-[10px] text-amber-400/80 font-semibold">Official AI ⚡</div>
+
+                  <div className="text-[10px] text-amber-400/80 font-semibold">
+                    Official AI ⚡
+                  </div>
                 </div>
               </div>
 
-              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-1 shrink-0">
+              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-1">
                 <VerifiedTick size={10} />
                 AI
               </span>
             </div>
 
-            {/* REAL ONLINE USERS LIST (No fake or randomly generated users) */}
+            {/* REAL USERS */}
             {onlineUsers.length > 0 ? (
               onlineUsers.map((u) => {
-                const isMe = currentUser && u.userId === currentUser.id;
+                const isMe =
+                  Boolean(currentUser) &&
+                  u.userId === currentUser?.id;
+
                 return (
                   <div
                     key={u.userId}
-                    className={`flex items-center justify-between p-2 rounded-2xl transition-colors ${
-                      isMe ? 'bg-amber-500/15 border border-amber-500/30' : 'hover:bg-slate-900/80'
+                    className={`flex items-center justify-between p-2 rounded-2xl ${
+                      isMe
+                        ? 'bg-amber-500/15 border border-amber-500/30'
+                        : 'hover:bg-slate-900/80'
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className="relative">
                         <Image
-                          src={u.userAvatar}
+                          src={
+                            u.userAvatar ||
+                            'https://api.dicebear.com/7.x/bottts/svg?seed=dhoti'
+                          }
                           alt={u.userName}
                           width={32}
                           height={32}
                           referrerPolicy="no-referrer"
                           className="h-8 w-8 rounded-full bg-slate-800"
                         />
-                        <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-slate-950"></span>
+
+                        <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-slate-950" />
                       </div>
+
                       <div className="min-w-0 text-left">
                         <div className="text-xs font-medium text-slate-200 truncate flex items-center gap-1">
                           <span>
-                            {u.userName} {isMe ? '(You)' : ''}
+                            {u.userName}{' '}
+                            {isMe ? '(You)' : ''}
                           </span>
-                          {u.isVerified && <VerifiedTick size={12} />}
+
+                          {u.isVerified && (
+                            <VerifiedTick size={12} />
+                          )}
                         </div>
+
                         <div className="text-[10px] text-slate-500 truncate">
                           {u.userBadge || 'Resident'}
                         </div>
@@ -703,8 +1150,12 @@ export function WorldChat({ currentUser, onOpenAuth, onStartBattleInvite }: Worl
 
                     {!isMe && currentUser && (
                       <button
-                        onClick={() => onStartBattleInvite(u.userName)}
-                        className="p-1.5 text-slate-500 hover:text-orange-400 hover:bg-slate-800 rounded-xl transition-colors"
+                        onClick={() =>
+                          onStartBattleInvite(
+                            u.userName
+                          )
+                        }
+                        className="p-1.5 text-slate-500 hover:text-orange-400 hover:bg-slate-800 rounded-xl"
                         title={`Challenge ${u.userName}`}
                       >
                         <Swords className="h-3.5 w-3.5" />
@@ -715,19 +1166,20 @@ export function WorldChat({ currentUser, onOpenAuth, onStartBattleInvite }: Worl
               })
             ) : (
               <div className="text-center py-6 text-slate-500 text-xs px-2">
-                {currentUser ? (
-                  <span>You are currently the only member in the room.</span>
-                ) : (
-                  <span>No active users right now. Sign in to be the first in the room!</span>
-                )}
+                {currentUser
+                  ? 'You are currently the only member in the room.'
+                  : 'No active users right now.'}
               </div>
             )}
           </div>
 
-          <div className="pt-3 border-t border-slate-800 text-center space-y-1">
+          <div className="pt-3 border-t border-slate-800 text-center">
             <div className="inline-flex items-center gap-1.5 text-[11px] text-slate-400">
               <Sparkles className="h-3.5 w-3.5 text-amber-400" />
-              <span>Talk to DHOTI AALE AI or say &quot;chup&quot; to pause</span>
+
+              <span>
+                Talk to DHOTI AALE AI
+              </span>
             </div>
           </div>
         </div>
