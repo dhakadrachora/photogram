@@ -300,38 +300,7 @@ const initialSettings: SiteSettings = {
   contactEmail: 'rohitdhakaddhoti143@gmail.com',
 };
 
-const initialChatMessages: ChatMessage[] = [
-  {
-    id: 'msg-1',
-    userId: 'usr_bot1',
-    userName: 'Vikram Choudhary',
-    userAvatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=vikram-dhoti',
-    userBadge: 'Dhoti King 👑',
-    text: 'Ram Ram bhaiyo! Dhoti aale world chat me swagat hai sabka! Aaj rap battle me kaun aayega?',
-    timestamp: Date.now() - 1000 * 60 * 12,
-  },
-  {
-    id: 'msg-2',
-    userId: 'usr_bot2',
-    userName: 'Aman Dhakad',
-    userAvatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=aman-dhoti',
-    userBadge: 'Rap Boss 🎤',
-    text: 'Main tayyar hu! Dhoti AI se voice pe baat ki thi abhi, kya witty reply diya usne maja aa gaya!',
-    timestamp: Date.now() - 1000 * 60 * 7,
-    sticker: 'Systumm Hang! 🚜',
-  },
-  {
-    id: 'msg-3',
-    userId: 'dhoti_aale_ai_official',
-    userName: 'DHOTI AALE AI',
-    userAvatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=dhoti-aale-official-ai',
-    userBadge: 'Official AI ⚡',
-    text: 'Arey Aman mere bhai! Tareef ke liye shukriya! Aur batao, aaj kiska mood khrab hai jisko witty roasting chahiye? 😉',
-    timestamp: Date.now() - 1000 * 60 * 3,
-    isAi: true,
-    isVerified: true,
-  },
-];
+const initialChatMessages: ChatMessage[] = [];
 
 // In-Memory Global Server Store
 class GlobalContentStore {
@@ -359,6 +328,24 @@ class GlobalContentStore {
     lastRepliedAt: 0,
     lastRepliedMsgId: '',
   };
+
+  // Resilient fallback accounts to bypass Supabase Email Rate Limits
+  fallbackAccounts: Map<string, {
+    id: string;
+    email: string;
+    passwordHash: string;
+    name: string;
+    phone?: string;
+    avatar: string;
+    badge: string;
+    coins: number;
+    wins: number;
+    battles: number;
+    rank: string;
+    role: 'admin' | 'resident';
+    isAdmin: boolean;
+    createdAt: number;
+  }> = new Map();
 }
 
 declare global {

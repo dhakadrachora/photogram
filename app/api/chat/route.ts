@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAdminRequestAsync, isSiteAdmin } from '@/lib/admin-auth';
+import { isSiteAdmin } from '@/lib/admin-auth';
 import { contentStore } from '@/lib/content-store';
 import {
   fetchSupabaseChatMessages,
   insertSupabaseChatMessage,
+  deleteSupabaseChatMessage,
+  cleanupExpiredSupabaseChatMessages,
   isSupabaseConfigured,
   supabase,
 } from '@/lib/supabase';
@@ -12,22 +14,36 @@ import { processDhotiAiWorldChatMessage } from '@/lib/dhoti-ai-chat';
 
 export const dynamic = 'force-dynamic';
 
+const MESSAGE_EXPIRATION_MS = 24 * 60 * 60 * 1000; // 24 Hours
+
 export async function GET() {
+  const cutoffTime = Date.now() - MESSAGE_EXPIRATION_MS;
+
+  // Clean memory store of expired messages
+  contentStore.chatMessages = contentStore.chatMessages.filter(
+    (m) => m.timestamp >= cutoffTime
+  );
+
   let messages = contentStore.chatMessages;
 
   if (isSupabaseConfigured()) {
+    // Asynchronously cleanup expired messages in Supabase database
+    cleanupExpiredSupabaseChatMessages().catch(() => {});
+
     const sbMessages = await fetchSupabaseChatMessages();
     if (sbMessages && sbMessages.length > 0) {
-      // Ensure verified flags are preserved
-      messages = sbMessages.map((m) => ({
-        ...m,
-        isVerified:
-          m.isVerified ||
-          m.userId === 'dhoti_aale_ai_official' ||
-          m.userName === 'DHOTI AALE AI' ||
-          contentStore.verifiedUsers.has(m.userId) ||
-          (m.userBadge?.includes('Site Owner') ?? false),
-      }));
+      // Ensure verified flags are preserved and filter by 24h
+      messages = sbMessages
+        .filter((m) => m.timestamp >= cutoffTime)
+        .map((m) => ({
+          ...m,
+          isVerified:
+            m.isVerified ||
+            m.userId === 'dhoti_aale_ai_official' ||
+            m.userName === 'DHOTI AALE AI' ||
+            contentStore.verifiedUsers.has(m.userId) ||
+            (m.userBadge?.includes('Site Owner') ?? false),
+        }));
       contentStore.chatMessages = messages;
     }
   }
@@ -145,16 +161,8 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// DELETE: Admin moderates inappropriate chat messages (SERVER-SIDE ENFORCED)
+// DELETE: Users can delete their own messages, Admin can moderate any message
 export async function DELETE(req: NextRequest) {
-  const isAdmin = await verifyAdminRequestAsync(req);
-  if (!isAdmin) {
-    return NextResponse.json(
-      { error: 'Unauthorized: Only site admin can moderate chat messages.' },
-      { status: 403 }
-    );
-  }
-
   const { searchParams } = new URL(req.url);
   const messageId = searchParams.get('id');
 
@@ -162,20 +170,62 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'Message ID is required' }, { status: 400 });
   }
 
+  const userEmail = (req.headers.get('x-user-email') || '').toLowerCase().trim();
+  const userId = (req.headers.get('x-user-id') || '').toString().trim();
+  const isAdmin = isSiteAdmin(userEmail);
+
+  if (!userId && !isAdmin) {
+    return NextResponse.json(
+      { error: 'Unauthorized: Authentication required.' },
+      { status: 401 }
+    );
+  }
+
+  // Find message author
+  let messageOwnerId: string | null = null;
+  const storeMsg = contentStore.chatMessages.find((m) => m.id === messageId);
+  if (storeMsg) {
+    messageOwnerId = storeMsg.userId;
+  } else if (isSupabaseConfigured()) {
+    try {
+      const { data: dbMsg } = await supabase
+        .from('chat_messages')
+        .select('user_id')
+        .eq('id', messageId)
+        .maybeSingle();
+      if (dbMsg) {
+        messageOwnerId = dbMsg.user_id;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  const isOwner = Boolean(userId && messageOwnerId && userId === messageOwnerId);
+
+  if (!isOwner && !isAdmin) {
+    return NextResponse.json(
+      { error: 'Unauthorized: You can delete only your own messages.' },
+      { status: 403 }
+    );
+  }
+
+  // Remove from memory store
   const prevCount = contentStore.chatMessages.length;
   contentStore.chatMessages = contentStore.chatMessages.filter((m) => m.id !== messageId);
   const deleted = contentStore.chatMessages.length < prevCount;
 
+  // Remove from Supabase
   if (isSupabaseConfigured()) {
     try {
-      await supabase.from('chat_messages').delete().eq('id', messageId);
+      await deleteSupabaseChatMessage(messageId);
     } catch (e) {
       console.warn('Could not delete message from Supabase:', e);
     }
   }
 
   return NextResponse.json({
-    success: deleted,
+    success: true,
     deletedId: messageId,
     remainingCount: contentStore.chatMessages.length,
   });

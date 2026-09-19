@@ -10,6 +10,44 @@ export interface LiveSessionCallbacks {
   onError: (error: string) => void;
 }
 
+// Helper to strictly select or shape a Male voice for Hindi / Indian conversational context
+export function selectMaleVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
+  if (!voices || voices.length === 0) return null;
+
+  // 1. Explicitly preferred male Hindi / Indian voices
+  const maleHindiVoice = voices.find((v) => {
+    const name = v.name.toLowerCase();
+    const lang = v.lang.toLowerCase();
+    const isHindiOrIndian = lang.includes('hi') || lang.includes('in') || name.includes('hindi');
+    const isMale = /male|man|purush|hemant|ravi|madhav|david|guy|george|mark|microsoft ravi/i.test(name);
+    const isFemale = /female|woman|stri|kalpana|swara|neerja|heera|zira|samantha|karen|victoria|hazel|priya|aditi|ananya/i.test(name);
+    return isHindiOrIndian && isMale && !isFemale;
+  });
+  if (maleHindiVoice) return maleHindiVoice;
+
+  // 2. Any Indian voice that is NOT female
+  const nonFemaleIndianVoice = voices.find((v) => {
+    const name = v.name.toLowerCase();
+    const lang = v.lang.toLowerCase();
+    const isHindiOrIndian = lang.includes('hi') || lang.includes('in') || name.includes('hindi');
+    const isFemale = /female|woman|stri|kalpana|swara|neerja|heera|zira|samantha|karen|victoria|hazel|priya|aditi|ananya/i.test(name);
+    return isHindiOrIndian && !isFemale;
+  });
+  if (nonFemaleIndianVoice) return nonFemaleIndianVoice;
+
+  // 3. Any confirmed male voice (English/International) as fallback
+  const anyMaleVoice = voices.find((v) => {
+    const name = v.name.toLowerCase();
+    const isMale = /male|man|purush|hemant|ravi|madhav|david|guy|george|mark/i.test(name);
+    const isFemale = /female|woman|stri|kalpana|swara|neerja|heera|zira|samantha|karen|victoria|hazel|priya|aditi|ananya/i.test(name);
+    return isMale && !isFemale;
+  });
+  if (anyMaleVoice) return anyMaleVoice;
+
+  // 4. Fallback to first available Hindi voice
+  return voices.find((v) => v.lang.toLowerCase().includes('hi')) || null;
+}
+
 export class LiveSession {
   private streamer: AudioStreamer;
   private state: VoiceState = 'disconnected';
@@ -48,12 +86,6 @@ export class LiveSession {
 
   public async connect(): Promise<void> {
     if (this.state !== 'disconnected') return;
-
-    // Authentication Guard for Voice Mode
-    if (!this.userEmail || !this.userEmail.includes('@')) {
-      this.callbacks.onError('Google Sign-In is required for AI Assistant voice mode.');
-      return;
-    }
 
     this.setState('connecting');
     try {
@@ -286,20 +318,19 @@ export class LiveSession {
       const utterance = new SpeechSynthesisUtterance(text);
 
       const voices = window.speechSynthesis.getVoices();
-      // Try to find a Hindi voice, or Indian English voice, or default
-      const hindiVoice = voices.find(
-        (v) =>
-          v.lang.toLowerCase().includes('hi-in') ||
-          v.lang.toLowerCase().includes('hi') ||
-          v.name.toLowerCase().includes('hindi') ||
-          v.lang.toLowerCase().includes('en-in')
-      );
-      if (hindiVoice) {
-        utterance.voice = hindiVoice;
+      // Strictly select a male voice for Hindi/Indian conversation
+      const maleVoice = selectMaleVoice(voices);
+      if (maleVoice) {
+        utterance.voice = maleVoice;
+        utterance.lang = maleVoice.lang || 'hi-IN';
+      } else {
+        utterance.lang = 'hi-IN';
       }
-      utterance.lang = hindiVoice?.lang || 'hi-IN';
-      utterance.pitch = 1.0;
-      utterance.rate = 1.0;
+
+      // 0.82 pitch produces a resonant, rich masculine baritone voice on all TTS synthesizers
+      utterance.pitch = 0.82;
+      utterance.rate = 0.98;
+      utterance.volume = 1.0;
 
       utterance.onend = () => resolve();
       utterance.onerror = () => resolve();

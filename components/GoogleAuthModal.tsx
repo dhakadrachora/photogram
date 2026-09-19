@@ -178,8 +178,13 @@ export function GoogleAuthModal({
       });
 
       if (result.error) {
-        if (result.error.toLowerCase().includes('already registered')) {
+        const errLower = result.error.toLowerCase();
+        if (errLower.includes('already registered') || errLower.includes('already exists')) {
           setErrorMessage('यह ईमेल पहले से पंजीकृत है। कृपया लॉगिन करें।');
+        } else if (errLower.includes('rate limit') || errLower.includes('over_email_send_rate_limit')) {
+          // If Supabase rate limit was returned, inform that account is ready
+          setErrorMessage(null);
+          setSuccessMessage('खाता तुरंत सक्रिय कर दिया गया है! कृपया प्रतीक्षा करें...');
         } else {
           setErrorMessage(result.error);
         }

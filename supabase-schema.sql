@@ -140,8 +140,35 @@ CREATE TABLE IF NOT EXISTS public.chat_messages (
   text TEXT NOT NULL,
   sticker TEXT,
   is_ai BOOLEAN DEFAULT false,
+  is_verified BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- Ensure is_verified exists on public.chat_messages
+ALTER TABLE public.chat_messages ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT false;
+
+-- Enable Realtime Broadcast / Replication for World Chat
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'chat_messages'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.chat_messages;
+  END IF;
+EXCEPTION WHEN OTHERS THEN
+  -- Handled gracefully if publication is managed by Supabase dashboard
+  NULL;
+END $$;
+
+-- 24-Hour World Chat Expiration Cleanup Function
+CREATE OR REPLACE FUNCTION public.cleanup_expired_chat_messages()
+RETURNS void AS $$
+BEGIN
+  DELETE FROM public.chat_messages
+  WHERE created_at < (now() - interval '24 hours');
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- 11. SITE SETTINGS TABLE
 CREATE TABLE IF NOT EXISTS public.site_settings (
@@ -200,6 +227,7 @@ CREATE POLICY "Public can view votes count" ON public.battle_votes FOR SELECT US
 -- 2. Authenticated Users Actions
 CREATE POLICY "Users can upsert own profile" ON public.users FOR ALL USING (auth.uid()::text = id OR public.is_admin());
 CREATE POLICY "Users can send chat messages" ON public.chat_messages FOR INSERT WITH CHECK (auth.role() = 'authenticated' OR public.is_admin());
+CREATE POLICY "Users can delete own chat messages" ON public.chat_messages FOR DELETE USING (auth.uid()::text = user_id OR public.is_admin());
 CREATE POLICY "Users can cast one vote per battle" ON public.battle_votes FOR INSERT WITH CHECK (auth.role() = 'authenticated' OR public.is_admin());
 
 -- 3. Admin Full Management (CRUD) for rohitdhakaddhoti143@gmail.com

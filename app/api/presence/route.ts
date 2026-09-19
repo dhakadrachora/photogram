@@ -5,13 +5,23 @@ import { PresenceUser } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
-const INACTIVITY_TIMEOUT_MS = 40000; // 40 seconds timeout for real active user heartbeat
+const INACTIVITY_TIMEOUT_MS = 35000; // 35 seconds timeout for real active user heartbeat
 
 function getCleanActiveUsers(): PresenceUser[] {
   const now = Date.now();
   const activeList: PresenceUser[] = [];
 
   for (const [userId, u] of contentStore.activePresence.entries()) {
+    // Explicitly exclude AI and guest IDs from human online count
+    if (
+      userId === 'dhoti_aale_ai_official' ||
+      u.userId === 'dhoti_aale_ai_official' ||
+      userId.startsWith('guest_')
+    ) {
+      contentStore.activePresence.delete(userId);
+      continue;
+    }
+
     if (now - u.lastActive > INACTIVITY_TIMEOUT_MS) {
       contentStore.activePresence.delete(userId);
     } else {
@@ -57,6 +67,16 @@ export async function POST(req: NextRequest) {
     }
 
     const trimmedId = userId.trim();
+    if (
+      trimmedId === 'dhoti_aale_ai_official' ||
+      trimmedId.startsWith('guest_') ||
+      !cleanEmail ||
+      !cleanEmail.includes('@')
+    ) {
+      const users = getCleanActiveUsers();
+      return NextResponse.json({ success: true, count: users.length, users });
+    }
+
     const isAdmin = isSiteAdmin(cleanEmail);
 
     // Verify verified status server-side (users cannot fake this)
@@ -67,7 +87,7 @@ export async function POST(req: NextRequest) {
 
     const presenceRecord: PresenceUser = {
       userId: trimmedId,
-      userName: (userName || (isAdmin ? 'Site Admin 👑' : 'Dhoti Resident')).toString().trim(),
+      userName: (userName || (isAdmin ? 'Rohit Dhakad (Admin)' : 'Dhoti Resident')).toString().trim(),
       userAvatar: (userAvatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${trimmedId}`).toString(),
       userBadge: isAdmin ? 'Site Owner & Admin 👑' : (userBadge || 'Resident').toString(),
       isVerified,

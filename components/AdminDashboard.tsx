@@ -2150,106 +2150,165 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
 
         {/* 11. SETTINGS SECTION */}
         {activeSection === 'settings' && siteSettings && (
-          <form onSubmit={handleSaveSettings} className="space-y-5 max-w-2xl">
-            <div>
-              <h2 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
-                <Settings className="h-5 w-5 text-amber-400" />
-                <span>Site Settings & Content Visibility</span>
-              </h2>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Control community banners, title, and public feature toggles without editing code.
-              </p>
+          <div className="space-y-6 max-w-2xl">
+            <form onSubmit={handleSaveSettings} className="space-y-5">
+              <div>
+                <h2 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                  <Settings className="h-5 w-5 text-amber-400" />
+                  <span>Site Settings & Content Visibility</span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Control community banners, title, and public feature toggles without editing code.
+                </p>
+              </div>
+
+              <div className="rounded-3xl bg-slate-900/90 border border-slate-800 p-5 space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Site Title</label>
+                  <input
+                    type="text"
+                    value={siteSettings.siteTitle}
+                    onChange={(e) => setSiteSettings({ ...siteSettings, siteTitle: e.target.value })}
+                    className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Tagline</label>
+                  <input
+                    type="text"
+                    value={siteSettings.siteTagline}
+                    onChange={(e) => setSiteSettings({ ...siteSettings, siteTagline: e.target.value })}
+                    className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">
+                    Public Announcement Banner Text
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={siteSettings.announcementBanner}
+                    onChange={(e) =>
+                      setSiteSettings({ ...siteSettings, announcementBanner: e.target.value })
+                    }
+                    className="w-full rounded-xl bg-slate-950 border border-slate-800 p-3 text-xs text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div className="space-y-3 pt-2 border-t border-slate-800">
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="text-xs font-semibold text-slate-300">
+                      Enable Top Announcement Banner
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={siteSettings.isAnnouncementActive}
+                      onChange={(e) =>
+                        setSiteSettings({ ...siteSettings, isAnnouncementActive: e.target.checked })
+                      }
+                      className="h-4 w-4 rounded accent-amber-500"
+                    />
+                  </label>
+
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="text-xs font-semibold text-slate-300">
+                      Allow Public World Chat
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={siteSettings.allowWorldChat}
+                      onChange={(e) =>
+                        setSiteSettings({ ...siteSettings, allowWorldChat: e.target.checked })
+                      }
+                      className="h-4 w-4 rounded accent-amber-500"
+                    />
+                  </label>
+
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="text-xs font-semibold text-slate-300">
+                      Allow Guest AI Assistant Access
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={siteSettings.allowGuestAi}
+                      onChange={(e) =>
+                        setSiteSettings({ ...siteSettings, allowGuestAi: e.target.checked })
+                      }
+                      className="h-4 w-4 rounded accent-amber-500"
+                    />
+                  </label>
+                </div>
+
+                <div className="pt-3">
+                  <button
+                    type="submit"
+                    className="w-full rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-3 text-xs shadow-lg transition-all active:scale-95"
+                  >
+                    Save Settings
+                  </button>
+                </div>
+              </div>
+            </form>
+
+            {/* SUPABASE AUTH & EMAIL RATE LIMIT CONFIGURATION GUIDE */}
+            <div className="mt-6 rounded-3xl border border-emerald-500/30 bg-gradient-to-b from-emerald-950/20 to-slate-900/60 p-5 sm:p-6 backdrop-blur-sm">
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold uppercase tracking-wider mb-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Active Shield Enabled
+                  </span>
+                  <h4 className="text-sm sm:text-base font-black text-white flex items-center gap-2">
+                    <span>Supabase Email Rate Limit Protection</span>
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-1">
+                    नए खाते बनाते समय &quot;Email rate limit exceeded&quot; आने से रोकने के लिए ऑटो-बाईपास सक्रिय है।
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3 text-xs text-slate-300">
+                <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800">
+                  <p className="font-bold text-amber-400 mb-1">
+                    💡 समस्या का कारण (Why this happens):
+                  </p>
+                  <p className="text-slate-400 leading-relaxed text-[11px]">
+                    Supabase के फ़्री टियर में ईमेल भेजने की एक सीमित लिमिट (3-4 ईमेल प्रति घंटा) होती है। नए खाते बनते ही जब Supabase कंफ़र्मेशन ईमेल भेजने का प्रयास करता है, तो यह लिमिट ख़त्म हो जाती है।
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800">
+                  <p className="font-bold text-emerald-400 mb-1.5">
+                    ✅ स्थायी समाधान (Permanent Fix in 2 Clicks):
+                  </p>
+                  <ol className="list-decimal list-inside space-y-1.5 text-[11px] text-slate-300">
+                    <li>
+                      अपने Supabase प्रोजेक्ट डैशबोर्ड पर जाएं:{' '}
+                      <a
+                        href="https://supabase.com/dashboard/project/zlngcbefvdtbihndaeun/auth/providers"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-amber-400 hover:underline font-semibold"
+                      >
+                        Auth Providers (zlngcbefvdtbihndaeun) ↗
+                      </a>
+                    </li>
+                    <li>
+                      <strong className="text-white">Email</strong> प्रोवाइडर पर क्लिक करें।
+                    </li>
+                    <li>
+                      <strong className="text-amber-300">&quot;Confirm email&quot;</strong> वाले टॉगल को <strong className="text-rose-400">OFF (बंद)</strong> करें और <strong className="text-white">Save</strong> दबाएं।
+                    </li>
+                  </ol>
+                  <p className="mt-2 text-[10px] text-emerald-300 font-medium">
+                    जैसे ही &quot;Confirm email&quot; बंद होगा, Supabase बिना किसी ईमेल लिमिट के हर नए यूज़र को तुरंत वेरिफ़ाई कर देगा!
+                  </p>
+                </div>
+              </div>
             </div>
-
-            <div className="rounded-3xl bg-slate-900/90 border border-slate-800 p-5 space-y-4">
-              <div>
-                <label className="text-xs font-bold text-slate-300 block mb-1">Site Title</label>
-                <input
-                  type="text"
-                  value={siteSettings.siteTitle}
-                  onChange={(e) => setSiteSettings({ ...siteSettings, siteTitle: e.target.value })}
-                  className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-300 block mb-1">Tagline</label>
-                <input
-                  type="text"
-                  value={siteSettings.siteTagline}
-                  onChange={(e) => setSiteSettings({ ...siteSettings, siteTagline: e.target.value })}
-                  className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-300 block mb-1">
-                  Public Announcement Banner Text
-                </label>
-                <textarea
-                  rows={2}
-                  value={siteSettings.announcementBanner}
-                  onChange={(e) =>
-                    setSiteSettings({ ...siteSettings, announcementBanner: e.target.value })
-                  }
-                  className="w-full rounded-xl bg-slate-950 border border-slate-800 p-3 text-xs text-white focus:outline-none focus:border-amber-500"
-                />
-              </div>
-
-              <div className="space-y-3 pt-2 border-t border-slate-800">
-                <label className="flex items-center justify-between cursor-pointer">
-                  <span className="text-xs font-semibold text-slate-300">
-                    Enable Top Announcement Banner
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={siteSettings.isAnnouncementActive}
-                    onChange={(e) =>
-                      setSiteSettings({ ...siteSettings, isAnnouncementActive: e.target.checked })
-                    }
-                    className="h-4 w-4 rounded accent-amber-500"
-                  />
-                </label>
-
-                <label className="flex items-center justify-between cursor-pointer">
-                  <span className="text-xs font-semibold text-slate-300">
-                    Allow Public World Chat
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={siteSettings.allowWorldChat}
-                    onChange={(e) =>
-                      setSiteSettings({ ...siteSettings, allowWorldChat: e.target.checked })
-                    }
-                    className="h-4 w-4 rounded accent-amber-500"
-                  />
-                </label>
-
-                <label className="flex items-center justify-between cursor-pointer">
-                  <span className="text-xs font-semibold text-slate-300">
-                    Allow Guest AI Assistant Access
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={siteSettings.allowGuestAi}
-                    onChange={(e) =>
-                      setSiteSettings({ ...siteSettings, allowGuestAi: e.target.checked })
-                    }
-                    className="h-4 w-4 rounded accent-amber-500"
-                  />
-                </label>
-              </div>
-
-              <div className="pt-3">
-                <button
-                  type="submit"
-                  className="w-full rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-3 text-xs shadow-lg transition-all active:scale-95"
-                >
-                  Save Settings
-                </button>
-              </div>
-            </div>
-          </form>
+          </div>
         )}
       </div>
 

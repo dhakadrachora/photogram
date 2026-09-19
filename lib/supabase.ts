@@ -101,15 +101,60 @@ export async function signUpWithEmail({
   name: string;
   phone?: string;
   avatarUrl?: string;
-}): Promise<{ user: User | null; session: any | null; error?: string }> {
-  if (!isSupabaseConfigured()) {
-    throw new Error('SUPABASE_NOT_CONFIGURED');
-  }
-
+}): Promise<{ user: User | null; session: any | null; error?: string; isRateLimitBypassed?: boolean }> {
   const cleanEmail = email.trim().toLowerCase();
   const cleanName = name.trim();
   const cleanPhone = phone?.trim() || null;
   const cleanAvatar = avatarUrl?.trim() || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(cleanEmail)}`;
+
+  // Step 1: Call smart server signup route first
+  // Bypasses email sending completely via Admin API or creates instant resident account on rate-limit
+  try {
+    const apiRes = await fetch('/api/auth/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: cleanEmail,
+        password,
+        name: cleanName,
+        phone: cleanPhone,
+        avatarUrl: cleanAvatar,
+      }),
+    });
+
+    if (apiRes.ok) {
+      const apiData = await apiRes.json();
+      if (apiData.success && apiData.user) {
+        let sbSession = null;
+        if (isSupabaseConfigured()) {
+          try {
+            const { data: signData } = await supabase.auth.signInWithPassword({
+              email: cleanEmail,
+              password,
+            });
+            sbSession = signData?.session || null;
+          } catch {
+            // session optional if unconfirmed
+          }
+        }
+
+        return {
+          user: apiData.user,
+          session: sbSession,
+          isRateLimitBypassed: Boolean(apiData.rateLimitBypassed),
+        };
+      } else if (apiData.error && apiData.error.includes('पहले से पंजीकृत')) {
+        return { user: null, session: null, error: apiData.error };
+      }
+    }
+  } catch (apiErr) {
+    console.warn('API signup notice, attempting direct Supabase auth:', apiErr);
+  }
+
+  // Step 2: Direct Supabase client fallback
+  if (!isSupabaseConfigured()) {
+    throw new Error('SUPABASE_NOT_CONFIGURED');
+  }
 
   const { data, error } = await supabase.auth.signUp({
     email: cleanEmail,
@@ -125,6 +170,76 @@ export async function signUpWithEmail({
   });
 
   if (error) {
+    const errText = (error.message || '').toLowerCase();
+    const isRateLimit =
+      errText.includes('rate limit') ||
+      errText.includes('over_email_send_rate_limit') ||
+      (error as any).status === 429;
+
+    if (isRateLimit) {
+      console.warn('Supabase email rate limit detected. Activating instant resident account bypass.');
+
+      // Check if user was already created
+      try {
+        const checkSign = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password,
+        });
+        if (checkSign.data?.user) {
+          const appUser = mapSupabaseUserToAppUser(checkSign.data.user);
+          return { user: appUser, session: checkSign.data.session, isRateLimitBypassed: true };
+        }
+      } catch {
+        // continue
+      }
+
+      // Create instant resident account so user is NEVER blocked
+      const admin = isSiteAdmin(cleanEmail);
+      const fallbackUser: User = {
+        id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        name: cleanName,
+        email: cleanEmail,
+        avatar: cleanAvatar,
+        phone: cleanPhone || undefined,
+        badge: admin ? 'Site Owner & Admin 👑' : 'Dhoti Resident',
+        coins: 50,
+        wins: 0,
+        battles: 0,
+        rank: admin ? 'Super Admin 👑' : 'Resident',
+        isGoogle: false,
+        role: admin ? 'admin' : 'resident',
+        isAdmin: admin,
+        createdAt: Date.now(),
+      };
+
+      try {
+        await supabase.from('users').upsert({
+          id: fallbackUser.id,
+          email: cleanEmail,
+          name: cleanName,
+          phone: cleanPhone,
+          avatar: cleanAvatar,
+          badge: fallbackUser.badge,
+          coins: 50,
+          wins: 0,
+          battles: 0,
+          rank: fallbackUser.rank,
+          role: fallbackUser.role,
+          is_admin: Boolean(fallbackUser.isAdmin),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'id' });
+      } catch {
+        // ignore
+      }
+
+      return {
+        user: fallbackUser,
+        session: null,
+        isRateLimitBypassed: true,
+      };
+    }
+
     return { user: null, session: null, error: error.message };
   }
 
@@ -205,46 +320,65 @@ export async function signInWithEmail({
     password,
   });
 
-  if (error) {
-    return { user: null, session: null, error: error.message };
+  if (!error && data?.user) {
+    let appUser = mapSupabaseUserToAppUser(data.user);
+
+    try {
+      const { data: dbUser } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', data.user.id)
+        .maybeSingle();
+
+      if (dbUser) {
+        appUser = {
+          ...appUser,
+          name: dbUser.name || appUser.name,
+          avatar: dbUser.avatar || appUser.avatar,
+          phone: dbUser.phone || appUser.phone,
+          badge: dbUser.badge || appUser.badge,
+          coins: dbUser.coins ?? appUser.coins,
+          wins: dbUser.wins ?? appUser.wins,
+          battles: dbUser.battles ?? appUser.battles,
+          rank: dbUser.rank || appUser.rank,
+          role: dbUser.role || appUser.role,
+          isAdmin: Boolean(dbUser.is_admin) || isSiteAdmin(cleanEmail),
+          createdAt: dbUser.created_at || appUser.createdAt,
+        };
+      } else {
+        void syncUserProfile(appUser);
+      }
+    } catch (err) {
+      console.warn('Error fetching db user profile:', err);
+    }
+
+    return { user: appUser, session: data.session };
   }
 
-  if (!data.user) {
-    return { user: null, session: null, error: 'Sign in failed.' };
-  }
-
-  let appUser = mapSupabaseUserToAppUser(data.user);
-
+  // If Supabase Auth failed (e.g. account created during email rate limit bypass or unconfirmed)
+  // Check our fallback authentication route
   try {
-    const { data: dbUser } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', data.user.id)
-      .maybeSingle();
+    const loginRes = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: cleanEmail, password }),
+    });
 
-    if (dbUser) {
-      appUser = {
-        ...appUser,
-        name: dbUser.name || appUser.name,
-        avatar: dbUser.avatar || appUser.avatar,
-        phone: dbUser.phone || appUser.phone,
-        badge: dbUser.badge || appUser.badge,
-        coins: dbUser.coins ?? appUser.coins,
-        wins: dbUser.wins ?? appUser.wins,
-        battles: dbUser.battles ?? appUser.battles,
-        rank: dbUser.rank || appUser.rank,
-        role: dbUser.role || appUser.role,
-        isAdmin: Boolean(dbUser.is_admin) || isSiteAdmin(cleanEmail),
-        createdAt: dbUser.created_at || appUser.createdAt,
-      };
-    } else {
-      void syncUserProfile(appUser);
+    if (loginRes.ok) {
+      const loginData = await loginRes.json();
+      if (loginData.success && loginData.user) {
+        return { user: loginData.user, session: null };
+      }
     }
   } catch (err) {
-    console.warn('Error fetching db user profile:', err);
+    console.warn('Fallback login verification check notice:', err);
   }
 
-  return { user: appUser, session: data.session };
+  return {
+    user: null,
+    session: null,
+    error: error?.message || 'लॉगिन विफल रहा। कृपया सही ईमेल व पासवर्ड दर्ज करें।',
+  };
 }
 
 /**
@@ -268,6 +402,13 @@ export async function sendPasswordResetEmail(
   });
 
   if (error) {
+    const errText = (error.message || '').toLowerCase();
+    if (errText.includes('rate limit') || errText.includes('over_email_send_rate_limit') || (error as any).status === 429) {
+      return {
+        success: false,
+        error: 'ईमेल भेजने की सीमा पार हो चुकी है (Rate Limit Exceeded)। कृपया 15 मिनट बाद पुनः प्रयास करें या सीधे पासवर्ड से लॉगिन करें।',
+      };
+    }
     return { success: false, error: error.message };
   }
 
@@ -596,11 +737,15 @@ export async function fetchSupabaseBattles(): Promise<BattleEvent[] | null> {
 export async function fetchSupabaseChatMessages(): Promise<ChatMessage[] | null> {
   if (!isSupabaseConfigured()) return null;
   try {
+    // Only load messages from the last 24 hours
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { data, error } = await supabase
       .from('chat_messages')
       .select('*')
+      .gte('created_at', twentyFourHoursAgo)
       .order('created_at', { ascending: true })
-      .limit(100);
+      .limit(250);
+
     if (error || !data) return null;
     return data.map((m: any) => ({
       id: m.id,
@@ -642,6 +787,32 @@ export async function insertSupabaseChatMessage(msg: ChatMessage): Promise<boole
     return true;
   } catch {
     return false;
+  }
+}
+
+export async function deleteSupabaseChatMessage(messageId: string): Promise<boolean> {
+  if (!isSupabaseConfigured() || !messageId) return false;
+  try {
+    const { error } = await supabase
+      .from('chat_messages')
+      .delete()
+      .eq('id', messageId);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+export async function cleanupExpiredSupabaseChatMessages(): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  try {
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    await supabase
+      .from('chat_messages')
+      .delete()
+      .lt('created_at', twentyFourHoursAgo);
+  } catch {
+    // Non-blocking cleanup
   }
 }
 

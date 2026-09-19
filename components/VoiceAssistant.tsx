@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { User, VoiceState, ToolCall, AppTab } from '@/types';
-import { LiveSession } from '@/lib/audio/live-session';
+import { LiveSession, selectMaleVoice } from '@/lib/audio/live-session';
 import { AudioVisualizer } from './AudioVisualizer';
 import {
   Mic,
@@ -55,8 +55,17 @@ export function VoiceAssistant({ currentUser, onNavigateTab, onOpenAuth }: Voice
     } else if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(greetingText);
-      utterance.lang = 'hi-IN';
-      utterance.rate = 0.95;
+      const voices = window.speechSynthesis.getVoices();
+      const maleVoice = selectMaleVoice(voices);
+      if (maleVoice) {
+        utterance.voice = maleVoice;
+        utterance.lang = maleVoice.lang || 'hi-IN';
+      } else {
+        utterance.lang = 'hi-IN';
+      }
+      utterance.pitch = 0.82; // Deep masculine tone
+      utterance.rate = 0.98;
+      utterance.volume = 1.0;
       window.speechSynthesis.speak(utterance);
     }
   };
@@ -93,6 +102,12 @@ export function VoiceAssistant({ currentUser, onNavigateTab, onOpenAuth }: Voice
             setTimeout(() => {
               onNavigateTab('battle');
             }, 1500);
+          } else if (tool.name === 'navigateTab' && tool.args?.tab) {
+            let targetTab = String(tool.args.tab).toLowerCase();
+            if (targetTab === 'chat') targetTab = 'worldchat';
+            if (['home', 'worldchat', 'battle', 'assistant', 'profile', 'admin'].includes(targetTab)) {
+              onNavigateTab(targetTab as AppTab);
+            }
           }
         },
         onError: (err) => {
@@ -120,15 +135,8 @@ export function VoiceAssistant({ currentUser, onNavigateTab, onOpenAuth }: Voice
   const toggleConnection = async () => {
     setErrorMessage(null);
 
-    // Strict Voice Mode Access Control: If logged out, show Login prompt
-    if (!currentUser) {
-      setErrorMessage('Login is required to activate AI Voice mode.');
-      onOpenAuth();
-      return;
-    }
-
     if (!liveSessionRef.current) return;
-    liveSessionRef.current.setUserEmail(currentUser.email);
+    liveSessionRef.current.setUserEmail(currentUser?.email || 'guest@dhoti-aale.local');
 
     if (voiceState === 'disconnected') {
       try {
@@ -253,10 +261,9 @@ export function VoiceAssistant({ currentUser, onNavigateTab, onOpenAuth }: Voice
                 ? 'bg-gradient-to-tr from-orange-600 via-amber-500 to-amber-300 text-slate-950 ring-8 ring-orange-500/40 animate-pulse'
                 : voiceState === 'connecting'
                 ? 'bg-blue-600 text-white ring-8 ring-blue-500/30 animate-spin'
-                : !currentUser
-                ? 'bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border-2 border-slate-700 hover:border-amber-400 group'
-                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border-2 border-amber-500/40 hover:border-amber-400'
+                : 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 hover:from-amber-950/40 hover:to-slate-800 text-amber-400 hover:text-amber-300 border-2 border-amber-500/50 hover:border-amber-400 hover:shadow-amber-500/20'
             }`}
+            title="DHOTI AALE से देसी मर्द की आवाज़ में बात करें"
           >
             {voiceState === 'listening' ? (
               <Mic className="h-10 w-10 sm:h-12 sm:w-12 animate-bounce" />
@@ -264,15 +271,13 @@ export function VoiceAssistant({ currentUser, onNavigateTab, onOpenAuth }: Voice
               <Volume2 className="h-10 w-10 sm:h-12 sm:w-12 animate-pulse" />
             ) : voiceState === 'connecting' ? (
               <Radio className="h-10 w-10 sm:h-12 sm:w-12 animate-spin" />
-            ) : !currentUser ? (
+            ) : (
               <div className="flex flex-col items-center">
-                <MicOff className="h-8 w-8 sm:h-10 sm:w-10 text-slate-400 group-hover:text-amber-300" />
-                <span className="text-[9px] font-bold uppercase text-amber-400 mt-1 flex items-center gap-0.5">
-                  <Lock className="h-2.5 w-2.5" /> Login
+                <Mic className="h-8 w-8 sm:h-10 sm:w-10 text-amber-400 group-hover:scale-110 transition-transform" />
+                <span className="text-[9px] font-extrabold uppercase text-amber-300/90 mt-1 tracking-wider">
+                  बोलें
                 </span>
               </div>
-            ) : (
-              <MicOff className="h-10 w-10 sm:h-12 sm:w-12" />
             )}
           </button>
 
@@ -286,21 +291,17 @@ export function VoiceAssistant({ currentUser, onNavigateTab, onOpenAuth }: Voice
                   ? 'bg-orange-400 animate-pulse'
                   : voiceState === 'connecting'
                   ? 'bg-blue-400 animate-spin'
-                  : !currentUser
-                  ? 'bg-amber-500'
-                  : 'bg-slate-500'
+                  : 'bg-amber-400'
               }`}
             />
             <span className="text-xs sm:text-sm font-bold uppercase tracking-widest text-slate-300">
               {voiceState === 'listening'
-                ? 'LISTENING TO YOU...'
+                ? 'सुन रहा हूँ भाईसाहब...'
                 : voiceState === 'speaking'
-                ? 'DHOTI AI SPEAKING'
+                ? 'DHOTI AALE बोल रहा है (मर्द की आवाज़)'
                 : voiceState === 'connecting'
-                ? 'CONNECTING TO GEMINI...'
-                : !currentUser
-                ? 'SIGN IN WITH GOOGLE FOR VOICE CHAT'
-                : 'TAP TO ACTIVATE VOICE'}
+                ? 'कनेक्ट हो रहा है...'
+                : 'बोलने के लिए माइक दबाएं (पुरुष आवाज़)'}
             </span>
           </div>
 
@@ -311,7 +312,7 @@ export function VoiceAssistant({ currentUser, onNavigateTab, onOpenAuth }: Voice
               className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 hover:bg-amber-500/20 px-3.5 py-1 text-xs font-bold text-amber-300 border border-amber-500/30 transition-all hover:scale-105"
             >
               <LogIn className="h-3.5 w-3.5" />
-              <span>Login to enable Voice Mode</span>
+              <span>Sign in to earn Dhoti Coins & rank</span>
             </button>
           )}
 
