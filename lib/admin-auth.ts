@@ -1,6 +1,5 @@
 export const SITE_OWNER_EMAILS = [
   'rohitdhakaddhoti143@gmail.com',
-  'rohitkumarnagar50@gmail.com',
 ];
 
 export const SITE_OWNER_EMAIL = SITE_OWNER_EMAILS[0];

@@ -8,7 +8,7 @@ import { WorldChat } from '@/components/WorldChat';
 import { BattleArena } from '@/components/BattleArena';
 import { ProfileView } from '@/components/ProfileView';
 import { AdminDashboard } from '@/components/AdminDashboard';
-import { GoogleAuthModal } from '@/components/GoogleAuthModal';
+import GoogleAuthModal from '@/components/GoogleAuthModal';
 import { PWAInstallBanner } from '@/components/PWAInstallBanner';
 import { isSiteAdmin } from '@/lib/admin-auth';
 import { useIsMounted } from '@/lib/useIsMounted';
