@@ -10,7 +10,8 @@ const DEFAULT_SUPABASE_ANON_KEY =
   'sb_publishable_JxGddMQ5KqRFTANuZG2TGg_I05TTskS';
 
 const supabaseUrl =
-  process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL;
+  process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  DEFAULT_SUPABASE_URL;
 
 const supabaseAnonKey =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
@@ -49,13 +50,22 @@ function createAppUser(
   };
 }
 
+/**
+ * Save the application profile into public.users.
+ *
+ * The project currently does not provide a generated
+ * Supabase Database type, so the Supabase client can
+ * infer the table as `never`. We intentionally cast
+ * only this database operation to a generic shape.
+ */
 async function savePublicUser(
   client: ReturnType<typeof createClient>,
   appUser: User
-) {
-  const { error } = await client
-    .from('users')
-    .upsert(
+): Promise<boolean> {
+  try {
+    const usersTable = (client as any).from('users');
+
+    const { error } = await usersTable.upsert(
       {
         id: appUser.id,
         email: appUser.email,
@@ -77,14 +87,24 @@ async function savePublicUser(
       }
     );
 
-  if (error) {
+    if (error) {
+      console.warn(
+        'Could not save public.users profile:',
+        error.message
+      );
+
+      return false;
+    }
+
+    return true;
+  } catch (error) {
     console.warn(
       'Could not save public.users profile:',
-      error.message
+      error
     );
-  }
 
-  return !error;
+    return false;
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -158,11 +178,7 @@ export async function POST(req: NextRequest) {
 
     // -----------------------------------------
     // METHOD 1
-    // SERVER-SIDE SUPABASE ADMIN CREATION
-    //
-    // This is preferred because it can create
-    // an already-confirmed account without
-    // sending a confirmation email.
+    // SUPABASE ADMIN CREATE USER
     // -----------------------------------------
 
     if (serviceRoleKey.length > 20) {
@@ -209,8 +225,7 @@ export async function POST(req: NextRequest) {
             appUser
           );
 
-          // Create a normal login session after
-          // successful account creation.
+          // Create an immediate login session.
           const loginClient = createClient(
             supabaseUrl,
             supabaseAnonKey,
@@ -248,15 +263,18 @@ export async function POST(req: NextRequest) {
             isConfirmed: true,
             rateLimitBypassed: false,
             accessToken:
-              loginData.session?.access_token || null,
+              loginData.session?.access_token ||
+              null,
             refreshToken:
-              loginData.session?.refresh_token || null,
+              loginData.session?.refresh_token ||
+              null,
             expiresAt:
-              loginData.session?.expires_at || null,
+              loginData.session?.expires_at ||
+              null,
           });
         }
 
-        // Existing account
+        // Existing account.
         if (
           error &&
           (
@@ -331,7 +349,9 @@ export async function POST(req: NextRequest) {
       if (
         lowerError.includes('already registered') ||
         lowerError.includes('already exists') ||
-        lowerError.includes('user already registered')
+        lowerError.includes(
+          'user already registered'
+        )
       ) {
         return NextResponse.json(
           {
@@ -367,7 +387,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: errorMessage ||
+          error:
+            errorMessage ||
             'साइन-अप करने में समस्या आई।',
         },
         { status: 400 }
@@ -375,7 +396,7 @@ export async function POST(req: NextRequest) {
     }
 
     // -----------------------------------------
-    // SUPABASE USER CREATED
+    // USER MUST EXIST
     // -----------------------------------------
 
     if (!data.user) {
@@ -410,14 +431,12 @@ export async function POST(req: NextRequest) {
     );
 
     // -----------------------------------------
-    // CONFIRMATION STATUS
+    // SESSION / CONFIRMATION
     // -----------------------------------------
 
     const isConfirmed =
       Boolean(sbUser.confirmed_at);
 
-    // If Supabase email confirmation is disabled,
-    // a session is normally returned immediately.
     const session = data.session;
 
     return NextResponse.json({
@@ -433,10 +452,9 @@ export async function POST(req: NextRequest) {
         session?.expires_at || null,
       requiresEmailConfirmation:
         !isConfirmed && !session,
-      message:
-        session
-          ? 'खाता सफलतापूर्वक बन गया है और आप लॉगिन हो चुके हैं।'
-          : 'खाता सफलतापूर्वक बन गया है। कृपया ईमेल सत्यापन पूरा करके लॉगिन करें।',
+      message: session
+        ? 'खाता सफलतापूर्वक बन गया है और आप लॉगिन हो चुके हैं।'
+        : 'खाता सफलतापूर्वक बन गया है। कृपया ईमेल सत्यापन पूरा करके लॉगिन करें।',
     });
   } catch (err: any) {
     console.error(
