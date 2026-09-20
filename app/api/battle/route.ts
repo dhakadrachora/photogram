@@ -1,6 +1,4 @@
-from pathlib import Path
-
-code = r'''import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import crypto from "node:crypto";
 
@@ -1608,8 +1606,3 @@ export async function DELETE(
     );
   }
 }
-'''
-
-path = Path("/mnt/data/route-fixed.ts")
-path.write_text(code, encoding="utf-8")
-print(path)
