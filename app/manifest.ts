@@ -5,13 +5,17 @@ export default function manifest(): MetadataRoute.Manifest {
     id: '/',
     name: 'DHOTI AALE - ढोटी की अपनी डिजिटल पहचान',
     short_name: 'DHOTI AALE',
-    description: "राजस्थान का पहला डिजिटल गाँव समुदाय | Rajasthan's Digital Village Community.",
+    description:
+      "राजस्थान का डिजिटल गाँव समुदाय | Rajasthan's Digital Village Community.",
     start_url: '/',
     scope: '/',
     display: 'standalone',
     orientation: 'portrait',
     background_color: '#FBF9F5',
     theme_color: '#C25E29',
+    lang: 'hi',
+    dir: 'ltr',
+    categories: ['social', 'community', 'news'],
     icons: [
       {
         src: '/icon-192.png',
