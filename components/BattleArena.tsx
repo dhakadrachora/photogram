@@ -58,10 +58,7 @@ function formatRemaining(ms: number): string {
   )}:${String(seconds).padStart(2, '0')}`;
 }
 
-function getBattleStatus(
-  battle: BattleEvent,
-  now: number
-) {
+function getBattleStatus(battle: BattleEvent, now: number) {
   if (battle.isEnded || battle.status === 'closed') {
     return 'closed' as const;
   }
@@ -77,9 +74,7 @@ function getBattleStatus(
   return 'active' as const;
 }
 
-function getWinnerLabel(
-  battle: BattleEvent
-): string | null {
+function getWinnerLabel(battle: BattleEvent): string | null {
   if (!battle.winnerOptionId) {
     return null;
   }
@@ -141,24 +136,15 @@ export function BattleArena({
 }: BattleArenaProps) {
   const isAdmin = isSiteAdmin(currentUser?.email);
 
-  const [activeArenaTab, setActiveArenaTab] = useState<
-    'events' | '1v1'
-  >('events');
+  const [activeArenaTab, setActiveArenaTab] = useState<'events' | '1v1'>(
+    'events'
+  );
 
-  const [battleEvents, setBattleEvents] = useState<
-    BattleEvent[]
-  >([]);
-
-  const [isLoadingBattles, setIsLoadingBattles] =
-    useState(true);
-
-  const [isRefreshing, setIsRefreshing] =
-    useState(false);
-
+  const [battleEvents, setBattleEvents] = useState<BattleEvent[]>([]);
+  const [isLoadingBattles, setIsLoadingBattles] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [now, setNow] = useState(Date.now());
-
-  const [votingBattleId, setVotingBattleId] =
-    useState<string | null>(null);
+  const [votingBattleId, setVotingBattleId] = useState<string | null>(null);
 
   const [voteFeedback, setVoteFeedback] =
     useState<VoteFeedback | null>(null);
@@ -166,8 +152,7 @@ export function BattleArena({
   const [selectedBattle, setSelectedBattle] =
     useState<BattleEvent | null>(null);
 
-  const [errorMessage, setErrorMessage] =
-    useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const opponentName =
     selectedOpponent || 'Dhoti Aale AI Champion';
@@ -182,30 +167,22 @@ export function BattleArena({
         setErrorMessage(null);
 
         const emailParam = currentUser?.email
-          ? `?email=${encodeURIComponent(
-              currentUser.email
-            )}`
+          ? `?email=${encodeURIComponent(currentUser.email)}`
           : '';
 
-        const response = await fetch(
-          `/api/battle/vote${emailParam}`,
-          {
-            method: 'GET',
-            cache: 'no-store',
-            headers: {
-              Accept: 'application/json',
-            },
-          }
-        );
+        const response = await fetch(`/api/battle/vote${emailParam}`, {
+          method: 'GET',
+          cache: 'no-store',
+          headers: {
+            Accept: 'application/json',
+          },
+        });
 
-        const data = await response
-          .json()
-          .catch(() => null);
+        const data = await response.json().catch(() => null);
 
         if (!response.ok) {
           throw new Error(
-            data?.error ||
-              'Battle data load nahi ho saka.'
+            data?.error || 'Battle data load nahi ho saka.'
           );
         }
 
@@ -238,48 +215,33 @@ export function BattleArena({
         setIsLoadingBattles(true);
 
         const emailParam = currentUser?.email
-          ? `?email=${encodeURIComponent(
-              currentUser.email
-            )}`
+          ? `?email=${encodeURIComponent(currentUser.email)}`
           : '';
 
-        const response = await fetch(
-          `/api/battle/vote${emailParam}`,
-          {
-            method: 'GET',
-            cache: 'no-store',
-            headers: {
-              Accept: 'application/json',
-            },
-          }
-        );
+        const response = await fetch(`/api/battle/vote${emailParam}`, {
+          method: 'GET',
+          cache: 'no-store',
+          headers: {
+            Accept: 'application/json',
+          },
+        });
 
-        const data = await response
-          .json()
-          .catch(() => null);
+        const data = await response.json().catch(() => null);
 
         if (!cancelled) {
-          if (
-            response.ok &&
-            Array.isArray(data?.battles)
-          ) {
+          if (response.ok && Array.isArray(data?.battles)) {
             setBattleEvents(data.battles);
             setErrorMessage(null);
           } else {
             setBattleEvents([]);
-
             setErrorMessage(
-              data?.error ||
-                'Battle data load nahi ho saka.'
+              data?.error || 'Battle data load nahi ho saka.'
             );
           }
         }
       } catch (error) {
         if (!cancelled) {
-          console.error(
-            'Battle initial load error:',
-            error
-          );
+          console.error('Battle initial load error:', error);
 
           setErrorMessage(
             error instanceof Error
@@ -312,19 +274,15 @@ export function BattleArena({
   }, []);
 
   useEffect(() => {
-    const hasExpiredActiveBattle =
-      battleEvents.some((battle) => {
-        const status = getBattleStatus(
-          battle,
-          now
-        );
+    const hasExpiredActiveBattle = battleEvents.some((battle) => {
+      const status = getBattleStatus(battle, now);
 
-        return (
-          status === 'closed' &&
-          !battle.isEnded &&
-          battle.status !== 'closed'
-        );
-      });
+      return (
+        status === 'closed' &&
+        !battle.isEnded &&
+        battle.status !== 'closed'
+      );
+    });
 
     if (!hasExpiredActiveBattle) {
       return;
@@ -356,46 +314,37 @@ export function BattleArena({
     setVoteFeedback(null);
 
     try {
-      const response = await fetch(
-        '/api/battle/vote',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-          },
-          body: JSON.stringify({
-            battleId,
-            optionId,
-          }),
-        }
-      );
+      const response = await fetch('/api/battle/vote', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          battleId,
+          optionId,
+        }),
+      });
 
-      const data = await response
-        .json()
-        .catch(() => null);
+      const data = await response.json().catch(() => null);
 
       if (!response.ok) {
         throw new Error(
-          data?.error ||
-            'Vote submit nahi ho saka.'
+          data?.error || 'Vote submit nahi ho saka.'
         );
       }
 
       setVoteFeedback({
         battleId,
         message:
-          data?.message ||
-          'Vote successfully submit ho gaya.',
+          data?.message || 'Vote successfully submit ho gaya.',
         type: 'success',
       });
 
       if (data?.battle) {
         setBattleEvents((previous) =>
           previous.map((battle) =>
-            battle.id === battleId
-              ? data.battle
-              : battle
+            battle.id === battleId ? data.battle : battle
           )
         );
       }
@@ -405,15 +354,11 @@ export function BattleArena({
       if (onUpdateUser) {
         onUpdateUser((previous) => ({
           ...previous,
-          battles:
-            (previous.battles || 0) + 1,
+          battles: (previous.battles || 0) + 1,
         }));
       }
     } catch (error) {
-      console.error(
-        'Battle vote error:',
-        error
-      );
+      console.error('Battle vote error:', error);
 
       setVoteFeedback({
         battleId,
@@ -440,41 +385,24 @@ export function BattleArena({
 
   const activeBattles = useMemo(() => {
     return visibleBattles.filter(
-      (battle) =>
-        getBattleStatus(
-          battle,
-          now
-        ) === 'active'
+      (battle) => getBattleStatus(battle, now) === 'active'
     );
   }, [visibleBattles, now]);
 
   const upcomingBattles = useMemo(() => {
     return visibleBattles.filter(
-      (battle) =>
-        getBattleStatus(
-          battle,
-          now
-        ) === 'upcoming'
+      (battle) => getBattleStatus(battle, now) === 'upcoming'
     );
   }, [visibleBattles, now]);
 
   const closedBattles = useMemo(() => {
     return visibleBattles.filter(
-      (battle) =>
-        getBattleStatus(
-          battle,
-          now
-        ) === 'closed'
+      (battle) => getBattleStatus(battle, now) === 'closed'
     );
   }, [visibleBattles, now]);
 
-  const renderBattleCard = (
-    battle: BattleEvent
-  ) => {
-    const status = getBattleStatus(
-      battle,
-      now
-    );
+  const renderBattleCard = (battle: BattleEvent) => {
+    const status = getBattleStatus(battle, now);
 
     const totalVotes =
       typeof battle.totalVotes === 'number'
@@ -482,41 +410,22 @@ export function BattleArena({
         : (battle.optionA.votes || 0) +
           (battle.optionB.votes || 0);
 
-    const optionAVotes =
-      battle.optionA.votes || 0;
-
-    const optionBVotes =
-      battle.optionB.votes || 0;
+    const optionAVotes = battle.optionA.votes || 0;
+    const optionBVotes = battle.optionB.votes || 0;
 
     const optionAPercent =
       totalVotes > 0
-        ? Math.round(
-            (optionAVotes /
-              totalVotes) *
-              100
-          )
+        ? Math.round((optionAVotes / totalVotes) * 100)
         : 0;
 
     const optionBPercent =
-      totalVotes > 0
-        ? 100 - optionAPercent
-        : 0;
+      totalVotes > 0 ? 100 - optionAPercent : 0;
 
-    const winnerLabel =
-      getWinnerLabel(battle);
+    const winnerLabel = getWinnerLabel(battle);
 
-    /*
-     * IMPORTANT:
-     * endsAt optional hai, isliye countdown tabhi calculate
-     * hoga jab valid endsAt available ho.
-     */
     const remaining =
-      status === 'active' &&
-      battle.endsAt != null
-        ? Math.max(
-            0,
-            battle.endsAt - now
-          )
+      status === 'active' && battle.endsAt != null
+        ? Math.max(0, battle.endsAt - now)
         : 0;
 
     const canVote =
@@ -586,61 +495,45 @@ export function BattleArena({
         {status === 'active' && (
           <div className="flex items-center justify-center gap-2 border-b border-white/10 bg-red-500/5 px-4 py-3 text-sm font-bold text-red-300">
             <Clock size={16} />
-            Voting closes in{' '}
-            {formatRemaining(
-              remaining
-            )}
+            Voting closes in {formatRemaining(remaining)}
           </div>
         )}
 
-        {status === 'upcoming' &&
-          battle.startsAt != null && (
-            <div className="flex items-center justify-center gap-2 border-b border-white/10 bg-blue-500/5 px-4 py-3 text-sm font-bold text-blue-300">
-              <Clock size={16} />
-              Battle starts soon
-            </div>
-          )}
+        {status === 'upcoming' && battle.startsAt != null && (
+          <div className="flex items-center justify-center gap-2 border-b border-white/10 bg-blue-500/5 px-4 py-3 text-sm font-bold text-blue-300">
+            <Clock size={16} />
+            Battle starts soon
+          </div>
+        )}
 
         <div className="grid gap-4 p-4 md:grid-cols-2 md:p-6">
           <div
             className={`overflow-hidden rounded-2xl border ${
-              battle.userVotedOptionId ===
-              battle.optionA.id
+              battle.userVotedOptionId === battle.optionA.id
                 ? 'border-emerald-400/60 bg-emerald-500/5'
                 : 'border-white/10 bg-white/[0.03]'
             }`}
           >
             <div className="relative min-h-[220px] overflow-hidden">
               <BattleOptionImage
-                imageUrl={
-                  battle.optionA
-                    .imageUrl
-                }
-                alt={
-                  battle.optionA.label
-                }
+                imageUrl={battle.optionA.imageUrl}
+                alt={battle.optionA.label}
               />
 
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/10 to-transparent" />
 
               <div className="absolute bottom-4 left-4 right-4">
                 <div className="mb-1 text-3xl">
-                  {battle.optionA
-                    .emoji || '🔥'}
+                  {battle.optionA.emoji || '🔥'}
                 </div>
 
                 <h4 className="text-xl font-black text-white">
                   {battle.optionA.label}
                 </h4>
 
-                {battle.optionA
-                  .tagline && (
+                {battle.optionA.tagline && (
                   <p className="mt-1 text-sm text-zinc-300">
-                    {
-                      battle
-                        .optionA
-                        .tagline
-                    }
+                    {battle.optionA.tagline}
                   </p>
                 )}
               </div>
@@ -649,8 +542,7 @@ export function BattleArena({
             <div className="p-4">
               <div className="mb-3 flex items-center justify-between text-sm">
                 <span className="font-semibold text-zinc-300">
-                  {optionAVotes}{' '}
-                  votes
+                  {optionAVotes} votes
                 </span>
 
                 <span className="font-black text-orange-300">
@@ -674,8 +566,7 @@ export function BattleArena({
                   onClick={() =>
                     voteForBattle(
                       battle.id,
-                      battle.optionA
-                        .id
+                      battle.optionA.id
                     )
                   }
                   className="flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-3 font-bold text-white transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-50"
@@ -683,13 +574,10 @@ export function BattleArena({
                   {battle.userVotedOptionId ===
                   battle.optionA.id ? (
                     <>
-                      <CheckCircle2
-                        size={18}
-                      />
+                      <CheckCircle2 size={18} />
                       Your Vote
                     </>
-                  ) : votingBattleId ===
-                    battle.id ? (
+                  ) : votingBattleId === battle.id ? (
                     <>
                       <RefreshCw
                         size={18}
@@ -706,14 +594,10 @@ export function BattleArena({
                 </button>
               )}
 
-              {status ===
-                'closed' &&
-                battle.winnerOptionId ===
-                  battle.optionA.id && (
+              {status === 'closed' &&
+                battle.winnerOptionId === battle.optionA.id && (
                   <div className="flex items-center justify-center gap-2 rounded-xl bg-yellow-500/10 px-4 py-3 font-bold text-yellow-300">
-                    <Trophy
-                      size={18}
-                    />
+                    <Trophy size={18} />
                     Winner
                   </div>
                 )}
@@ -734,43 +618,31 @@ export function BattleArena({
 
           <div
             className={`overflow-hidden rounded-2xl border ${
-              battle.userVotedOptionId ===
-              battle.optionB.id
+              battle.userVotedOptionId === battle.optionB.id
                 ? 'border-emerald-400/60 bg-emerald-500/5'
                 : 'border-white/10 bg-white/[0.03]'
             }`}
           >
             <div className="relative min-h-[220px] overflow-hidden">
               <BattleOptionImage
-                imageUrl={
-                  battle.optionB
-                    .imageUrl
-                }
-                alt={
-                  battle.optionB.label
-                }
+                imageUrl={battle.optionB.imageUrl}
+                alt={battle.optionB.label}
               />
 
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/10 to-transparent" />
 
               <div className="absolute bottom-4 left-4 right-4">
                 <div className="mb-1 text-3xl">
-                  {battle.optionB
-                    .emoji || '⚡'}
+                  {battle.optionB.emoji || '⚡'}
                 </div>
 
                 <h4 className="text-xl font-black text-white">
                   {battle.optionB.label}
                 </h4>
 
-                {battle.optionB
-                  .tagline && (
+                {battle.optionB.tagline && (
                   <p className="mt-1 text-sm text-zinc-300">
-                    {
-                      battle
-                        .optionB
-                        .tagline
-                    }
+                    {battle.optionB.tagline}
                   </p>
                 )}
               </div>
@@ -779,8 +651,7 @@ export function BattleArena({
             <div className="p-4">
               <div className="mb-3 flex items-center justify-between text-sm">
                 <span className="font-semibold text-zinc-300">
-                  {optionBVotes}{' '}
-                  votes
+                  {optionBVotes} votes
                 </span>
 
                 <span className="font-black text-purple-300">
@@ -804,8 +675,7 @@ export function BattleArena({
                   onClick={() =>
                     voteForBattle(
                       battle.id,
-                      battle.optionB
-                        .id
+                      battle.optionB.id
                     )
                   }
                   className="flex w-full items-center justify-center gap-2 rounded-xl bg-purple-500 px-4 py-3 font-bold text-white transition hover:bg-purple-400 disabled:cursor-not-allowed disabled:opacity-50"
@@ -813,13 +683,10 @@ export function BattleArena({
                   {battle.userVotedOptionId ===
                   battle.optionB.id ? (
                     <>
-                      <CheckCircle2
-                        size={18}
-                      />
+                      <CheckCircle2 size={18} />
                       Your Vote
                     </>
-                  ) : votingBattleId ===
-                    battle.id ? (
+                  ) : votingBattleId === battle.id ? (
                     <>
                       <RefreshCw
                         size={18}
@@ -836,14 +703,10 @@ export function BattleArena({
                 </button>
               )}
 
-              {status ===
-                'closed' &&
-                battle.winnerOptionId ===
-                  battle.optionB.id && (
+              {status === 'closed' &&
+                battle.winnerOptionId === battle.optionB.id && (
                   <div className="flex items-center justify-center gap-2 rounded-xl bg-yellow-500/10 px-4 py-3 font-bold text-yellow-300">
-                    <Trophy
-                      size={18}
-                    />
+                    <Trophy size={18} />
                     Winner
                   </div>
                 )}
@@ -857,6 +720,7 @@ export function BattleArena({
               <>
                 <div className="mb-2 flex items-center justify-center gap-2 text-yellow-300">
                   <Trophy size={22} />
+
                   <span className="font-black">
                     BATTLE RESULT
                   </span>
@@ -877,8 +741,7 @@ export function BattleArena({
                 </div>
 
                 <p className="mt-1 text-sm text-zinc-400">
-                  Result calculate ho
-                  raha hai.
+                  Result calculate ho raha hai.
                 </p>
               </>
             )}
@@ -888,17 +751,14 @@ export function BattleArena({
         {battle.userVotedOptionId && (
           <div className="mx-4 mb-4 flex items-center justify-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-sm font-semibold text-emerald-300 md:mx-6">
             <CheckCircle2 size={17} />
-            Aapka vote already recorded
-            hai.
+            Aapka vote already recorded hai.
           </div>
         )}
 
-        {voteFeedback?.battleId ===
-          battle.id && (
+        {voteFeedback?.battleId === battle.id && (
           <div
             className={`mx-4 mb-4 rounded-xl border px-4 py-3 text-center text-sm font-semibold md:mx-6 ${
-              voteFeedback.type ===
-              'success'
+              voteFeedback.type === 'success'
                 ? 'border-emerald-500/20 bg-emerald-500/5 text-emerald-300'
                 : 'border-red-500/20 bg-red-500/5 text-red-300'
             }`}
@@ -934,8 +794,7 @@ export function BattleArena({
             </h2>
 
             <p className="mt-3 max-w-2xl text-zinc-400">
-              Dhoti ke real community
-              battles dekho aur active
+              Dhoti ke real community battles dekho aur active
               battle me apna vote do.
             </p>
           </div>
@@ -992,9 +851,7 @@ export function BattleArena({
       <div className="mb-6 flex rounded-2xl border border-white/10 bg-zinc-950 p-1">
         <button
           type="button"
-          onClick={() =>
-            setActiveArenaTab('events')
-          }
+          onClick={() => setActiveArenaTab('events')}
           className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition ${
             activeArenaTab === 'events'
               ? 'bg-red-500 text-white'
@@ -1007,9 +864,7 @@ export function BattleArena({
 
         <button
           type="button"
-          onClick={() =>
-            setActiveArenaTab('1v1')
-          }
+          onClick={() => setActiveArenaTab('1v1')}
           className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition ${
             activeArenaTab === '1v1'
               ? 'bg-red-500 text-white'
@@ -1031,19 +886,13 @@ export function BattleArena({
 
             <button
               type="button"
-              onClick={() =>
-                loadBattles(true)
-              }
+              onClick={() => loadBattles(true)}
               disabled={isRefreshing}
               className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-bold text-zinc-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <RefreshCw
                 size={16}
-                className={
-                  isRefreshing
-                    ? 'animate-spin'
-                    : ''
-                }
+                className={isRefreshing ? 'animate-spin' : ''}
               />
               Refresh
             </button>
@@ -1059,15 +908,12 @@ export function BattleArena({
 
                 <div>
                   <div className="font-bold text-white">
-                    Vote karne ke liye login
-                    required hai
+                    Vote karne ke liye login required hai
                   </div>
 
                   <div className="mt-1 text-sm text-zinc-400">
-                    Battle public dekh sakte
-                    ho, lekin vote sirf
-                    logged-in user de sakta
-                    hai.
+                    Battle public dekh sakte ho, lekin vote sirf
+                    logged-in user de sakta hai.
                   </div>
                 </div>
               </div>
@@ -1098,29 +944,24 @@ export function BattleArena({
                 />
               ))}
             </div>
-          ) : visibleBattles.length ===
-            0 ? (
+          ) : visibleBattles.length === 0 ? (
             <div className="rounded-3xl border border-dashed border-white/10 bg-zinc-950 p-10 text-center">
               <div className="mb-4 text-5xl">
                 ⚔️
               </div>
 
               <h3 className="text-xl font-black text-white">
-                Abhi koi battle nahi
-                hai
+                Abhi koi battle nahi hai
               </h3>
 
               <p className="mx-auto mt-2 max-w-md text-sm text-zinc-500">
-                Super Admin jab battle
-                publish karega tab yahan
+                Super Admin jab battle publish karega tab yahan
                 automatically show hoga.
               </p>
             </div>
           ) : (
             <div className="grid gap-6">
-              {visibleBattles.map(
-                renderBattleCard
-              )}
+              {visibleBattles.map(renderBattleCard)}
             </div>
           )}
 
@@ -1136,8 +977,7 @@ export function BattleArena({
               </div>
 
               <div className="mt-1 text-xs text-zinc-500">
-                Duplicate voting
-                server-side blocked hai.
+                Duplicate voting server-side blocked hai.
               </div>
             </div>
 
@@ -1152,9 +992,8 @@ export function BattleArena({
               </div>
 
               <div className="mt-1 text-xs text-zinc-500">
-                Voting server ke
-                start/end time ke according
-                close hoti hai.
+                Voting server ke start/end time ke according close
+                hoti hai.
               </div>
             </div>
 
@@ -1169,8 +1008,7 @@ export function BattleArena({
               </div>
 
               <div className="mt-1 text-xs text-zinc-500">
-                Winner real vote count se
-                calculate hota hai.
+                Winner real vote count se calculate hota hai.
               </div>
             </div>
           </div>
@@ -1187,8 +1025,7 @@ export function BattleArena({
             </h3>
 
             <p className="mt-3 text-zinc-400">
-              {opponentName} ke saath AI
-              battle mode.
+              {opponentName} ke saath AI battle mode.
             </p>
 
             <div className="mt-8 grid gap-4 sm:grid-cols-3">
@@ -1252,9 +1089,7 @@ export function BattleArena({
                 type="button"
                 onClick={() => {
                   if (onNavigateTab) {
-                    onNavigateTab(
-                      'ai'
-                    );
+                    onNavigateTab('assistant');
                   }
                 }}
                 className="mt-8 flex w-full items-center justify-center gap-2 rounded-2xl bg-red-500 px-5 py-4 font-black text-white hover:bg-red-400"
@@ -1270,15 +1105,11 @@ export function BattleArena({
       {selectedBattle && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
-          onClick={() =>
-            setSelectedBattle(null)
-          }
+          onClick={() => setSelectedBattle(null)}
         >
           <div
             className="w-full max-w-2xl rounded-3xl border border-white/10 bg-zinc-950 p-6"
-            onClick={(event) =>
-              event.stopPropagation()
-            }
+            onClick={(event) => event.stopPropagation()}
           >
             <div className="mb-5 flex items-center justify-between">
               <h3 className="text-xl font-black text-white">
@@ -1287,18 +1118,14 @@ export function BattleArena({
 
               <button
                 type="button"
-                onClick={() =>
-                  setSelectedBattle(null)
-                }
+                onClick={() => setSelectedBattle(null)}
                 className="rounded-xl bg-white/5 px-3 py-2 text-zinc-400 hover:bg-white/10 hover:text-white"
               >
                 Close
               </button>
             </div>
 
-            {renderBattleCard(
-              selectedBattle
-            )}
+            {renderBattleCard(selectedBattle)}
           </div>
         </div>
       )}
