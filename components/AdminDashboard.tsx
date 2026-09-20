@@ -1419,7 +1419,7 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
                       </div>
                       <div className="flex justify-between text-[10px] text-slate-500">
                         <span>Total Votes: {total}</span>
-                        <span>Ends: {new Date(battle.endsAt).toLocaleDateString()}</span>
+                        <span>Ends: {new Date(battle.endsAt ?? Date.now()).toLocaleDateString()}</span>
                       </div>
                     </div>
 
