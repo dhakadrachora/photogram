@@ -51,41 +51,40 @@ function createAppUser(
 }
 
 /**
- * Save the application profile into public.users.
+ * Save user profile.
  *
- * The project currently does not provide a generated
- * Supabase Database type, so the Supabase client can
- * infer the table as `never`. We intentionally cast
- * only this database operation to a generic shape.
+ * `any` is intentionally used here because this project
+ * does not currently provide generated Supabase Database
+ * types for the public.users table.
  */
 async function savePublicUser(
-  client: ReturnType<typeof createClient>,
+  client: any,
   appUser: User
 ): Promise<boolean> {
   try {
-    const usersTable = (client as any).from('users');
-
-    const { error } = await usersTable.upsert(
-      {
-        id: appUser.id,
-        email: appUser.email,
-        name: appUser.name,
-        phone: appUser.phone || null,
-        avatar: appUser.avatar,
-        badge: appUser.badge,
-        coins: appUser.coins ?? 50,
-        wins: appUser.wins ?? 0,
-        battles: appUser.battles ?? 0,
-        rank: appUser.rank || 'Resident',
-        role: appUser.role || 'resident',
-        is_admin: Boolean(appUser.isAdmin),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      {
-        onConflict: 'id',
-      }
-    );
+    const { error } = await client
+      .from('users')
+      .upsert(
+        {
+          id: appUser.id,
+          email: appUser.email,
+          name: appUser.name,
+          phone: appUser.phone || null,
+          avatar: appUser.avatar,
+          badge: appUser.badge,
+          coins: appUser.coins ?? 50,
+          wins: appUser.wins ?? 0,
+          battles: appUser.battles ?? 0,
+          rank: appUser.rank || 'Resident',
+          role: appUser.role || 'resident',
+          is_admin: Boolean(appUser.isAdmin),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: 'id',
+        }
+      );
 
     if (error) {
       console.warn(
@@ -225,7 +224,10 @@ export async function POST(req: NextRequest) {
             appUser
           );
 
-          // Create an immediate login session.
+          // -------------------------------------
+          // IMMEDIATE LOGIN
+          // -------------------------------------
+
           const loginClient = createClient(
             supabaseUrl,
             supabaseAnonKey,
@@ -274,7 +276,10 @@ export async function POST(req: NextRequest) {
           });
         }
 
-        // Existing account.
+        // -------------------------------------
+        // EXISTING ACCOUNT
+        // -------------------------------------
+
         if (
           error &&
           (
@@ -335,6 +340,10 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // -----------------------------------------
+    // SUPABASE SIGNUP ERROR
+    // -----------------------------------------
+
     if (error) {
       const errorMessage =
         error.message || '';
@@ -342,10 +351,7 @@ export async function POST(req: NextRequest) {
       const lowerError =
         errorMessage.toLowerCase();
 
-      // ---------------------------------------
-      // ALREADY REGISTERED
-      // ---------------------------------------
-
+      // Already registered
       if (
         lowerError.includes('already registered') ||
         lowerError.includes('already exists') ||
@@ -363,10 +369,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // ---------------------------------------
-      // EMAIL RATE LIMIT
-      // ---------------------------------------
-
+      // Email rate limit
       if (
         lowerError.includes('rate limit') ||
         lowerError.includes(
@@ -396,7 +399,7 @@ export async function POST(req: NextRequest) {
     }
 
     // -----------------------------------------
-    // USER MUST EXIST
+    // USER CHECK
     // -----------------------------------------
 
     if (!data.user) {
