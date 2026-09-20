@@ -1,1641 +1,1386 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { randomUUID } from 'crypto';
+import { NextRequest, NextResponse } from "next/server";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
-import { verifyAdminRequestAsync } from '@/lib/admin-auth';
-import {
-  contentStore,
-  BattleEventStore,
-} from '@/lib/content-store';
+import { verifyAdminRequestAsync } from "@/lib/admin-auth";
+import { contentStore, BattleEventStore } from "@/lib/content-store";
+import { supabase } from "@/lib/supabase";
 
-import {
-  fetchSupabaseBattles,
-  isSupabaseConfigured,
-  supabase,
-} from '@/lib/supabase';
-
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const DEFAULT_DURATION_MS =
-  24 * 60 * 60 * 1000;
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  process.env.SUPABASE_URL ||
+  "https://zlngcbefvdtbihndaeun.supabase.co";
+
+const SUPABASE_ANON_KEY =
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  process.env.SUPABASE_ANON_KEY ||
+  "sb_publishable_JxGddMQ5KqRFTANuZG2TGg_I05TTskS";
+
+const SUPABASE_SERVICE_ROLE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SUPABASE_SERVICE_KEY ||
+  "";
 
 type AnyRecord = Record<string, any>;
 
-function toNumber(value: unknown): number | null {
-  if (
-    value === undefined ||
-    value === null ||
-    value === ''
-  ) {
-    return null;
+type BattleOption = {
+  id: string;
+  name: string;
+  imageUrl?: string;
+  image_url?: string;
+  votes?: number;
+};
+
+type BattleRecord = {
+  id: string;
+  title?: string;
+  question?: string;
+
+  optionA: BattleOption;
+  optionB: BattleOption;
+
+  option_a?: BattleOption;
+  option_b?: BattleOption;
+
+  durationMinutes?: number;
+
+  startsAt?: string;
+  endsAt?: string;
+
+  starts_at?: string;
+  ends_at?: string;
+
+  status?: string;
+  published?: boolean;
+  isPublished?: boolean;
+
+  isEnded?: boolean;
+  winnerOptionId?: string;
+  winner_option_id?: string | null;
+
+  totalVotes?: number;
+
+  createdAt?: string;
+  created_at?: string;
+
+  updatedAt?: string;
+  updated_at?: string;
+};
+
+function getDatabaseClient(preferAdmin = false): SupabaseClient {
+  if (preferAdmin && SUPABASE_SERVICE_ROLE_KEY) {
+    return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    });
   }
 
-  const n = Number(value);
-
-  return Number.isFinite(n)
-    ? n
-    : null;
+  return supabase;
 }
 
-function getDurationMs(
-  body: AnyRecord
-): number {
-  const durationMs =
-    toNumber(body.durationMs);
-
-  if (
-    durationMs !== null &&
-    durationMs > 0
-  ) {
-    return durationMs;
-  }
-
-  const durationMinutes =
-    toNumber(body.durationMinutes);
-
-  if (
-    durationMinutes !== null &&
-    durationMinutes > 0
-  ) {
-    return (
-      durationMinutes *
-      60 *
-      1000
+function getAdminDatabaseClient(): SupabaseClient {
+  if (!SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error(
+      "SUPABASE_SERVICE_ROLE_KEY is missing. Add the server-side Supabase service role key to your environment variables."
     );
   }
 
-  const durationHours =
-    toNumber(body.durationHours);
-
-  if (
-    durationHours !== null &&
-    durationHours > 0
-  ) {
-    return (
-      durationHours *
-      60 *
-      60 *
-      1000
-    );
-  }
-
-  const durationDays =
-    toNumber(body.durationDays);
-
-  if (
-    durationDays !== null &&
-    durationDays > 0
-  ) {
-    return (
-      durationDays *
-      24 *
-      60 *
-      60 *
-      1000
-    );
-  }
-
-  return DEFAULT_DURATION_MS;
+  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
 }
 
-function getImageUrl(
-  option: AnyRecord | null | undefined
-): string {
-  if (
-    !option ||
-    typeof option !== 'object'
-  ) {
-    return '';
-  }
-
-  const values = [
-    option.imageUrl,
-    option.image_url,
-    option.photoUrl,
-    option.photo_url,
-    option.image,
-    option.url,
-  ];
-
-  for (const value of values) {
-    if (
-      typeof value === 'string' &&
-      value.trim()
-    ) {
-      return value.trim();
-    }
-  }
-
-  return '';
+function jsonResponse(data: any, status = 200) {
+  return NextResponse.json(data, {
+    status,
+    headers: {
+      "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+      Pragma: "no-cache",
+      Expires: "0",
+      "Surrogate-Control": "no-store",
+    },
+  });
 }
 
-function getOptionLabel(
-  option: AnyRecord | null | undefined
-): string {
-  if (
-    !option ||
-    typeof option !== 'object'
-  ) {
-    return '';
-  }
+function cleanString(value: any): string {
+  if (typeof value !== "string") return "";
+  return value.trim();
+}
 
-  const values = [
-    option.label,
-    option.name,
-    option.title,
-  ];
-
-  for (const value of values) {
-    if (
-      typeof value === 'string' &&
-      value.trim()
-    ) {
-      return value.trim();
-    }
-  }
-
-  return '';
+function getImageUrl(option: AnyRecord): string {
+  return cleanString(
+    option?.imageUrl ??
+      option?.image_url ??
+      option?.image ??
+      option?.photoUrl ??
+      option?.photo_url ??
+      ""
+  );
 }
 
 function normalizeOption(
-  option: AnyRecord | null | undefined,
-  prefix: string,
-  emoji: string
-) {
-  const source =
-    option &&
-    typeof option === 'object'
-      ? option
-      : {};
+  option: AnyRecord,
+  fallbackId: string,
+  fallbackName: string
+): BattleOption {
+  const source = option || {};
 
-  const label =
-    getOptionLabel(source);
+  const id =
+    cleanString(source.id) ||
+    cleanString(source.optionId) ||
+    cleanString(source.option_id) ||
+    fallbackId;
+
+  const name =
+    cleanString(source.name) ||
+    cleanString(source.title) ||
+    cleanString(source.label) ||
+    fallbackName;
+
+  const imageUrl = getImageUrl(source);
 
   const votes =
-    toNumber(source.votes) || 0;
+    typeof source.votes === "number" && Number.isFinite(source.votes)
+      ? source.votes
+      : 0;
 
   return {
-    ...source,
-
-    id:
-      typeof source.id === 'string' &&
-      source.id.trim()
-        ? source.id.trim()
-        : `${prefix}_${randomUUID()}`,
-
-    label,
-
-    name: label,
-
-    tagline:
-      typeof source.tagline === 'string'
-        ? source.tagline
-        : '',
-
-    imageUrl:
-      getImageUrl(source),
-
-    votes:
-      votes >= 0
-        ? votes
-        : 0,
-
-    emoji:
-      typeof source.emoji === 'string' &&
-      source.emoji.trim()
-        ? source.emoji
-        : emoji,
+    id,
+    name,
+    imageUrl: imageUrl || undefined,
+    image_url: imageUrl || undefined,
+    votes,
   };
 }
 
-function getRawOption(
-  battle: AnyRecord,
-  side: 'A' | 'B'
-) {
-  if (side === 'A') {
-    return (
-      battle.optionA ||
-      battle.option_a ||
-      battle.options?.[0] ||
-      {}
-    );
+function normalizeBattle(row: AnyRecord): BattleRecord {
+  const optionA = normalizeOption(
+    row.option_a ?? row.optionA ?? {},
+    "option_a",
+    "Option A"
+  );
+
+  const optionB = normalizeOption(
+    row.option_b ?? row.optionB ?? {},
+    "option_b",
+    "Option B"
+  );
+
+  const startsAt =
+    cleanString(row.starts_at) ||
+    cleanString(row.startsAt) ||
+    cleanString(row.start_time) ||
+    cleanString(row.startTime);
+
+  const endsAt =
+    cleanString(row.ends_at) ||
+    cleanString(row.endsAt) ||
+    cleanString(row.end_time) ||
+    cleanString(row.endTime);
+
+  const status = cleanString(row.status) || "active";
+
+  const published =
+    typeof row.published === "boolean"
+      ? row.published
+      : typeof row.is_published === "boolean"
+        ? row.is_published
+        : typeof row.isPublished === "boolean"
+          ? row.isPublished
+          : true;
+
+  const winnerOptionId =
+    cleanString(row.winner_option_id) ||
+    cleanString(row.winnerOptionId) ||
+    "";
+
+  const durationMinutes =
+    typeof row.duration_minutes === "number"
+      ? row.duration_minutes
+      : typeof row.durationMinutes === "number"
+        ? row.durationMinutes
+        : undefined;
+
+  const createdAt =
+    cleanString(row.created_at) ||
+    cleanString(row.createdAt) ||
+    new Date().toISOString();
+
+  const updatedAt =
+    cleanString(row.updated_at) ||
+    cleanString(row.updatedAt) ||
+    createdAt;
+
+  const isEnded =
+    status === "closed" ||
+    status === "ended" ||
+    Boolean(row.is_ended) ||
+    Boolean(row.isEnded) ||
+    Boolean(endsAt && new Date(endsAt).getTime() <= Date.now());
+
+  return {
+    ...row,
+
+    id: cleanString(row.id),
+
+    title:
+      cleanString(row.title) ||
+      cleanString(row.question) ||
+      "Battle",
+
+    question:
+      cleanString(row.question) ||
+      cleanString(row.title) ||
+      "Battle",
+
+    optionA,
+    optionB,
+
+    option_a: optionA,
+    option_b: optionB,
+
+    durationMinutes,
+
+    startsAt: startsAt || undefined,
+    endsAt: endsAt || undefined,
+
+    starts_at: startsAt || undefined,
+    ends_at: endsAt || undefined,
+
+    status: isEnded ? "closed" : status,
+
+    published,
+    isPublished: published,
+
+    isEnded,
+
+    winnerOptionId: winnerOptionId || undefined,
+    winner_option_id: winnerOptionId || null,
+
+    totalVotes:
+      (typeof optionA.votes === "number" ? optionA.votes : 0) +
+      (typeof optionB.votes === "number" ? optionB.votes : 0),
+
+    createdAt,
+    created_at: createdAt,
+
+    updatedAt,
+    updated_at: updatedAt,
+  };
+}
+
+function getDurationMinutes(body: AnyRecord): number {
+  const value =
+    Number(body.durationMinutes) ||
+    Number(body.duration_minutes) ||
+    Number(body.duration) ||
+    10;
+
+  if (!Number.isFinite(value) || value <= 0) {
+    return 10;
   }
 
-  return (
-    battle.optionB ||
-    battle.option_b ||
-    battle.options?.[1] ||
-    {}
-  );
+  return Math.max(1, Math.round(value));
 }
 
-function getStartsAt(
-  battle: AnyRecord
-): number {
-  return (
-    toNumber(battle.startsAt) ||
-    toNumber(battle.starts_at) ||
-    0
-  );
+function getStartTime(body: AnyRecord): string {
+  const raw =
+    cleanString(body.startsAt) ||
+    cleanString(body.starts_at) ||
+    cleanString(body.startTime) ||
+    cleanString(body.start_time);
+
+  if (raw) {
+    const timestamp = new Date(raw);
+
+    if (!Number.isNaN(timestamp.getTime())) {
+      return timestamp.toISOString();
+    }
+  }
+
+  return new Date().toISOString();
 }
 
-function getEndsAt(
-  battle: AnyRecord
-): number {
-  return (
-    toNumber(battle.endsAt) ||
-    toNumber(battle.ends_at) ||
-    0
-  );
+function calculateEndTime(
+  startsAt: string,
+  durationMinutes: number
+): string {
+  const start = new Date(startsAt);
+
+  if (Number.isNaN(start.getTime())) {
+    return new Date(
+      Date.now() + durationMinutes * 60 * 1000
+    ).toISOString();
+  }
+
+  return new Date(
+    start.getTime() + durationMinutes * 60 * 1000
+  ).toISOString();
 }
 
-function isExpired(
-  battle: AnyRecord
-): boolean {
-  const endsAt =
-    getEndsAt(battle);
+function isBattleExpired(battle: BattleRecord): boolean {
+  if (battle.status === "closed" || battle.status === "ended") {
+    return true;
+  }
 
-  return (
-    endsAt > 0 &&
-    Date.now() >= endsAt
-  );
+  if (battle.isEnded) {
+    return true;
+  }
+
+  if (!battle.endsAt) {
+    return false;
+  }
+
+  const end = new Date(battle.endsAt).getTime();
+
+  if (!Number.isFinite(end)) {
+    return false;
+  }
+
+  return end <= Date.now();
 }
 
-function isEnded(
-  battle: AnyRecord
-): boolean {
-  return (
-    battle.isEnded === true ||
-    battle.is_ended === true ||
-    battle.status === 'closed' ||
-    isExpired(battle)
-  );
-}
+function getWinnerOptionId(battle: BattleRecord): string | null {
+  const aVotes = Number(battle.optionA?.votes || 0);
+  const bVotes = Number(battle.optionB?.votes || 0);
 
-function calculateWinner(
-  battle: AnyRecord
-): string | null {
-  const optionA =
-    normalizeOption(
-      getRawOption(battle, 'A'),
-      'option_a',
-      '🔥'
-    );
-
-  const optionB =
-    normalizeOption(
-      getRawOption(battle, 'B'),
-      'option_b',
-      '⚡'
-    );
-
-  const a =
-    Number(optionA.votes || 0);
-
-  const b =
-    Number(optionB.votes || 0);
-
-  if (a === b) {
+  if (aVotes === bVotes) {
     return null;
   }
 
-  return a > b
-    ? optionA.id
-    : optionB.id;
+  return aVotes > bVotes
+    ? battle.optionA.id
+    : battle.optionB.id;
 }
 
-function finalizeBattle(
-  battle: BattleEventStore
-) {
-  if (
-    !isEnded(battle as any)
-  ) {
-    return;
+function finalizeBattle(battle: BattleRecord): boolean {
+  if (!isBattleExpired(battle)) {
+    return false;
   }
 
-  battle.optionA =
-    normalizeOption(
-      battle.optionA as any,
-      'option_a',
-      '🔥'
-    ) as any;
+  const winner = getWinnerOptionId(battle);
 
-  battle.optionB =
-    normalizeOption(
-      battle.optionB as any,
-      'option_b',
-      '⚡'
-    ) as any;
-
+  battle.status = "closed";
   battle.isEnded = true;
-  battle.status = 'closed';
 
-  battle.winnerOptionId =
-    calculateWinner(
-      battle as any
-    ) || undefined;
+  battle.winnerOptionId = winner || undefined;
+  battle.winner_option_id = winner;
+
+  battle.totalVotes =
+    Number(battle.optionA?.votes || 0) +
+    Number(battle.optionB?.votes || 0);
+
+  battle.updatedAt = new Date().toISOString();
+  battle.updated_at = battle.updatedAt;
+
+  return true;
 }
 
-function formatBattle(
-  battle: BattleEventStore
-) {
-  const optionA =
-    normalizeOption(
-      battle.optionA as any,
-      'option_a',
-      '🔥'
-    );
+function getBattleDbRow(battle: BattleRecord): AnyRecord {
+  const optionA = normalizeOption(
+    battle.optionA || {},
+    "option_a",
+    "Option A"
+  );
 
-  const optionB =
-    normalizeOption(
-      battle.optionB as any,
-      'option_b',
-      '⚡'
-    );
-
-  const startsAt =
-    getStartsAt(
-      battle as any
-    );
-
-  const endsAt =
-    getEndsAt(
-      battle as any
-    );
-
-  const ended =
-    isEnded(
-      battle as any
-    );
-
-  const aVotes =
-    Number(optionA.votes || 0);
-
-  const bVotes =
-    Number(optionB.votes || 0);
-
-  const tie =
-    ended &&
-    aVotes === bVotes;
+  const optionB = normalizeOption(
+    battle.optionB || {},
+    "option_b",
+    "Option B"
+  );
 
   return {
     id: battle.id,
 
-    title:
-      battle.title,
+    title: battle.title || battle.question || "Battle",
 
-    category:
-      battle.category ||
-      'Community',
+    question:
+      battle.question ||
+      battle.title ||
+      "Battle",
 
-    description:
-      battle.description ||
-      '',
+    option_a: {
+      ...optionA,
+      imageUrl: optionA.imageUrl || null,
+      image_url: optionA.imageUrl || null,
+      votes: Number(optionA.votes || 0),
+    },
 
-    optionA,
+    option_b: {
+      ...optionB,
+      imageUrl: optionB.imageUrl || null,
+      image_url: optionB.imageUrl || null,
+      votes: Number(optionB.votes || 0),
+    },
 
-    optionB,
-
-    options: [
-      optionA,
-      optionB,
-    ],
-
-    startsAt,
-
-    endsAt,
-
-    starts_at:
-      startsAt
-        ? new Date(
-            startsAt
-          ).toISOString()
+    duration_minutes:
+      typeof battle.durationMinutes === "number"
+        ? battle.durationMinutes
         : null,
 
-    ends_at:
-      endsAt
-        ? new Date(
-            endsAt
-          ).toISOString()
-        : null,
+    starts_at: battle.startsAt || null,
 
-    published:
-      battle.published !== false,
-
-    isEnded: ended,
+    ends_at: battle.endsAt || null,
 
     status:
-      ended
-        ? 'closed'
-        : battle.status ||
-          'active',
+      battle.status === "ended"
+        ? "closed"
+        : battle.status || "active",
 
-    winnerOptionId:
-      tie
-        ? null
-        : battle.winnerOptionId ||
-          calculateWinner(
-            battle as any
-          ),
+    published:
+      typeof battle.published === "boolean"
+        ? battle.published
+        : true,
 
-    isTie: tie,
+    winner_option_id:
+      battle.winnerOptionId ||
+      battle.winner_option_id ||
+      null,
 
-    totalVotes:
-      aVotes + bVotes,
+    is_ended: Boolean(battle.isEnded),
 
-    commentsClosed:
-      ended,
+    created_at:
+      battle.createdAt ||
+      battle.created_at ||
+      new Date().toISOString(),
+
+    updated_at:
+      battle.updatedAt ||
+      battle.updated_at ||
+      new Date().toISOString(),
   };
 }
 
-/* =========================================================
-   HYDRATE
-========================================================= */
+async function fetchDatabaseBattles(): Promise<BattleRecord[]> {
+  const db = getDatabaseClient(Boolean(SUPABASE_SERVICE_ROLE_KEY));
 
-async function hydrateBattles() {
-  if (
-    !isSupabaseConfigured()
-  ) {
-    return;
+  const { data, error } = await db
+    .from("battles")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw new Error(
+      `Failed to load battles from Supabase: ${error.message}`
+    );
   }
 
-  const rows =
-    await fetchSupabaseBattles();
+  return (data || [])
+    .map((row: AnyRecord) => normalizeBattle(row))
+    .filter((battle) => Boolean(battle.id));
+}
 
-  if (
-    !Array.isArray(rows)
-  ) {
-    return;
+/**
+ * IMPORTANT:
+ * Supabase is the single source of truth.
+ *
+ * Old implementation only added DB battles into memory.
+ * Therefore a battle deleted from DB could remain inside
+ * contentStore.battles and come back after refresh.
+ *
+ * This implementation also removes runtime battles that
+ * no longer exist in Supabase.
+ */
+async function hydrateBattles(): Promise<BattleRecord[]> {
+  const databaseBattles = await fetchDatabaseBattles();
+
+  const dbIds = new Set(
+    databaseBattles.map((battle) => battle.id)
+  );
+
+  const runtimeBattles = (contentStore as any).battles;
+
+  if (runtimeBattles instanceof Map) {
+    for (const runtimeId of Array.from(
+      runtimeBattles.keys()
+    )) {
+      if (!dbIds.has(String(runtimeId))) {
+        runtimeBattles.delete(runtimeId);
+      }
+    }
+
+    for (const battle of databaseBattles) {
+      runtimeBattles.set(battle.id, battle);
+    }
+
+    return Array.from(
+      runtimeBattles.values()
+    ) as BattleRecord[];
   }
 
-  for (
-    const raw of rows as AnyRecord[]
-  ) {
-    if (!raw?.id) {
-      continue;
-    }
+  return databaseBattles;
+}
 
-    const id =
-      String(raw.id);
+async function persistBattle(
+  battle: BattleRecord
+): Promise<void> {
+  const db = getDatabaseClient(Boolean(SUPABASE_SERVICE_ROLE_KEY));
 
-    const optionA =
-      normalizeOption(
-        getRawOption(raw, 'A'),
-        'option_a',
-        '🔥'
-      );
+  const row = getBattleDbRow(battle);
 
-    const optionB =
-      normalizeOption(
-        getRawOption(raw, 'B'),
-        'option_b',
-        '⚡'
-      );
+  const { error } = await db
+    .from("battles")
+    .upsert(row, {
+      onConflict: "id",
+    });
 
-    const existing =
-      contentStore.battles.get(
-        id
-      );
-
-    if (existing) {
-      existing.title =
-        raw.title || '';
-
-      existing.category =
-        raw.category ||
-        'Community';
-
-      existing.description =
-        raw.description ||
-        '';
-
-      existing.optionA =
-        optionA as any;
-
-      existing.optionB =
-        optionB as any;
-
-      existing.startsAt =
-        getStartsAt(raw);
-
-      existing.endsAt =
-        getEndsAt(raw);
-
-      existing.published =
-        raw.published !== false;
-
-      existing.status =
-        raw.status ||
-        'active';
-
-      existing.isEnded =
-        raw.isEnded === true ||
-        raw.is_ended === true;
-
-      existing.winnerOptionId =
-        raw.winnerOptionId ||
-        raw.winner_option_id ||
-        undefined;
-
-      continue;
-    }
-
-    const battle =
-      {
-        id,
-
-        title:
-          raw.title || '',
-
-        category:
-          raw.category ||
-          'Community',
-
-        description:
-          raw.description ||
-          '',
-
-        optionA:
-          optionA as any,
-
-        optionB:
-          optionB as any,
-
-        startsAt:
-          getStartsAt(raw),
-
-        endsAt:
-          getEndsAt(raw),
-
-        published:
-          raw.published !== false,
-
-        status:
-          raw.status ||
-          'active',
-
-        isEnded:
-          raw.isEnded === true ||
-          raw.is_ended === true,
-
-        winnerOptionId:
-          raw.winnerOptionId ||
-          raw.winner_option_id ||
-          undefined,
-
-        votedUserEmails:
-          new Set<string>(),
-
-        userVotes:
-          new Map<string, string>(),
-      } as BattleEventStore;
-
-    contentStore.battles.set(
-      id,
-      battle
+  if (error) {
+    throw new Error(
+      `Failed to save battle: ${error.message}`
     );
   }
 }
 
-/* =========================================================
-   SAVE
-========================================================= */
+async function removeBattleFromRuntime(
+  battleId: string
+): Promise<void> {
+  const runtimeBattles = (contentStore as any).battles;
 
-async function persistBattle(
-  battle: BattleEventStore
-) {
-  if (
-    !isSupabaseConfigured()
-  ) {
-    return;
+  if (runtimeBattles instanceof Map) {
+    runtimeBattles.delete(battleId);
   }
 
-  const startsAt =
-    getStartsAt(
-      battle as any
-    );
+  const store = contentStore as any;
 
-  const endsAt =
-    getEndsAt(
-      battle as any
-    );
-
-  if (
-    !startsAt ||
-    !endsAt ||
-    endsAt <= startsAt
-  ) {
-    throw new Error(
-      'Invalid battle start/end time.'
-    );
+  if (typeof store.deleteBattle === "function") {
+    try {
+      await store.deleteBattle(battleId);
+    } catch {
+      // Runtime Map deletion above is already handled.
+    }
   }
 
-  const optionA =
-    normalizeOption(
-      battle.optionA as any,
-      'option_a',
-      '🔥'
-    );
+  if (typeof store.removeBattle === "function") {
+    try {
+      await store.removeBattle(battleId);
+    } catch {
+      // Ignore because the Map has already been cleaned.
+    }
+  }
+}
 
-  const optionB =
-    normalizeOption(
-      battle.optionB as any,
-      'option_b',
-      '⚡'
-    );
+function formatBattle(battle: BattleRecord): AnyRecord {
+  const optionA = normalizeOption(
+    battle.optionA || {},
+    "option_a",
+    "Option A"
+  );
 
-  const { error } =
-    await supabase
-      .from('battles')
-      .upsert(
-        {
-          id:
-            battle.id,
+  const optionB = normalizeOption(
+    battle.optionB || {},
+    "option_b",
+    "Option B"
+  );
 
-          title:
-            battle.title,
+  const ended = isBattleExpired(battle);
 
-          category:
-            battle.category ||
-            'Community',
+  const winnerOptionId =
+    battle.winnerOptionId ||
+    battle.winner_option_id ||
+    (ended ? getWinnerOptionId(battle) : null);
 
-          description:
-            battle.description ||
-            '',
+  const totalVotes =
+    Number(optionA.votes || 0) +
+    Number(optionB.votes || 0);
 
-          option_a:
-            optionA,
+  return {
+    id: battle.id,
 
-          option_b:
-            optionB,
+    title: battle.title || battle.question || "Battle",
 
-          starts_at:
-            new Date(
-              startsAt
-            ).toISOString(),
+    question:
+      battle.question ||
+      battle.title ||
+      "Battle",
 
-          ends_at:
-            new Date(
-              endsAt
-            ).toISOString(),
+    optionA,
+    optionB,
 
-          is_ended:
-            battle.isEnded === true,
+    durationMinutes: battle.durationMinutes,
 
-          status:
-            battle.status ||
-            'active',
+    startsAt: battle.startsAt,
+    endsAt: battle.endsAt,
 
-          published:
-            battle.published !== false,
+    status: ended ? "closed" : battle.status || "active",
 
-          winner_option_id:
-            battle.winnerOptionId ||
-            null,
-        },
-        {
-          onConflict: 'id',
-        }
+    published:
+      typeof battle.published === "boolean"
+        ? battle.published
+        : true,
+
+    isPublished:
+      typeof battle.published === "boolean"
+        ? battle.published
+        : true,
+
+    isEnded: ended,
+
+    winnerOptionId: winnerOptionId || null,
+
+    totalVotes,
+
+    commentsClosed: ended,
+
+    createdAt:
+      battle.createdAt ||
+      battle.created_at,
+
+    updatedAt:
+      battle.updatedAt ||
+      battle.updated_at,
+  };
+}
+
+async function finalizeExpiredBattles(
+  battles: BattleRecord[]
+): Promise<void> {
+  for (const battle of battles) {
+    if (!isBattleExpired(battle)) {
+      continue;
+    }
+
+    const changed = finalizeBattle(battle);
+
+    if (!changed) {
+      continue;
+    }
+
+    try {
+      await persistBattle(battle);
+    } catch (error) {
+      console.error(
+        "[BATTLE] Failed to persist expired battle:",
+        error
       );
-
-  if (error) {
-    throw error;
+    }
   }
 }
 
 /* =========================================================
    GET
-========================================================= */
+   ========================================================= */
 
-export async function GET(
-  req: NextRequest
-) {
+export async function GET(req: NextRequest) {
   try {
-    const isAdmin =
-      await verifyAdminRequestAsync(
-        req
-      );
+    const adminResult =
+      await verifyAdminRequestAsync(req);
 
-    await hydrateBattles();
+    const isAdmin = Boolean(
+      adminResult?.authorized ||
+        adminResult?.isAdmin ||
+        adminResult?.user?.isAdmin
+    );
 
-    for (
-      const battle of
-      contentStore.battles.values()
-    ) {
-      if (
-        isExpired(
-          battle as any
-        )
-      ) {
-        finalizeBattle(
-          battle
-        );
+    const battles = await hydrateBattles();
 
-        try {
-          await persistBattle(
-            battle
-          );
-        } catch (error) {
-          console.error(
-            'Failed to finalize expired battle:',
-            error
-          );
+    await finalizeExpiredBattles(battles);
+
+    const refreshedBattles = await hydrateBattles();
+
+    const visibleBattles = refreshedBattles
+      .filter((battle) => {
+        if (isAdmin) {
+          return true;
         }
-      }
+
+        const published =
+          typeof battle.published === "boolean"
+            ? battle.published
+            : true;
+
+        return published;
+      })
+      .map(formatBattle);
+
+    return jsonResponse({
+      success: true,
+      battles: visibleBattles,
+    });
+  } catch (error: any) {
+    console.error(
+      "[BATTLE GET ERROR]",
+      error
+    );
+
+    return jsonResponse(
+      {
+        success: false,
+        error:
+          error?.message ||
+          "Failed to load battles.",
+      },
+      500
+    );
+  }
+}
+
+/* =========================================================
+   POST - CREATE BATTLE
+   ========================================================= */
+
+export async function POST(req: NextRequest) {
+  try {
+    const adminResult =
+      await verifyAdminRequestAsync(req);
+
+    const isAdmin = Boolean(
+      adminResult?.authorized ||
+        adminResult?.isAdmin ||
+        adminResult?.user?.isAdmin
+    );
+
+    if (!isAdmin) {
+      return jsonResponse(
+        {
+          success: false,
+          error: "Admin access required.",
+        },
+        403
+      );
+    }
+
+    const body = await req.json();
+
+    const title =
+      cleanString(body.title) ||
+      cleanString(body.question) ||
+      "Battle";
+
+    const question =
+      cleanString(body.question) ||
+      title;
+
+    const optionA = normalizeOption(
+      body.optionA ??
+        body.option_a ??
+        body.a ??
+        {},
+      "option_a",
+      "Option A"
+    );
+
+    const optionB = normalizeOption(
+      body.optionB ??
+        body.option_b ??
+        body.b ??
+        {},
+      "option_b",
+      "Option B"
+    );
+
+    const durationMinutes =
+      getDurationMinutes(body);
+
+    const startsAt =
+      getStartTime(body);
+
+    const endsAt =
+      cleanString(body.endsAt) ||
+      cleanString(body.ends_at)
+        ? new Date(
+            cleanString(body.endsAt) ||
+              cleanString(body.ends_at)
+          ).toISOString()
+        : calculateEndTime(
+            startsAt,
+            durationMinutes
+          );
+
+    const battleId =
+      cleanString(body.id) ||
+      `battle_${crypto.randomUUID()}`;
+
+    const published =
+      typeof body.published === "boolean"
+        ? body.published
+        : typeof body.isPublished === "boolean"
+          ? body.isPublished
+          : true;
+
+    const battle: BattleRecord = {
+      id: battleId,
+
+      title,
+      question,
+
+      optionA: {
+        ...optionA,
+        votes: 0,
+      },
+
+      optionB: {
+        ...optionB,
+        votes: 0,
+      },
+
+      durationMinutes,
+
+      startsAt,
+      endsAt,
+
+      status: "active",
+
+      published,
+      isPublished: published,
+
+      isEnded: false,
+
+      winnerOptionId: undefined,
+      winner_option_id: null,
+
+      totalVotes: 0,
+
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    await persistBattle(battle);
+
+    const runtimeBattles =
+      (contentStore as any).battles;
+
+    if (runtimeBattles instanceof Map) {
+      runtimeBattles.set(
+        battle.id,
+        battle
+      );
+    }
+
+    return jsonResponse(
+      {
+        success: true,
+        battle: formatBattle(battle),
+      },
+      201
+    );
+  } catch (error: any) {
+    console.error(
+      "[BATTLE POST ERROR]",
+      error
+    );
+
+    return jsonResponse(
+      {
+        success: false,
+        error:
+          error?.message ||
+          "Failed to create battle.",
+      },
+      500
+    );
+  }
+}
+
+/* =========================================================
+   PUT - UPDATE BATTLE
+   ========================================================= */
+
+export async function PUT(req: NextRequest) {
+  try {
+    const adminResult =
+      await verifyAdminRequestAsync(req);
+
+    const isAdmin = Boolean(
+      adminResult?.authorized ||
+        adminResult?.isAdmin ||
+        adminResult?.user?.isAdmin
+    );
+
+    if (!isAdmin) {
+      return jsonResponse(
+        {
+          success: false,
+          error: "Admin access required.",
+        },
+        403
+      );
+    }
+
+    const body = await req.json();
+
+    const battleId =
+      cleanString(body.id) ||
+      cleanString(body.battleId) ||
+      cleanString(body.battle_id);
+
+    if (!battleId) {
+      return jsonResponse(
+        {
+          success: false,
+          error: "Battle ID is required.",
+        },
+        400
+      );
     }
 
     const battles =
-      Array.from(
-        contentStore.battles.values()
-      )
-        .filter((battle) =>
-          isAdmin
-            ? true
-            : battle.published !== false
-        )
-        .map(formatBattle)
-        .sort(
-          (a, b) =>
-            b.startsAt -
-            a.startsAt
-        );
-
-    return NextResponse.json(
-      {
-        success: true,
-
-        battles,
-
-        battle:
-          battles[0] ||
-          null,
-
-        isAdmin,
-      },
-      {
-        headers: {
-          'Cache-Control':
-            'no-store, no-cache, must-revalidate, proxy-revalidate',
-
-          Pragma:
-            'no-cache',
-
-          Expires:
-            '0',
-        },
-      }
-    );
-  } catch (error: any) {
-    console.error(
-      'Battle GET error:',
-      error
-    );
-
-    return NextResponse.json(
-      {
-        success: false,
-        error:
-          'Failed to load battles.',
-      },
-      {
-        status: 500,
-      }
-    );
-  }
-}
-
-/* =========================================================
-   POST
-========================================================= */
-
-export async function POST(
-  req: NextRequest
-) {
-  const isAdmin =
-    await verifyAdminRequestAsync(
-      req
-    );
-
-  if (!isAdmin) {
-    return NextResponse.json(
-      {
-        success: false,
-        error:
-          'Unauthorized.',
-      },
-      {
-        status: 403,
-      }
-    );
-  }
-
-  try {
-    const body =
-      await req.json();
-
-    const title =
-      typeof body.title === 'string'
-        ? body.title.trim()
-        : '';
-
-    const category =
-      typeof body.category === 'string'
-        ? body.category.trim()
-        : 'Community';
-
-    const description =
-      typeof body.description === 'string'
-        ? body.description.trim()
-        : '';
-
-    const optionAInput =
-      body.optionA ||
-      body.option_a ||
-      body.options?.[0] ||
-      {};
-
-    const optionBInput =
-      body.optionB ||
-      body.option_b ||
-      body.options?.[1] ||
-      {};
-
-    const labelA =
-      getOptionLabel(
-        optionAInput
-      );
-
-    const labelB =
-      getOptionLabel(
-        optionBInput
-      );
-
-    if (
-      !title ||
-      !labelA ||
-      !labelB
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-
-          error:
-            'Battle title and both participant names are required.',
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    const startsAt =
-      toNumber(
-        body.startsAt
-      ) ||
-      toNumber(
-        body.starts_at
-      ) ||
-      Date.now();
-
-    const endsAt =
-      toNumber(
-        body.endsAt
-      ) ||
-      toNumber(
-        body.ends_at
-      ) ||
-      startsAt +
-        getDurationMs(body);
-
-    if (
-      endsAt <= startsAt
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-
-          error:
-            'Battle end time must be after start time.',
-        },
-        {
-          status: 400,
-        }
-      );
-    }
+      await hydrateBattles();
 
     const battle =
-      {
-        id:
-          `battle_${randomUUID()}`,
-
-        title,
-
-        category:
-          category ||
-          'Community',
-
-        description,
-
-        optionA:
-          normalizeOption(
-            {
-              ...optionAInput,
-              label: labelA,
-            },
-            'option_a',
-            '🔥'
-          ) as any,
-
-        optionB:
-          normalizeOption(
-            {
-              ...optionBInput,
-              label: labelB,
-            },
-            'option_b',
-            '⚡'
-          ) as any,
-
-        startsAt,
-
-        endsAt,
-
-        published:
-          body.published !== false,
-
-        isEnded:
-          false,
-
-        status:
-          'active',
-
-        winnerOptionId:
-          undefined,
-
-        votedUserEmails:
-          new Set<string>(),
-
-        userVotes:
-          new Map<string, string>(),
-      } as BattleEventStore;
-
-    await persistBattle(
-      battle
-    );
-
-    contentStore.battles.set(
-      battle.id,
-      battle
-    );
-
-    return NextResponse.json(
-      {
-        success: true,
-
-        battle:
-          formatBattle(
-            battle
-          ),
-      },
-      {
-        status: 201,
-      }
-    );
-  } catch (error: any) {
-    console.error(
-      'Battle POST error:',
-      error
-    );
-
-    return NextResponse.json(
-      {
-        success: false,
-
-        error:
-          'Failed to create battle.',
-
-        details:
-          process.env.NODE_ENV ===
-          'development'
-            ? error?.message
-            : undefined,
-      },
-      {
-        status: 500,
-      }
-    );
-  }
-}
-
-/* =========================================================
-   PUT
-========================================================= */
-
-export async function PUT(
-  req: NextRequest
-) {
-  const isAdmin =
-    await verifyAdminRequestAsync(
-      req
-    );
-
-  if (!isAdmin) {
-    return NextResponse.json(
-      {
-        success: false,
-        error:
-          'Unauthorized.',
-      },
-      {
-        status: 403,
-      }
-    );
-  }
-
-  try {
-    await hydrateBattles();
-
-    const body =
-      await req.json();
-
-    const id =
-      typeof body.id === 'string'
-        ? body.id.trim()
-        : '';
-
-    if (!id) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            'Battle id is required.',
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    const battle =
-      contentStore.battles.get(
-        id
+      battles.find(
+        (item) => item.id === battleId
       );
 
     if (!battle) {
-      return NextResponse.json(
+      return jsonResponse(
         {
           success: false,
-          error:
-            'Battle not found.',
+          error: "Battle not found.",
         },
-        {
-          status: 404,
-        }
+        404
       );
     }
 
-    const action =
-      typeof body.action === 'string'
-        ? body.action.trim()
-        : '';
-
     if (
-      action === 'toggle_publish'
+      typeof body.title === "string" &&
+      cleanString(body.title)
     ) {
-      battle.published =
-        battle.published === false;
+      battle.title =
+        cleanString(body.title);
     }
 
     if (
-      action === 'start'
+      typeof body.question === "string" &&
+      cleanString(body.question)
     ) {
-      const duration =
-        Math.max(
-          60 * 1000,
-          getEndsAt(
-            battle as any
-          ) -
-            getStartsAt(
-              battle as any
-            )
+      battle.question =
+        cleanString(body.question);
+    }
+
+    if (
+      body.optionA ||
+      body.option_a
+    ) {
+      const incoming =
+        normalizeOption(
+          body.optionA ??
+            body.option_a,
+          battle.optionA.id,
+          battle.optionA.name
         );
 
-      battle.startsAt =
-        Date.now();
+      battle.optionA = {
+        ...battle.optionA,
+        ...incoming,
 
-      battle.endsAt =
-        battle.startsAt +
+        imageUrl:
+          incoming.imageUrl ||
+          battle.optionA.imageUrl,
+
+        image_url:
+          incoming.imageUrl ||
+          battle.optionA.imageUrl,
+
+        votes:
+          battle.optionA.votes || 0,
+      };
+    }
+
+    if (
+      body.optionB ||
+      body.option_b
+    ) {
+      const incoming =
+        normalizeOption(
+          body.optionB ??
+            body.option_b,
+          battle.optionB.id,
+          battle.optionB.name
+        );
+
+      battle.optionB = {
+        ...battle.optionB,
+        ...incoming,
+
+        imageUrl:
+          incoming.imageUrl ||
+          battle.optionB.imageUrl,
+
+        image_url:
+          incoming.imageUrl ||
+          battle.optionB.imageUrl,
+
+        votes:
+          battle.optionB.votes || 0,
+      };
+    }
+
+    if (
+      typeof body.published === "boolean"
+    ) {
+      battle.published =
+        body.published;
+
+      battle.isPublished =
+        body.published;
+    }
+
+    if (
+      typeof body.isPublished === "boolean"
+    ) {
+      battle.published =
+        body.isPublished;
+
+      battle.isPublished =
+        body.isPublished;
+    }
+
+    if (
+      body.durationMinutes !== undefined ||
+      body.duration_minutes !== undefined
+    ) {
+      const duration =
+        getDurationMinutes(body);
+
+      battle.durationMinutes =
         duration;
+
+      if (
+        body.endsAt === undefined &&
+        body.ends_at === undefined
+      ) {
+        const start =
+          battle.startsAt ||
+          new Date().toISOString();
+
+        battle.endsAt =
+          calculateEndTime(
+            start,
+            duration
+          );
+
+        battle.ends_at =
+          battle.endsAt;
+      }
+    }
+
+    if (
+      body.startsAt ||
+      body.starts_at
+    ) {
+      const startsAt =
+        getStartTime(body);
+
+      battle.startsAt =
+        startsAt;
+
+      battle.starts_at =
+        startsAt;
+    }
+
+    if (
+      body.endsAt ||
+      body.ends_at
+    ) {
+      const rawEnd =
+        cleanString(
+          body.endsAt ||
+            body.ends_at
+        );
+
+      const endDate =
+        new Date(rawEnd);
+
+      if (!Number.isNaN(endDate.getTime())) {
+        battle.endsAt =
+          endDate.toISOString();
+
+        battle.ends_at =
+          battle.endsAt;
+      }
+    }
+
+    if (
+      body.status === "closed" ||
+      body.status === "ended"
+    ) {
+      battle.status =
+        "closed";
+
+      battle.isEnded =
+        true;
+
+      battle.winnerOptionId =
+        getWinnerOptionId(battle) ||
+        undefined;
+
+      battle.winner_option_id =
+        battle.winnerOptionId ||
+        null;
+    }
+
+    if (
+      body.status === "active"
+    ) {
+      battle.status =
+        "active";
 
       battle.isEnded =
         false;
 
-      battle.status =
-        'active';
-
       battle.winnerOptionId =
         undefined;
+
+      battle.winner_option_id =
+        null;
     }
 
-    if (
-      action === 'end' ||
-      action === 'close'
-    ) {
-      battle.isEnded =
-        true;
+    finalizeBattle(battle);
 
-      battle.status =
-        'closed';
+    battle.totalVotes =
+      Number(battle.optionA.votes || 0) +
+      Number(battle.optionB.votes || 0);
 
-      battle.endsAt =
-        Date.now();
+    battle.updatedAt =
+      new Date().toISOString();
 
-      battle.winnerOptionId =
-        calculateWinner(
-          battle as any
-        ) || undefined;
+    battle.updated_at =
+      battle.updatedAt;
+
+    await persistBattle(battle);
+
+    const runtimeBattles =
+      (contentStore as any).battles;
+
+    if (runtimeBattles instanceof Map) {
+      runtimeBattles.set(
+        battle.id,
+        battle
+      );
     }
 
-    const updates =
-      body.updates &&
-      typeof body.updates === 'object'
-        ? body.updates
-        : {};
-
-    if (
-      typeof updates.title === 'string'
-    ) {
-      battle.title =
-        updates.title.trim();
-    }
-
-    if (
-      typeof updates.description === 'string'
-    ) {
-      battle.description =
-        updates.description.trim();
-    }
-
-    if (
-      typeof updates.category === 'string'
-    ) {
-      battle.category =
-        updates.category.trim();
-    }
-
-    if (
-      typeof updates.published === 'boolean'
-    ) {
-      battle.published =
-        updates.published;
-    }
-
-    if (
-      updates.optionA &&
-      typeof updates.optionA === 'object'
-    ) {
-      const current =
-        normalizeOption(
-          battle.optionA as any,
-          'option_a',
-          '🔥'
-        );
-
-      const incoming =
-        updates.optionA;
-
-      const label =
-        getOptionLabel(
-          incoming
-        ) ||
-        current.label;
-
-      battle.optionA =
-        {
-          ...current,
-          ...incoming,
-          id: current.id,
-          label,
-          name: label,
-          imageUrl:
-            getImageUrl(
-              incoming
-            ) ||
-            current.imageUrl,
-          votes:
-            current.votes,
-        } as any;
-    }
-
-    if (
-      updates.optionB &&
-      typeof updates.optionB === 'object'
-    ) {
-      const current =
-        normalizeOption(
-          battle.optionB as any,
-          'option_b',
-          '⚡'
-        );
-
-      const incoming =
-        updates.optionB;
-
-      const label =
-        getOptionLabel(
-          incoming
-        ) ||
-        current.label;
-
-      battle.optionB =
-        {
-          ...current,
-          ...incoming,
-          id: current.id,
-          label,
-          name: label,
-          imageUrl:
-            getImageUrl(
-              incoming
-            ) ||
-            current.imageUrl,
-          votes:
-            current.votes,
-        } as any;
-    }
-
-    finalizeBattle(
-      battle
-    );
-
-    await persistBattle(
-      battle
-    );
-
-    return NextResponse.json(
-      {
-        success: true,
-
-        battle:
-          formatBattle(
-            battle
-          ),
-      }
-    );
+    return jsonResponse({
+      success: true,
+      battle: formatBattle(battle),
+    });
   } catch (error: any) {
     console.error(
-      'Battle PUT error:',
+      "[BATTLE PUT ERROR]",
       error
     );
 
-    return NextResponse.json(
+    return jsonResponse(
       {
         success: false,
-
         error:
-          'Failed to update battle.',
-
-        details:
-          process.env.NODE_ENV ===
-          'development'
-            ? error?.message
-            : undefined,
+          error?.message ||
+          "Failed to update battle.",
       },
-      {
-        status: 500,
-      }
+      500
     );
   }
 }
 
 /* =========================================================
-   DELETE — PERMANENT BATTLE DELETE
-========================================================= */
+   DELETE - PERMANENTLY DELETE BATTLE
+   ========================================================= */
 
 export async function DELETE(
   req: NextRequest
 ) {
   try {
-    const isAdmin =
-      await verifyAdminRequestAsync(
-        req
-      );
+    const adminResult =
+      await verifyAdminRequestAsync(req);
+
+    const isAdmin = Boolean(
+      adminResult?.authorized ||
+        adminResult?.isAdmin ||
+        adminResult?.user?.isAdmin
+    );
 
     if (!isAdmin) {
-      return NextResponse.json(
+      return jsonResponse(
         {
           success: false,
-
-          error:
-            'Unauthorized: Only admin can delete battles.',
+          error: "Admin access required.",
         },
-        {
-          status: 403,
-        }
+        403
       );
     }
+
+    const body =
+      await req.json().catch(
+        () => ({})
+      );
 
     const url =
       new URL(req.url);
 
     const battleId =
-      url.searchParams
-        .get('id')
-        ?.trim() || '';
+      cleanString(body.id) ||
+      cleanString(body.battleId) ||
+      cleanString(body.battle_id) ||
+      cleanString(
+        url.searchParams.get("id")
+      ) ||
+      cleanString(
+        url.searchParams.get("battleId")
+      );
 
     if (!battleId) {
-      return NextResponse.json(
+      return jsonResponse(
         {
           success: false,
-
-          error:
-            'Battle id is required.',
+          error: "Battle ID is required.",
         },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    console.log(
-      '[BATTLE DELETE] Requested:',
-      battleId
-    );
-
-    if (
-      !isSupabaseConfigured()
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-
-          error:
-            'Supabase is not configured. Battle cannot be permanently deleted.',
-        },
-        {
-          status: 500,
-        }
+        400
       );
     }
 
     /*
      * IMPORTANT:
+     * DELETE MUST use service-role client.
      *
-     * Delete child rows first.
-     * This prevents foreign-key problems.
+     * The normal browser/anon Supabase client can be blocked
+     * by RLS even though the application knows the requester
+     * is an admin.
      */
-
-    const comments =
-      await supabase
-        .from('battle_comments')
-        .delete()
-        .eq(
-          'battle_id',
-          battleId
-        );
-
-    if (comments.error) {
-      console.error(
-        '[BATTLE DELETE] Comments delete failed:',
-        comments.error
-      );
-
-      return NextResponse.json(
-        {
-          success: false,
-
-          error:
-            'Could not delete battle comments.',
-
-          details:
-            comments.error.message,
-        },
-        {
-          status: 500,
-        }
-      );
-    }
-
-    const votes =
-      await supabase
-        .from('battle_votes')
-        .delete()
-        .eq(
-          'battle_id',
-          battleId
-        );
-
-    if (votes.error) {
-      console.error(
-        '[BATTLE DELETE] Votes delete failed:',
-        votes.error
-      );
-
-      return NextResponse.json(
-        {
-          success: false,
-
-          error:
-            'Could not delete battle votes.',
-
-          details:
-            votes.error.message,
-        },
-        {
-          status: 500,
-        }
-      );
-    }
+    const db =
+      getAdminDatabaseClient();
 
     /*
-     * NOW delete the actual battle.
+     * First delete comments.
      */
-
-    const battleDelete =
-      await supabase
-        .from('battles')
-        .delete()
-        .eq(
-          'id',
-          battleId
-        )
-        .select('id');
-
-    if (
-      battleDelete.error
-    ) {
-      console.error(
-        '[BATTLE DELETE] Battle delete failed:',
-        battleDelete.error
-      );
-
-      return NextResponse.json(
-        {
-          success: false,
-
-          error:
-            'Battle could not be deleted from database.',
-
-          details:
-            battleDelete.error.message,
-        },
-        {
-          status: 500,
-        }
-      );
-    }
-
-    /*
-     * VERY IMPORTANT:
-     *
-     * If DELETE affected zero rows,
-     * do not pretend it succeeded.
-     */
-
-    const deletedRows =
-      battleDelete.data || [];
-
-    if (
-      deletedRows.length === 0
-    ) {
-      console.error(
-        '[BATTLE DELETE] Zero rows deleted:',
+    const {
+      error: commentsError,
+    } = await db
+      .from("battle_comments")
+      .delete()
+      .eq(
+        "battle_id",
         battleId
       );
 
-      return NextResponse.json(
-        {
-          success: false,
-
-          error:
-            'Battle was not deleted. Database returned zero deleted rows.',
-        },
-        {
-          status: 404,
-        }
+    if (commentsError) {
+      throw new Error(
+        `Failed to delete battle comments: ${commentsError.message}`
       );
     }
 
     /*
-     * Remove from server runtime too.
+     * Then delete votes.
      */
+    const {
+      error: votesError,
+    } = await db
+      .from("battle_votes")
+      .delete()
+      .eq(
+        "battle_id",
+        battleId
+      );
 
-    contentStore.battles.delete(
+    if (votesError) {
+      throw new Error(
+        `Failed to delete battle votes: ${votesError.message}`
+      );
+    }
+
+    /*
+     * Delete the actual battle.
+     *
+     * select("id") allows us to verify exactly what
+     * Supabase deleted.
+     */
+    const {
+      data: deletedRows,
+      error: battleDeleteError,
+    } = await db
+      .from("battles")
+      .delete()
+      .eq(
+        "id",
+        battleId
+      )
+      .select("id");
+
+    if (battleDeleteError) {
+      throw new Error(
+        `Failed to delete battle: ${battleDeleteError.message}`
+      );
+    }
+
+    /*
+     * IMPORTANT:
+     * Even if DB row was already deleted manually,
+     * remove the runtime copy so it cannot continue
+     * appearing in the current server process.
+     */
+    await removeBattleFromRuntime(
       battleId
     );
 
     /*
-     * Verify that database no longer
-     * contains the battle.
+     * Verify that the battle is REALLY gone from DB.
      */
-
-    const verification =
-      await supabase
-        .from('battles')
-        .select('id')
-        .eq(
-          'id',
-          battleId
-        )
-        .maybeSingle();
-
-    if (
-      verification.error
-    ) {
-      console.error(
-        '[BATTLE DELETE] Verification failed:',
-        verification.error
-      );
-
-      return NextResponse.json(
-        {
-          success: false,
-
-          error:
-            'Battle delete verification failed.',
-
-          details:
-            verification.error.message,
-        },
-        {
-          status: 500,
-        }
-      );
-    }
-
-    if (
-      verification.data
-    ) {
-      console.error(
-        '[BATTLE DELETE] Battle still exists:',
+    const {
+      data: remainingBattle,
+      error: verifyError,
+    } = await db
+      .from("battles")
+      .select("id")
+      .eq(
+        "id",
         battleId
-      );
+      )
+      .maybeSingle();
 
-      return NextResponse.json(
-        {
-          success: false,
-
-          error:
-            'Battle still exists in database after delete.',
-        },
-        {
-          status: 500,
-        }
+    if (verifyError) {
+      throw new Error(
+        `Battle deletion verification failed: ${verifyError.message}`
       );
     }
 
-    console.log(
-      '[BATTLE DELETE] Successfully deleted:',
-      battleId
-    );
-
-    return NextResponse.json(
-      {
-        success: true,
-
-        deletedId:
-          battleId,
-
-        message:
-          'Battle permanently deleted.',
-      },
-      {
-        status: 200,
-
-        headers: {
-          'Cache-Control':
-            'no-store, no-cache, must-revalidate, proxy-revalidate',
-
-          Pragma:
-            'no-cache',
-
-          Expires:
-            '0',
+    if (remainingBattle) {
+      return jsonResponse(
+        {
+          success: false,
+          error:
+            "Battle was not completely deleted from Supabase.",
         },
-      }
-    );
+        500
+      );
+    }
+
+    const deleted =
+      Array.isArray(deletedRows) &&
+      deletedRows.length > 0;
+
+    return jsonResponse({
+      success: true,
+
+      message: deleted
+        ? "Battle permanently deleted."
+        : "Battle was already absent from the database and has been removed from runtime.",
+
+      deleted: true,
+
+      battleId,
+    });
   } catch (error: any) {
     console.error(
-      '[BATTLE DELETE] Fatal error:',
+      "[BATTLE DELETE ERROR]",
       error
     );
 
-    return NextResponse.json(
+    return jsonResponse(
       {
         success: false,
 
         error:
-          'Failed to permanently delete battle.',
-
-        details:
-          process.env.NODE_ENV ===
-          'development'
-            ? error?.message
-            : undefined,
+          error?.message ||
+          "Failed to delete battle.",
       },
-      {
-        status: 500,
-      }
+      500
     );
   }
 }
