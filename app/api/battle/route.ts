@@ -1,4 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+from pathlib import Path
+
+code = r'''import { NextRequest, NextResponse } from "next/server";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import crypto from "node:crypto";
 
@@ -13,11 +15,6 @@ const SUPABASE_URL =
   process.env.NEXT_PUBLIC_SUPABASE_URL ||
   process.env.SUPABASE_URL ||
   "https://zlngcbefvdtbihndaeun.supabase.co";
-
-const SUPABASE_ANON_KEY =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  process.env.SUPABASE_ANON_KEY ||
-  "sb_publishable_JxGddMQ5KqRFTANuZG2TGg_I05TTskS";
 
 const SUPABASE_SERVICE_ROLE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY ||
@@ -38,34 +35,24 @@ type BattleRecord = {
   id: string;
   title?: string;
   question?: string;
-
   optionA: BattleOption;
   optionB: BattleOption;
-
   option_a?: BattleOption;
   option_b?: BattleOption;
-
   durationMinutes?: number;
-
   startsAt?: string;
   endsAt?: string;
-
   starts_at?: string;
   ends_at?: string;
-
   status?: string;
   published?: boolean;
   isPublished?: boolean;
-
   isEnded?: boolean;
   winnerOptionId?: string;
   winner_option_id?: string | null;
-
   totalVotes?: number;
-
   createdAt?: string;
   created_at?: string;
-
   updatedAt?: string;
   updated_at?: string;
 };
@@ -114,8 +101,7 @@ function jsonResponse(data: any, status = 200) {
 }
 
 function cleanString(value: any): string {
-  if (typeof value !== "string") return "";
-  return value.trim();
+  return typeof value === "string" ? value.trim() : "";
 }
 
 function getImageUrl(option: AnyRecord): string {
@@ -222,25 +208,20 @@ function normalizeBattle(row: AnyRecord): BattleRecord {
     cleanString(row.updatedAt) ||
     createdAt;
 
-  /*
-   * FIX:
-   * endsAt is optional, therefore never compare it directly
-   * with Date.now().
-   */
+  const endTimestamp = endsAt
+    ? new Date(endsAt).getTime()
+    : NaN;
+
   const isEnded =
     status === "closed" ||
     status === "ended" ||
     Boolean(row.is_ended) ||
     Boolean(row.isEnded) ||
-    Boolean(
-      endsAt &&
-        Number.isFinite(new Date(endsAt).getTime()) &&
-        new Date(endsAt).getTime() <= Date.now()
-    );
+    (Number.isFinite(endTimestamp) &&
+      endTimestamp <= Date.now());
 
   return {
     ...row,
-
     id: cleanString(row.id),
 
     title:
@@ -255,7 +236,6 @@ function normalizeBattle(row: AnyRecord): BattleRecord {
 
     optionA,
     optionB,
-
     option_a: optionA,
     option_b: optionB,
 
@@ -263,7 +243,6 @@ function normalizeBattle(row: AnyRecord): BattleRecord {
 
     startsAt: startsAt || undefined,
     endsAt: endsAt || undefined,
-
     starts_at: startsAt || undefined,
     ends_at: endsAt || undefined,
 
@@ -274,12 +253,15 @@ function normalizeBattle(row: AnyRecord): BattleRecord {
 
     isEnded,
 
-    winnerOptionId: winnerOptionId || undefined,
-    winner_option_id: winnerOptionId || null,
+    winnerOptionId:
+      winnerOptionId || undefined,
+
+    winner_option_id:
+      winnerOptionId || null,
 
     totalVotes:
-      (typeof optionA.votes === "number" ? optionA.votes : 0) +
-      (typeof optionB.votes === "number" ? optionB.votes : 0),
+      Number(optionA.votes || 0) +
+      Number(optionB.votes || 0),
 
     createdAt,
     created_at: createdAt,
@@ -338,7 +320,11 @@ function calculateEndTime(
   ).toISOString();
 }
 
-function getEndTime(body: AnyRecord, startsAt: string, durationMinutes: number): string {
+function getEndTime(
+  body: AnyRecord,
+  startsAt: string,
+  durationMinutes: number
+): string {
   const rawEnd =
     cleanString(body.endsAt) ||
     cleanString(body.ends_at);
@@ -351,29 +337,39 @@ function getEndTime(body: AnyRecord, startsAt: string, durationMinutes: number):
     }
   }
 
-  return calculateEndTime(startsAt, durationMinutes);
+  return calculateEndTime(
+    startsAt,
+    durationMinutes
+  );
 }
 
-function isBattleExpired(battle: BattleRecord): boolean {
-  if (battle.status === "closed" || battle.status === "ended") {
+function isBattleExpired(
+  battle: BattleRecord
+): boolean {
+  if (
+    battle.status === "closed" ||
+    battle.status === "ended" ||
+    battle.isEnded
+  ) {
     return true;
   }
 
-  if (battle.isEnded) {
-    return true;
-  }
+  const endsAt = battle.endsAt;
 
-  if (!battle.endsAt) {
+  if (
+    endsAt == null ||
+    endsAt === ""
+  ) {
     return false;
   }
 
-  const end = new Date(battle.endsAt).getTime();
+  const endTimestamp =
+    new Date(endsAt).getTime();
 
-  if (!Number.isFinite(end)) {
-    return false;
-  }
-
-  return end <= Date.now();
+  return (
+    Number.isFinite(endTimestamp) &&
+    endTimestamp <= Date.now()
+  );
 }
 
 function getWinnerOptionId(
@@ -403,7 +399,8 @@ function finalizeBattle(
     return false;
   }
 
-  const winner = getWinnerOptionId(battle);
+  const winner =
+    getWinnerOptionId(battle);
 
   battle.status = "closed";
   battle.isEnded = true;
@@ -415,8 +412,12 @@ function finalizeBattle(
     winner;
 
   battle.totalVotes =
-    Number(battle.optionA?.votes || 0) +
-    Number(battle.optionB?.votes || 0);
+    Number(
+      battle.optionA?.votes || 0
+    ) +
+    Number(
+      battle.optionB?.votes || 0
+    );
 
   battle.updatedAt =
     new Date().toISOString();
@@ -430,17 +431,19 @@ function finalizeBattle(
 function getBattleDbRow(
   battle: BattleRecord
 ): AnyRecord {
-  const optionA = normalizeOption(
-    battle.optionA || {},
-    "option_a",
-    "Option A"
-  );
+  const optionA =
+    normalizeOption(
+      battle.optionA || {},
+      "option_a",
+      "Option A"
+    );
 
-  const optionB = normalizeOption(
-    battle.optionB || {},
-    "option_b",
-    "Option B"
-  );
+  const optionB =
+    normalizeOption(
+      battle.optionB || {},
+      "option_b",
+      "Option B"
+    );
 
   return {
     id: battle.id,
@@ -476,7 +479,8 @@ function getBattleDbRow(
     },
 
     duration_minutes:
-      typeof battle.durationMinutes === "number"
+      typeof battle.durationMinutes ===
+      "number"
         ? battle.durationMinutes
         : null,
 
@@ -492,7 +496,8 @@ function getBattleDbRow(
         : battle.status || "active",
 
     published:
-      typeof battle.published === "boolean"
+      typeof battle.published ===
+      "boolean"
         ? battle.published
         : true,
 
@@ -521,7 +526,9 @@ async function fetchDatabaseBattles(): Promise<
 > {
   const db =
     getDatabaseClient(
-      Boolean(SUPABASE_SERVICE_ROLE_KEY)
+      Boolean(
+        SUPABASE_SERVICE_ROLE_KEY
+      )
     );
 
   const {
@@ -564,10 +571,14 @@ async function hydrateBattles(): Promise<
   const runtimeBattles =
     (contentStore as any).battles;
 
-  if (runtimeBattles instanceof Map) {
-    for (const runtimeId of Array.from(
-      runtimeBattles.keys()
-    )) {
+  if (
+    runtimeBattles instanceof Map
+  ) {
+    for (
+      const runtimeId of Array.from(
+        runtimeBattles.keys()
+      )
+    ) {
       if (
         !dbIds.has(
           String(runtimeId)
@@ -579,7 +590,9 @@ async function hydrateBattles(): Promise<
       }
     }
 
-    for (const battle of databaseBattles) {
+    for (
+      const battle of databaseBattles
+    ) {
       runtimeBattles.set(
         battle.id,
         battle
@@ -599,7 +612,9 @@ async function persistBattle(
 ): Promise<void> {
   const db =
     getDatabaseClient(
-      Boolean(SUPABASE_SERVICE_ROLE_KEY)
+      Boolean(
+        SUPABASE_SERVICE_ROLE_KEY
+      )
     );
 
   const row =
@@ -626,7 +641,9 @@ async function removeBattleFromRuntime(
   const runtimeBattles =
     (contentStore as any).battles;
 
-  if (runtimeBattles instanceof Map) {
+  if (
+    runtimeBattles instanceof Map
+  ) {
     runtimeBattles.delete(
       battleId
     );
@@ -680,14 +697,20 @@ function formatBattle(
     );
 
   const ended =
-    isBattleExpired(battle);
+    isBattleExpired(
+      battle
+    );
 
   const winnerOptionId =
     battle.winnerOptionId ||
     battle.winner_option_id ||
-    (ended
-      ? getWinnerOptionId(battle)
-      : null);
+    (
+      ended
+        ? getWinnerOptionId(
+            battle
+          )
+        : null
+    );
 
   const totalVotes =
     Number(optionA.votes || 0) +
@@ -725,12 +748,14 @@ function formatBattle(
           "active",
 
     published:
-      typeof battle.published === "boolean"
+      typeof battle.published ===
+      "boolean"
         ? battle.published
         : true,
 
     isPublished:
-      typeof battle.published === "boolean"
+      typeof battle.published ===
+      "boolean"
         ? battle.published
         : true,
 
@@ -758,13 +783,21 @@ function formatBattle(
 async function finalizeExpiredBattles(
   battles: BattleRecord[]
 ): Promise<void> {
-  for (const battle of battles) {
-    if (!isBattleExpired(battle)) {
+  for (
+    const battle of battles
+  ) {
+    if (
+      !isBattleExpired(
+        battle
+      )
+    ) {
       continue;
     }
 
     const changed =
-      finalizeBattle(battle);
+      finalizeBattle(
+        battle
+      );
 
     if (!changed) {
       continue;
@@ -791,11 +824,6 @@ export async function GET(
   req: NextRequest
 ) {
   try {
-    /*
-     * FIX:
-     * verifyAdminRequestAsync returns boolean.
-     * Do not access .authorized/.isAdmin/.user.
-     */
     const isAdmin =
       Boolean(
         await verifyAdminRequestAsync(
@@ -1063,12 +1091,8 @@ export async function PUT(
 
     const battleId =
       cleanString(body.id) ||
-      cleanString(
-        body.battleId
-      ) ||
-      cleanString(
-        body.battle_id
-      );
+      cleanString(body.battleId) ||
+      cleanString(body.battle_id);
 
     if (!battleId) {
       return jsonResponse(
@@ -1274,9 +1298,7 @@ export async function PUT(
         );
 
       const endDate =
-        new Date(
-          rawEnd
-        );
+        new Date(rawEnd);
 
       if (
         !Number.isNaN(
@@ -1435,9 +1457,7 @@ export async function DELETE(
         body.battle_id
       ) ||
       cleanString(
-        url.searchParams.get(
-          "id"
-        )
+        url.searchParams.get("id")
       ) ||
       cleanString(
         url.searchParams.get(
@@ -1459,9 +1479,6 @@ export async function DELETE(
     const db =
       getAdminDatabaseClient();
 
-    /*
-     * Delete comments first.
-     */
     const {
       error:
         commentsError,
@@ -1481,9 +1498,6 @@ export async function DELETE(
       );
     }
 
-    /*
-     * Delete votes.
-     */
     const {
       error:
         votesError,
@@ -1503,9 +1517,6 @@ export async function DELETE(
       );
     }
 
-    /*
-     * Delete battle.
-     */
     const {
       data:
         deletedRows,
@@ -1526,16 +1537,10 @@ export async function DELETE(
       );
     }
 
-    /*
-     * Remove runtime copy.
-     */
     await removeBattleFromRuntime(
       battleId
     );
 
-    /*
-     * Verify deletion.
-     */
     const {
       data:
         remainingBattle,
@@ -1577,9 +1582,10 @@ export async function DELETE(
     return jsonResponse({
       success: true,
 
-      message: deleted
-        ? "Battle permanently deleted."
-        : "Battle was already absent from the database and has been removed from runtime.",
+      message:
+        deleted
+          ? "Battle permanently deleted."
+          : "Battle was already absent from the database and has been removed from runtime.",
 
       deleted: true,
 
@@ -1594,7 +1600,6 @@ export async function DELETE(
     return jsonResponse(
       {
         success: false,
-
         error:
           error?.message ||
           "Failed to delete battle.",
@@ -1603,3 +1608,8 @@ export async function DELETE(
     );
   }
 }
+'''
+
+path = Path("/mnt/data/route-fixed.ts")
+path.write_text(code, encoding="utf-8")
+print(path)
