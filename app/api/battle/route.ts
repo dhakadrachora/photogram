@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import crypto from "crypto";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import crypto from "node:crypto";
 
 import { verifyAdminRequestAsync } from "@/lib/admin-auth";
 import { contentStore } from "@/lib/content-store";
@@ -72,17 +72,13 @@ type BattleRecord = {
 
 function getDatabaseClient(preferAdmin = false): SupabaseClient {
   if (preferAdmin && SUPABASE_SERVICE_ROLE_KEY) {
-    return createClient(
-      SUPABASE_URL,
-      SUPABASE_SERVICE_ROLE_KEY,
-      {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-          detectSessionInUrl: false,
-        },
-      }
-    );
+    return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    });
   }
 
   return supabase;
@@ -95,17 +91,13 @@ function getAdminDatabaseClient(): SupabaseClient {
     );
   }
 
-  return createClient(
-    SUPABASE_URL,
-    SUPABASE_SERVICE_ROLE_KEY,
-    {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-        detectSessionInUrl: false,
-      },
-    }
-  );
+  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
 }
 
 function jsonResponse(data: any, status = 200) {
@@ -122,10 +114,7 @@ function jsonResponse(data: any, status = 200) {
 }
 
 function cleanString(value: any): string {
-  if (typeof value !== "string") {
-    return "";
-  }
-
+  if (typeof value !== "string") return "";
   return value.trim();
 }
 
@@ -162,8 +151,7 @@ function normalizeOption(
   const imageUrl = getImageUrl(source);
 
   const votes =
-    typeof source.votes === "number" &&
-    Number.isFinite(source.votes)
+    typeof source.votes === "number" && Number.isFinite(source.votes)
       ? source.votes
       : 0;
 
@@ -201,8 +189,7 @@ function normalizeBattle(row: AnyRecord): BattleRecord {
     cleanString(row.end_time) ||
     cleanString(row.endTime);
 
-  const status =
-    cleanString(row.status) || "active";
+  const status = cleanString(row.status) || "active";
 
   const published =
     typeof row.published === "boolean"
@@ -235,6 +222,11 @@ function normalizeBattle(row: AnyRecord): BattleRecord {
     cleanString(row.updatedAt) ||
     createdAt;
 
+  /*
+   * FIX:
+   * endsAt is optional, therefore never compare it directly
+   * with Date.now().
+   */
   const isEnded =
     status === "closed" ||
     status === "ended" ||
@@ -242,6 +234,7 @@ function normalizeBattle(row: AnyRecord): BattleRecord {
     Boolean(row.isEnded) ||
     Boolean(
       endsAt &&
+        Number.isFinite(new Date(endsAt).getTime()) &&
         new Date(endsAt).getTime() <= Date.now()
     );
 
@@ -281,19 +274,12 @@ function normalizeBattle(row: AnyRecord): BattleRecord {
 
     isEnded,
 
-    winnerOptionId:
-      winnerOptionId || undefined,
-
-    winner_option_id:
-      winnerOptionId || null,
+    winnerOptionId: winnerOptionId || undefined,
+    winner_option_id: winnerOptionId || null,
 
     totalVotes:
-      (typeof optionA.votes === "number"
-        ? optionA.votes
-        : 0) +
-      (typeof optionB.votes === "number"
-        ? optionB.votes
-        : 0),
+      (typeof optionA.votes === "number" ? optionA.votes : 0) +
+      (typeof optionB.votes === "number" ? optionB.votes : 0),
 
     createdAt,
     created_at: createdAt,
@@ -343,24 +329,33 @@ function calculateEndTime(
 
   if (Number.isNaN(start.getTime())) {
     return new Date(
-      Date.now() +
-        durationMinutes * 60 * 1000
+      Date.now() + durationMinutes * 60 * 1000
     ).toISOString();
   }
 
   return new Date(
-    start.getTime() +
-      durationMinutes * 60 * 1000
+    start.getTime() + durationMinutes * 60 * 1000
   ).toISOString();
 }
 
-function isBattleExpired(
-  battle: BattleRecord
-): boolean {
-  if (
-    battle.status === "closed" ||
-    battle.status === "ended"
-  ) {
+function getEndTime(body: AnyRecord, startsAt: string, durationMinutes: number): string {
+  const rawEnd =
+    cleanString(body.endsAt) ||
+    cleanString(body.ends_at);
+
+  if (rawEnd) {
+    const endDate = new Date(rawEnd);
+
+    if (!Number.isNaN(endDate.getTime())) {
+      return endDate.toISOString();
+    }
+  }
+
+  return calculateEndTime(startsAt, durationMinutes);
+}
+
+function isBattleExpired(battle: BattleRecord): boolean {
+  if (battle.status === "closed" || battle.status === "ended") {
     return true;
   }
 
@@ -372,8 +367,7 @@ function isBattleExpired(
     return false;
   }
 
-  const end =
-    new Date(battle.endsAt).getTime();
+  const end = new Date(battle.endsAt).getTime();
 
   if (!Number.isFinite(end)) {
     return false;
@@ -409,8 +403,7 @@ function finalizeBattle(
     return false;
   }
 
-  const winner =
-    getWinnerOptionId(battle);
+  const winner = getWinnerOptionId(battle);
 
   battle.status = "closed";
   battle.isEnded = true;
@@ -468,9 +461,8 @@ function getBattleDbRow(
         optionA.imageUrl || null,
       image_url:
         optionA.imageUrl || null,
-      votes: Number(
-        optionA.votes || 0
-      ),
+      votes:
+        Number(optionA.votes || 0),
     },
 
     option_b: {
@@ -479,14 +471,12 @@ function getBattleDbRow(
         optionB.imageUrl || null,
       image_url:
         optionB.imageUrl || null,
-      votes: Number(
-        optionB.votes || 0
-      ),
+      votes:
+        Number(optionB.votes || 0),
     },
 
     duration_minutes:
-      typeof battle.durationMinutes ===
-      "number"
+      typeof battle.durationMinutes === "number"
         ? battle.durationMinutes
         : null,
 
@@ -502,8 +492,7 @@ function getBattleDbRow(
         : battle.status || "active",
 
     published:
-      typeof battle.published ===
-      "boolean"
+      typeof battle.published === "boolean"
         ? battle.published
         : true,
 
@@ -532,12 +521,13 @@ async function fetchDatabaseBattles(): Promise<
 > {
   const db =
     getDatabaseClient(
-      Boolean(
-        SUPABASE_SERVICE_ROLE_KEY
-      )
+      Boolean(SUPABASE_SERVICE_ROLE_KEY)
     );
 
-  const { data, error } = await db
+  const {
+    data,
+    error,
+  } = await db
     .from("battles")
     .select("*")
     .order("created_at", {
@@ -609,15 +599,15 @@ async function persistBattle(
 ): Promise<void> {
   const db =
     getDatabaseClient(
-      Boolean(
-        SUPABASE_SERVICE_ROLE_KEY
-      )
+      Boolean(SUPABASE_SERVICE_ROLE_KEY)
     );
 
   const row =
     getBattleDbRow(battle);
 
-  const { error } = await db
+  const {
+    error,
+  } = await db
     .from("battles")
     .upsert(row, {
       onConflict: "id",
@@ -654,7 +644,7 @@ async function removeBattleFromRuntime(
         battleId
       );
     } catch {
-      // Runtime Map deletion already handled.
+      // Ignore runtime cleanup errors.
     }
   }
 
@@ -667,7 +657,7 @@ async function removeBattleFromRuntime(
         battleId
       );
     } catch {
-      // Runtime Map deletion already handled.
+      // Ignore runtime cleanup errors.
     }
   }
 }
@@ -735,25 +725,25 @@ function formatBattle(
           "active",
 
     published:
-      typeof battle.published ===
-      "boolean"
+      typeof battle.published === "boolean"
         ? battle.published
         : true,
 
     isPublished:
-      typeof battle.published ===
-      "boolean"
+      typeof battle.published === "boolean"
         ? battle.published
         : true,
 
-    isEnded: ended,
+    isEnded:
+      ended,
 
     winnerOptionId:
       winnerOptionId || null,
 
     totalVotes,
 
-    commentsClosed: ended,
+    commentsClosed:
+      ended,
 
     createdAt:
       battle.createdAt ||
@@ -801,14 +791,17 @@ export async function GET(
   req: NextRequest
 ) {
   try {
-    const adminResult =
-      await verifyAdminRequestAsync(
-        req
-      );
-
-    // verifyAdminRequestAsync returns boolean.
+    /*
+     * FIX:
+     * verifyAdminRequestAsync returns boolean.
+     * Do not access .authorized/.isAdmin/.user.
+     */
     const isAdmin =
-      Boolean(adminResult);
+      Boolean(
+        await verifyAdminRequestAsync(
+          req
+        )
+      );
 
     const battles =
       await hydrateBattles();
@@ -868,13 +861,12 @@ export async function POST(
   req: NextRequest
 ) {
   try {
-    const adminResult =
-      await verifyAdminRequestAsync(
-        req
-      );
-
     const isAdmin =
-      Boolean(adminResult);
+      Boolean(
+        await verifyAdminRequestAsync(
+          req
+        )
+      );
 
     if (!isAdmin) {
       return jsonResponse(
@@ -925,35 +917,12 @@ export async function POST(
     const startsAt =
       getStartTime(body);
 
-    const requestedEnd =
-      cleanString(
-        body.endsAt
-      ) ||
-      cleanString(
-        body.ends_at
-      );
-
-    let endsAt =
-      calculateEndTime(
+    const endsAt =
+      getEndTime(
+        body,
         startsAt,
         durationMinutes
       );
-
-    if (requestedEnd) {
-      const endDate =
-        new Date(
-          requestedEnd
-        );
-
-      if (
-        !Number.isNaN(
-          endDate.getTime()
-        )
-      ) {
-        endsAt =
-          endDate.toISOString();
-      }
-    }
 
     const battleId =
       cleanString(body.id) ||
@@ -967,6 +936,9 @@ export async function POST(
             "boolean"
           ? body.isPublished
           : true;
+
+    const now =
+      new Date().toISOString();
 
     const battle: BattleRecord = {
       id: battleId,
@@ -989,13 +961,15 @@ export async function POST(
       startsAt,
       endsAt,
 
-      status: "active",
+      status:
+        "active",
 
       published,
       isPublished:
         published,
 
-      isEnded: false,
+      isEnded:
+        false,
 
       winnerOptionId:
         undefined,
@@ -1003,13 +977,14 @@ export async function POST(
       winner_option_id:
         null,
 
-      totalVotes: 0,
+      totalVotes:
+        0,
 
       createdAt:
-        new Date().toISOString(),
+        now,
 
       updatedAt:
-        new Date().toISOString(),
+        now,
     };
 
     await persistBattle(
@@ -1065,13 +1040,12 @@ export async function PUT(
   req: NextRequest
 ) {
   try {
-    const adminResult =
-      await verifyAdminRequestAsync(
-        req
-      );
-
     const isAdmin =
-      Boolean(adminResult);
+      Boolean(
+        await verifyAdminRequestAsync(
+          req
+        )
+      );
 
     if (!isAdmin) {
       return jsonResponse(
@@ -1089,8 +1063,12 @@ export async function PUT(
 
     const battleId =
       cleanString(body.id) ||
-      cleanString(body.battleId) ||
-      cleanString(body.battle_id);
+      cleanString(
+        body.battleId
+      ) ||
+      cleanString(
+        body.battle_id
+      );
 
     if (!battleId) {
       return jsonResponse(
@@ -1127,7 +1105,9 @@ export async function PUT(
     if (
       typeof body.title ===
         "string" &&
-      cleanString(body.title)
+      cleanString(
+        body.title
+      )
     ) {
       battle.title =
         cleanString(
@@ -1138,7 +1118,9 @@ export async function PUT(
     if (
       typeof body.question ===
         "string" &&
-      cleanString(body.question)
+      cleanString(
+        body.question
+      )
     ) {
       battle.question =
         cleanString(
@@ -1173,8 +1155,8 @@ export async function PUT(
             .imageUrl,
 
         votes:
-          battle.optionA.votes ||
-          0,
+          battle.optionA
+            .votes || 0,
       };
     }
 
@@ -1205,8 +1187,8 @@ export async function PUT(
             .imageUrl,
 
         votes:
-          battle.optionB.votes ||
-          0,
+          battle.optionB
+            .votes || 0,
       };
     }
 
@@ -1292,7 +1274,9 @@ export async function PUT(
         );
 
       const endDate =
-        new Date(rawEnd);
+        new Date(
+          rawEnd
+        );
 
       if (
         !Number.isNaN(
@@ -1416,13 +1400,12 @@ export async function DELETE(
   req: NextRequest
 ) {
   try {
-    const adminResult =
-      await verifyAdminRequestAsync(
-        req
-      );
-
     const isAdmin =
-      Boolean(adminResult);
+      Boolean(
+        await verifyAdminRequestAsync(
+          req
+        )
+      );
 
     if (!isAdmin) {
       return jsonResponse(
@@ -1445,10 +1428,16 @@ export async function DELETE(
 
     const battleId =
       cleanString(body.id) ||
-      cleanString(body.battleId) ||
-      cleanString(body.battle_id) ||
       cleanString(
-        url.searchParams.get("id")
+        body.battleId
+      ) ||
+      cleanString(
+        body.battle_id
+      ) ||
+      cleanString(
+        url.searchParams.get(
+          "id"
+        )
       ) ||
       cleanString(
         url.searchParams.get(
@@ -1470,11 +1459,16 @@ export async function DELETE(
     const db =
       getAdminDatabaseClient();
 
-    // Delete comments first.
+    /*
+     * Delete comments first.
+     */
     const {
-      error: commentsError,
+      error:
+        commentsError,
     } = await db
-      .from("battle_comments")
+      .from(
+        "battle_comments"
+      )
       .delete()
       .eq(
         "battle_id",
@@ -1487,11 +1481,16 @@ export async function DELETE(
       );
     }
 
-    // Delete votes.
+    /*
+     * Delete votes.
+     */
     const {
-      error: votesError,
+      error:
+        votesError,
     } = await db
-      .from("battle_votes")
+      .from(
+        "battle_votes"
+      )
       .delete()
       .eq(
         "battle_id",
@@ -1504,9 +1503,12 @@ export async function DELETE(
       );
     }
 
-    // Delete actual battle.
+    /*
+     * Delete battle.
+     */
     const {
-      data: deletedRows,
+      data:
+        deletedRows,
       error:
         battleDeleteError,
     } = await db
@@ -1524,15 +1526,21 @@ export async function DELETE(
       );
     }
 
-    // Remove runtime copy.
+    /*
+     * Remove runtime copy.
+     */
     await removeBattleFromRuntime(
       battleId
     );
 
-    // Verify DB deletion.
+    /*
+     * Verify deletion.
+     */
     const {
-      data: remainingBattle,
-      error: verifyError,
+      data:
+        remainingBattle,
+      error:
+        verifyError,
     } = await db
       .from("battles")
       .select("id")
@@ -1563,7 +1571,8 @@ export async function DELETE(
       Array.isArray(
         deletedRows
       ) &&
-      deletedRows.length > 0;
+      deletedRows.length >
+        0;
 
     return jsonResponse({
       success: true,
@@ -1585,6 +1594,7 @@ export async function DELETE(
     return jsonResponse(
       {
         success: false,
+
         error:
           error?.message ||
           "Failed to delete battle.",
