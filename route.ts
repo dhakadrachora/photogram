@@ -79,7 +79,7 @@ function getLiveWebsiteContext(): string {
     const closedBattles: string[] = [];
 
     for (const b of Array.from(contentStore.battles.values())) {
-      const isEnded = b.isEnded || Date.now() >= b.endsAt || b.status === 'closed';
+      const isEnded = Boolean(b.isEnded) || Boolean(b.endsAt && Date.now() >= b.endsAt) || b.status === 'closed';
       const total = (b.optionA.votes || 0) + (b.optionB.votes || 0);
       const pctA = total > 0 ? Math.round(((b.optionA.votes || 0) / total) * 100) : 50;
       const pctB = total > 0 ? 100 - pctA : 50;
