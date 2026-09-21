@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import Image from 'next/image';
 import { User, ChatMessage, PresenceUser } from '@/types';
 import { SoundEffects } from '@/lib/audio/sound-effects';
 import { VerifiedTick } from '@/components/VerifiedTick';
@@ -811,7 +810,7 @@ export function WorldChat({
                 >
                   {/* AVATAR */}
                   <div className="relative shrink-0">
-                    <Image
+                    <img
                       src={
                         msg.userAvatar ||
                         'https://api.dicebear.com/7.x/bottts/svg?seed=dhoti'
@@ -820,7 +819,7 @@ export function WorldChat({
                       width={36}
                       height={36}
                       referrerPolicy="no-referrer"
-                      className={`h-9 w-9 rounded-full bg-slate-800 ring-2 ${
+                      className={`h-9 w-9 rounded-full bg-slate-800 object-cover ring-2 ${
                         isAiParticipant
                           ? 'ring-amber-500/70'
                           : showVerifiedTick
@@ -1066,13 +1065,13 @@ export function WorldChat({
             <div className="p-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="relative">
-                  <Image
+                  <img
                     src="https://api.dicebear.com/7.x/bottts/svg?seed=dhoti-aale-official-ai"
                     alt="DHOTI AALE AI"
                     width={32}
                     height={32}
                     referrerPolicy="no-referrer"
-                    className="h-8 w-8 rounded-full bg-slate-800 ring-2 ring-amber-500/40"
+                    className="h-8 w-8 rounded-full bg-slate-800 ring-2 ring-amber-500/40 object-cover"
                   />
 
                   <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-slate-950" />
@@ -1115,7 +1114,7 @@ export function WorldChat({
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className="relative">
-                        <Image
+                        <img
                           src={
                             u.userAvatar ||
                             'https://api.dicebear.com/7.x/bottts/svg?seed=dhoti'
@@ -1124,7 +1123,7 @@ export function WorldChat({
                           width={32}
                           height={32}
                           referrerPolicy="no-referrer"
-                          className="h-8 w-8 rounded-full bg-slate-800"
+                          className="h-8 w-8 rounded-full bg-slate-800 object-cover"
                         />
 
                         <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-slate-950" />

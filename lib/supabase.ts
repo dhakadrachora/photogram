@@ -13,43 +13,35 @@ import {
 } from '@/types';
 import { isSiteAdmin } from './admin-auth';
 
-const DEFAULT_SUPABASE_URL =
-  'https://zlngcbefvdtbihndaeun.supabase.co';
+/* ============================================================
+   CONFIG
+   ============================================================ */
 
-const DEFAULT_SUPABASE_ANON_KEY =
-  'sb_publishable_JxGddMQ5KqRFTANuZG2TGg_I05TTskS';
+const FALLBACK_SUPABASE_URL = 'https://zlngcbefvdtbihndaeun.supabase.co';
+const FALLBACK_SUPABASE_ANON_KEY = 'sb_publishable_JxGddMQ5KqRFTANuZG2TGg_I05TTskS';
 
 const supabaseUrl =
-  process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL;
+  process.env.NEXT_PUBLIC_SUPABASE_URL || FALLBACK_SUPABASE_URL;
 
 const supabaseAnonKey =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  DEFAULT_SUPABASE_ANON_KEY;
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || FALLBACK_SUPABASE_ANON_KEY;
 
-/**
- * World Chat messages expire after 10 minutes.
- */
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+
 export const CHAT_MESSAGE_EXPIRATION_MS = 10 * 60 * 1000;
 
-/**
- * Check Supabase configuration.
- */
 export const isSupabaseConfigured = (): boolean => {
   return Boolean(
     supabaseUrl &&
       supabaseAnonKey &&
-      supabaseUrl.startsWith('http') &&
-      !supabaseUrl.includes('placeholder')
+      supabaseUrl.startsWith('http')
   );
 };
 
-/**
- * Main Supabase client.
- *
- * IMPORTANT:
- * Never put a Supabase service-role key in this file.
- * This file uses the publishable/anon key only.
- */
+/* ============================================================
+   CLIENTS
+   ============================================================ */
+
 export const supabase: SupabaseClient = createClient(
   supabaseUrl,
   supabaseAnonKey,
@@ -62,61 +54,45 @@ export const supabase: SupabaseClient = createClient(
   }
 );
 
-/**
- * Get currently authenticated Supabase user.
- */
-export async function getCurrentSupabaseUser() {
-  if (!isSupabaseConfigured()) {
-    return null;
+export function createServerClient(): SupabaseClient {
+  if (supabaseServiceKey) {
+    return createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
   }
+  return supabase;
+}
 
+/* ============================================================
+   AUTH — CURRENT USER
+   ============================================================ */
+
+export async function getCurrentSupabaseUser() {
+  if (!isSupabaseConfigured()) return null;
   try {
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser();
-
-    if (error || !user) {
-      return null;
-    }
-
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error || !user) return null;
     return user;
   } catch {
     return null;
   }
 }
 
-/**
- * Get current Supabase session.
- */
 export async function getCurrentSupabaseSession() {
-  if (!isSupabaseConfigured()) {
-    return null;
-  }
-
+  if (!isSupabaseConfigured()) return null;
   try {
-    const {
-      data: { session },
-      error,
-    } = await supabase.auth.getSession();
-
-    if (error || !session) {
-      return null;
-    }
-
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error || !session) return null;
     return session;
   } catch {
     return null;
   }
 }
 
-/**
- * Maps Supabase Auth user to DHOTI AALE User model.
- *
- * IMPORTANT:
- * This function does NOT give the client permission to change
- * admin fields. It only creates the application's read model.
- */
+/* ============================================================
+   MAP USER
+   ============================================================ */
+
 export function mapSupabaseUserToAppUser(sbUser: {
   id: string;
   email?: string | null;
@@ -125,7 +101,6 @@ export function mapSupabaseUserToAppUser(sbUser: {
 }): User {
   const email = (sbUser.email || '').trim().toLowerCase();
   const metadata = sbUser.user_metadata || {};
-
   const admin = isSiteAdmin(email);
 
   const name =
@@ -136,9 +111,7 @@ export function mapSupabaseUserToAppUser(sbUser: {
   const avatar =
     metadata.avatar_url ||
     metadata.picture ||
-    `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(
-      sbUser.id
-    )}`;
+    `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(sbUser.id)}`;
 
   const phone = metadata.phone || undefined;
 
@@ -148,40 +121,22 @@ export function mapSupabaseUserToAppUser(sbUser: {
     email,
     avatar,
     phone,
-
-    badge: admin
-      ? 'Site Owner & Admin 👑'
-      : 'Dhoti Resident',
-
+    badge: admin ? 'Site Owner & Admin 👑' : 'Dhoti Resident',
     coins: 50,
     wins: 0,
     battles: 0,
-
-    rank: admin
-      ? 'Super Admin 👑'
-      : 'Resident',
-
+    rank: admin ? 'Super Admin 👑' : 'Resident',
     isGoogle: false,
-
-    role: admin
-      ? 'admin'
-      : 'resident',
-
+    role: admin ? 'admin' : 'resident',
     isAdmin: admin,
-
     createdAt: sbUser.created_at || Date.now(),
   };
 }
 
-/**
- * Sign up with Supabase Email + Password.
- *
- * SECURITY:
- * - No fake/random fallback account.
- * - No local password storage.
- * - No password in public.users.
- * - Supabase Auth is the only authentication source.
- */
+/* ============================================================
+   SIGN UP
+   ============================================================ */
+
 export async function signUpWithEmail({
   email,
   password,
@@ -200,39 +155,22 @@ export async function signUpWithEmail({
   error?: string;
 }> {
   if (!isSupabaseConfigured()) {
-    return {
-      user: null,
-      session: null,
-      error: 'SUPABASE_NOT_CONFIGURED',
-    };
+    return { user: null, session: null, error: 'SUPABASE_NOT_CONFIGURED' };
   }
 
   const cleanEmail = email.trim().toLowerCase();
   const cleanName = name.trim();
   const cleanPhone = phone?.trim() || null;
-
   const cleanAvatar =
     avatarUrl?.trim() ||
-    `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(
-      cleanEmail
-    )}`;
+    `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(cleanEmail)}`;
 
   if (!cleanEmail) {
-    return {
-      user: null,
-      session: null,
-      error: 'Email is required.',
-    };
+    return { user: null, session: null, error: 'Email is required.' };
   }
-
   if (!cleanName) {
-    return {
-      user: null,
-      session: null,
-      error: 'Name is required.',
-    };
+    return { user: null, session: null, error: 'Name is required.' };
   }
-
   if (!password || password.length < 6) {
     return {
       user: null,
@@ -256,13 +194,8 @@ export async function signUpWithEmail({
     });
 
     if (error) {
-      return {
-        user: null,
-        session: null,
-        error: error.message,
-      };
+      return { user: null, session: null, error: error.message };
     }
-
     if (!data.user) {
       return {
         user: null,
@@ -282,20 +215,6 @@ export async function signUpWithEmail({
       },
     });
 
-    /**
-     * Only basic profile information is synced here.
-     *
-     * DO NOT write:
-     * - role
-     * - is_admin
-     * - coins
-     * - rank
-     * - badge
-     * - wins
-     * - battles
-     *
-     * Those are protected server/admin fields.
-     */
     try {
       await supabase.from('users').upsert(
         {
@@ -306,41 +225,26 @@ export async function signUpWithEmail({
           avatar: cleanAvatar,
           updated_at: new Date().toISOString(),
         },
-        {
-          onConflict: 'id',
-        }
+        { onConflict: 'id' }
       );
     } catch (err) {
-      console.warn(
-        'Could not create public.users profile:',
-        err
-      );
+      console.warn('Could not create public.users profile:', err);
     }
 
-    return {
-      user: appUser,
-      session: data.session || null,
-    };
+    return { user: appUser, session: data.session || null };
   } catch (err: any) {
     return {
       user: null,
       session: null,
-      error:
-        err?.message ||
-        'Signup failed. Please try again.',
+      error: err?.message || 'Signup failed. Please try again.',
     };
   }
 }
 
-/**
- * Sign in existing user with Supabase Email + Password.
- *
- * IMPORTANT:
- * There is NO fallback authentication route here.
- *
- * If Supabase Auth rejects the password,
- * login must fail.
- */
+/* ============================================================
+   SIGN IN
+   ============================================================ */
+
 export async function signInWithEmail({
   email,
   password,
@@ -353,15 +257,10 @@ export async function signInWithEmail({
   error?: string;
 }> {
   if (!isSupabaseConfigured()) {
-    return {
-      user: null,
-      session: null,
-      error: 'SUPABASE_NOT_CONFIGURED',
-    };
+    return { user: null, session: null, error: 'SUPABASE_NOT_CONFIGURED' };
   }
 
   const cleanEmail = email.trim().toLowerCase();
-
   if (!cleanEmail || !password) {
     return {
       user: null,
@@ -371,11 +270,10 @@ export async function signInWithEmail({
   }
 
   try {
-    const { data, error } =
-      await supabase.auth.signInWithPassword({
-        email: cleanEmail,
-        password,
-      });
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: cleanEmail,
+      password,
+    });
 
     if (error || !data?.user) {
       return {
@@ -387,119 +285,65 @@ export async function signInWithEmail({
       };
     }
 
-    let appUser =
-      mapSupabaseUserToAppUser(data.user);
+    let appUser = mapSupabaseUserToAppUser(data.user);
 
     try {
-      const { data: dbUser, error: dbError } =
-        await supabase
-          .from('users')
-          .select(
-            'id,name,email,phone,avatar,badge,coins,wins,battles,rank,role,is_admin,is_verified,is_blocked,chat_blocked,created_at'
-          )
-          .eq('id', data.user.id)
-          .maybeSingle();
+      const { data: dbUser, error: dbError } = await supabase
+        .from('users')
+        .select(
+          'id,name,email,phone,avatar,badge,coins,wins,battles,rank,role,is_admin,created_at'
+        )
+        .eq('id', data.user.id)
+        .maybeSingle();
 
       if (!dbError && dbUser) {
         const isAdmin =
-          isSiteAdmin(cleanEmail) ||
-          Boolean(dbUser.is_admin);
+          isSiteAdmin(cleanEmail) || Boolean(dbUser.is_admin);
 
         appUser = {
           ...appUser,
-
-          name:
-            dbUser.name ||
-            appUser.name,
-
-          avatar:
-            dbUser.avatar ||
-            appUser.avatar,
-
-          phone:
-            dbUser.phone ||
-            appUser.phone,
-
-          badge:
-            dbUser.badge ||
-            appUser.badge,
-
-          coins:
-            dbUser.coins ??
-            appUser.coins,
-
-          wins:
-            dbUser.wins ??
-            appUser.wins,
-
-          battles:
-            dbUser.battles ??
-            appUser.battles,
-
-          rank:
-            dbUser.rank ||
-            appUser.rank,
-
-          role:
-            dbUser.role ||
-            appUser.role,
-
+          name: dbUser.name || appUser.name,
+          avatar: dbUser.avatar || appUser.avatar,
+          phone: dbUser.phone || appUser.phone,
+          badge: dbUser.badge || appUser.badge,
+          coins: dbUser.coins ?? appUser.coins,
+          wins: dbUser.wins ?? appUser.wins,
+          battles: dbUser.battles ?? appUser.battles,
+          rank: dbUser.rank || appUser.rank,
+          role: dbUser.role || appUser.role,
           isAdmin,
-
-          createdAt:
-            dbUser.created_at ||
-            appUser.createdAt,
+          createdAt: dbUser.created_at || appUser.createdAt,
         };
-      } else {
-        await syncUserProfile(appUser);
       }
     } catch (err) {
-      console.warn(
-        'Error fetching database user profile:',
-        err
-      );
+      console.warn('Error fetching database user profile:', err);
     }
 
-    return {
-      user: appUser,
-      session: data.session || null,
-    };
+    return { user: appUser, session: data.session || null };
   } catch (err: any) {
     return {
       user: null,
       session: null,
-      error:
-        err?.message ||
-        'लॉगिन विफल रहा।',
+      error: err?.message || 'लॉगिन विफल रहा।',
     };
   }
 }
 
-/**
- * Send password reset email.
- */
+/* ============================================================
+   PASSWORD RESET
+   ============================================================ */
+
 export async function sendPasswordResetEmail(
   email: string,
   redirectToUrl?: string
-): Promise<{
-  success: boolean;
-  error?: string;
-}> {
+): Promise<{ success: boolean; error?: string }> {
   if (!isSupabaseConfigured()) {
-    return {
-      success: false,
-      error: 'SUPABASE_NOT_CONFIGURED',
-    };
+    return { success: false, error: 'SUPABASE_NOT_CONFIGURED' };
   }
 
-  const cleanEmail =
-    email.trim().toLowerCase();
-
+  const cleanEmail = email.trim().toLowerCase();
   if (!cleanEmail) {
-    return {
-      success: false,
-      error: 'Email is required.',
-    };
+    return { success: false, error: 'Email is required.' };
   }
 
   const redirectTarget =
@@ -509,361 +353,189 @@ export async function sendPasswordResetEmail(
       : '');
 
   try {
-    const { error } =
-      await supabase.auth.resetPasswordForEmail(
-        cleanEmail,
-        {
-          redirectTo: redirectTarget,
-        }
-      );
-
+    const { error } = await supabase.auth.resetPasswordForEmail(
+      cleanEmail,
+      { redirectTo: redirectTarget }
+    );
     if (error) {
-      return {
-        success: false,
-        error: error.message,
-      };
+      return { success: false, error: error.message };
     }
-
-    return {
-      success: true,
-    };
+    return { success: true };
   } catch (err: any) {
     return {
       success: false,
-      error:
-        err?.message ||
-        'Password reset failed.',
+      error: err?.message || 'Password reset failed.',
     };
   }
 }
 
-/**
- * Update password for currently authenticated user.
- */
 export async function updateUserPassword(
   newPassword: string
-): Promise<{
-  success: boolean;
-  error?: string;
-}> {
+): Promise<{ success: boolean; error?: string }> {
   if (!isSupabaseConfigured()) {
-    return {
-      success: false,
-      error: 'SUPABASE_NOT_CONFIGURED',
-    };
+    return { success: false, error: 'SUPABASE_NOT_CONFIGURED' };
   }
 
   if (!newPassword || newPassword.length < 6) {
     return {
       success: false,
-      error:
-        'Password must be at least 6 characters.',
+      error: 'Password must be at least 6 characters.',
     };
   }
 
   try {
-    const currentUser =
-      await getCurrentSupabaseUser();
-
+    const currentUser = await getCurrentSupabaseUser();
     if (!currentUser) {
-      return {
-        success: false,
-        error: 'User is not logged in.',
-      };
+      return { success: false, error: 'User is not logged in.' };
     }
 
-    const { error } =
-      await supabase.auth.updateUser({
-        password: newPassword,
-      });
-
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
     if (error) {
-      return {
-        success: false,
-        error: error.message,
-      };
+      return { success: false, error: error.message };
     }
-
-    return {
-      success: true,
-    };
+    return { success: true };
   } catch (err: any) {
     return {
       success: false,
-      error:
-        err?.message ||
-        'Could not update password.',
+      error: err?.message || 'Could not update password.',
     };
   }
 }
 
-/**
- * Sign out.
- */
-export async function signOutSupabase(): Promise<void> {
-  if (!isSupabaseConfigured()) {
-    return;
-  }
+/* ============================================================
+   SIGN OUT
+   ============================================================ */
 
+export async function signOutSupabase(): Promise<void> {
+  if (!isSupabaseConfigured()) return;
   try {
     await supabase.auth.signOut();
   } catch (err) {
-    console.warn(
-      'Supabase signOut error:',
-      err
-    );
+    console.warn('Supabase signOut error:', err);
   }
 }
 
-/**
- * Sync basic user profile.
- *
- * SECURITY:
- * This function deliberately does NOT write protected fields.
- */
-export async function syncUserProfile(
-  user: User
-): Promise<void> {
-  if (
-    !isSupabaseConfigured() ||
-    !user?.id
-  ) {
-    return;
-  }
+/* ============================================================
+   SYNC PROFILE
+   ============================================================ */
 
+export async function syncUserProfile(user: User): Promise<void> {
+  if (!isSupabaseConfigured() || !user?.id) return;
   try {
     await supabase.from('users').upsert(
       {
         id: user.id,
-        email:
-          user.email
-            ?.toLowerCase()
-            .trim() || null,
+        email: user.email?.toLowerCase().trim() || null,
         name: user.name,
         avatar: user.avatar,
         phone: user.phone || null,
-        updated_at:
-          new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       },
-      {
-        onConflict: 'id',
-      }
+      { onConflict: 'id' }
     );
   } catch (err) {
-    console.warn(
-      'Could not sync user profile:',
-      err
-    );
+    console.warn('Could not sync user profile:', err);
   }
 }
 
-/**
- * Update editable user profile details.
- *
- * Editable:
- * - name
- * - phone
- * - avatar
- *
- * NOT editable here:
- * - role
- * - is_admin
- * - coins
- * - rank
- * - badge
- * - wins
- * - battles
- */
 export async function updateUserProfileDetails(
   userId: string,
-  updates: {
-    name?: string;
-    phone?: string | null;
-    avatar?: string;
-  }
-): Promise<{
-  success: boolean;
-  error?: string;
-}> {
+  updates: { name?: string; phone?: string | null; avatar?: string }
+): Promise<{ success: boolean; error?: string }> {
   if (!isSupabaseConfigured()) {
-    return {
-      success: false,
-      error: 'SUPABASE_NOT_CONFIGURED',
-    };
+    return { success: false, error: 'SUPABASE_NOT_CONFIGURED' };
   }
 
   try {
-    const currentUser =
-      await getCurrentSupabaseUser();
-
+    const currentUser = await getCurrentSupabaseUser();
     if (!currentUser) {
-      return {
-        success: false,
-        error: 'User is not authenticated.',
-      };
+      return { success: false, error: 'User is not authenticated.' };
     }
-
-    /**
-     * User can only update their own profile.
-     */
     if (currentUser.id !== userId) {
-      return {
-        success: false,
-        error: 'Unauthorized profile update.',
-      };
+      return { success: false, error: 'Unauthorized profile update.' };
     }
 
     const cleanName =
-      updates.name !== undefined
-        ? updates.name.trim()
-        : undefined;
-
+      updates.name !== undefined ? updates.name.trim() : undefined;
     const cleanPhone =
-      updates.phone !== undefined
-        ? updates.phone?.trim() || null
-        : undefined;
-
+      updates.phone !== undefined ? updates.phone?.trim() || null : undefined;
     const cleanAvatar =
-      updates.avatar !== undefined
-        ? updates.avatar.trim()
-        : undefined;
+      updates.avatar !== undefined ? updates.avatar.trim() : undefined;
 
-    /**
-     * Update Supabase Auth metadata.
-     */
     const authMetadata: Record<string, any> = {};
-
     if (cleanName !== undefined) {
       authMetadata.full_name = cleanName;
       authMetadata.name = cleanName;
     }
-
-    if (cleanPhone !== undefined) {
-      authMetadata.phone = cleanPhone;
-    }
-
-    if (cleanAvatar !== undefined) {
-      authMetadata.avatar_url = cleanAvatar;
-    }
+    if (cleanPhone !== undefined) authMetadata.phone = cleanPhone;
+    if (cleanAvatar !== undefined) authMetadata.avatar_url = cleanAvatar;
 
     if (Object.keys(authMetadata).length > 0) {
-      const { error: authError } =
-        await supabase.auth.updateUser({
-          data: authMetadata,
-        });
-
+      const { error: authError } = await supabase.auth.updateUser({
+        data: authMetadata,
+      });
       if (authError) {
-        return {
-          success: false,
-          error: authError.message,
-        };
+        return { success: false, error: authError.message };
       }
     }
 
-    /**
-     * Update only editable database columns.
-     */
     const dbPayload: Record<string, any> = {
-      updated_at:
-        new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
+    if (cleanName !== undefined) dbPayload.name = cleanName;
+    if (cleanPhone !== undefined) dbPayload.phone = cleanPhone;
+    if (cleanAvatar !== undefined) dbPayload.avatar = cleanAvatar;
 
-    if (cleanName !== undefined) {
-      dbPayload.name = cleanName;
-    }
-
-    if (cleanPhone !== undefined) {
-      dbPayload.phone = cleanPhone;
-    }
-
-    if (cleanAvatar !== undefined) {
-      dbPayload.avatar = cleanAvatar;
-    }
-
-    const { error: dbError } =
-      await supabase
-        .from('users')
-        .update(dbPayload)
-        .eq('id', userId);
-
+    const { error: dbError } = await supabase
+      .from('users')
+      .update(dbPayload)
+      .eq('id', userId);
     if (dbError) {
-      return {
-        success: false,
-        error: dbError.message,
-      };
+      return { success: false, error: dbError.message };
     }
-
-    return {
-      success: true,
-    };
+    return { success: true };
   } catch (err: any) {
     return {
       success: false,
-      error:
-        err?.message ||
-        'Failed to update profile.',
+      error: err?.message || 'Failed to update profile.',
     };
   }
 }
 
-/**
- * Fetch registered users for admin view.
- *
- * NOTE:
- * This function should only be called from trusted admin UI/API.
- * RLS/server authorization must still enforce admin access.
- */
-export async function fetchSupabaseRegisteredUsers(): Promise<
-  any[] | null
-> {
-  if (!isSupabaseConfigured()) {
-    return null;
-  }
+/* ============================================================
+   FETCH USERS (Admin)
+   ============================================================ */
 
+export async function fetchSupabaseRegisteredUsers(): Promise<any[] | null> {
+  if (!isSupabaseConfigured()) return null;
   try {
-    const { data, error } =
-      await supabase
-        .from('users')
-        .select(
-          'id,name,email,phone,avatar,badge,rank,role,is_admin,coins,wins,battles,is_verified,is_blocked,chat_blocked,created_at'
-        )
-        .order('created_at', {
-          ascending: false,
-        });
-
-    if (error || !data) {
-      return null;
-    }
-
+    const { data, error } = await supabase
+      .from('users')
+      .select(
+        'id,name,email,phone,avatar,badge,rank,role,is_admin,coins,wins,battles,created_at'
+      )
+      .order('created_at', { ascending: false });
+    if (error || !data) return null;
     return data;
   } catch {
     return null;
   }
 }
 
-/**
- * NEWS
- */
-export async function fetchSupabaseNews(): Promise<
-  NewsItem[] | null
-> {
-  if (!isSupabaseConfigured()) {
-    return null;
-  }
+/* ============================================================
+   FETCH CONTENT
+   ============================================================ */
 
+export async function fetchSupabaseNews(): Promise<NewsItem[] | null> {
+  if (!isSupabaseConfigured()) return null;
   try {
-    const { data, error } =
-      await supabase
-        .from('news')
-        .select('*')
-        .order('created_at', {
-          ascending: false,
-        });
-
-    if (error || !data) {
-      return null;
-    }
-
+    const { data, error } = await supabase
+      .from('news')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error || !data) return null;
     return data.map((item: any) => ({
       id: item.id,
       title: item.title,
@@ -872,12 +544,9 @@ export async function fetchSupabaseNews(): Promise<
       content: item.content,
       imageUrl: item.image_url,
       author: item.author,
-      published:
-        item.published ?? true,
+      published: item.published ?? true,
       createdAt: item.created_at
-        ? new Date(
-            item.created_at
-          ).getTime()
+        ? new Date(item.created_at).getTime()
         : Date.now(),
       views: item.views || 0,
     }));
@@ -886,29 +555,14 @@ export async function fetchSupabaseNews(): Promise<
   }
 }
 
-/**
- * PEOPLE
- */
-export async function fetchSupabasePeople(): Promise<
-  PersonProfile[] | null
-> {
-  if (!isSupabaseConfigured()) {
-    return null;
-  }
-
+export async function fetchSupabasePeople(): Promise<PersonProfile[] | null> {
+  if (!isSupabaseConfigured()) return null;
   try {
-    const { data, error } =
-      await supabase
-        .from('people')
-        .select('*')
-        .order('created_at', {
-          ascending: false,
-        });
-
-    if (error || !data) {
-      return null;
-    }
-
+    const { data, error } = await supabase
+      .from('people')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error || !data) return null;
     return data.map((item: any) => ({
       id: item.id,
       name: item.name,
@@ -917,12 +571,9 @@ export async function fetchSupabasePeople(): Promise<
       photoUrl: item.photo_url,
       achievements: item.achievements,
       category: item.category,
-      published:
-        item.published ?? true,
+      published: item.published ?? true,
       createdAt: item.created_at
-        ? new Date(
-            item.created_at
-          ).getTime()
+        ? new Date(item.created_at).getTime()
         : Date.now(),
     }));
   } catch {
@@ -930,29 +581,14 @@ export async function fetchSupabasePeople(): Promise<
   }
 }
 
-/**
- * BUSINESS
- */
-export async function fetchSupabaseBusiness(): Promise<
-  BusinessItem[] | null
-> {
-  if (!isSupabaseConfigured()) {
-    return null;
-  }
-
+export async function fetchSupabaseBusiness(): Promise<BusinessItem[] | null> {
+  if (!isSupabaseConfigured()) return null;
   try {
-    const { data, error } =
-      await supabase
-        .from('business')
-        .select('*')
-        .order('created_at', {
-          ascending: false,
-        });
-
-    if (error || !data) {
-      return null;
-    }
-
+    const { data, error } = await supabase
+      .from('business')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error || !data) return null;
     return data.map((item: any) => ({
       id: item.id,
       name: item.name,
@@ -961,14 +597,10 @@ export async function fetchSupabaseBusiness(): Promise<
       address: item.address,
       description: item.description,
       logoUrl: item.logo_url,
-      verified:
-        item.verified ?? true,
-      published:
-        item.published ?? true,
+      verified: item.verified ?? true,
+      published: item.published ?? true,
       createdAt: item.created_at
-        ? new Date(
-            item.created_at
-          ).getTime()
+        ? new Date(item.created_at).getTime()
         : Date.now(),
     }));
   } catch {
@@ -976,41 +608,23 @@ export async function fetchSupabaseBusiness(): Promise<
   }
 }
 
-/**
- * GALLERY
- */
-export async function fetchSupabaseGallery(): Promise<
-  GalleryItem[] | null
-> {
-  if (!isSupabaseConfigured()) {
-    return null;
-  }
-
+export async function fetchSupabaseGallery(): Promise<GalleryItem[] | null> {
+  if (!isSupabaseConfigured()) return null;
   try {
-    const { data, error } =
-      await supabase
-        .from('gallery')
-        .select('*')
-        .order('created_at', {
-          ascending: false,
-        });
-
-    if (error || !data) {
-      return null;
-    }
-
+    const { data, error } = await supabase
+      .from('gallery')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error || !data) return null;
     return data.map((item: any) => ({
       id: item.id,
       title: item.title,
       category: item.category,
       imageUrl: item.image_url,
       caption: item.caption,
-      published:
-        item.published ?? true,
+      published: item.published ?? true,
       createdAt: item.created_at
-        ? new Date(
-            item.created_at
-          ).getTime()
+        ? new Date(item.created_at).getTime()
         : Date.now(),
     }));
   } catch {
@@ -1018,44 +632,24 @@ export async function fetchSupabaseGallery(): Promise<
   }
 }
 
-/**
- * VIDEOS
- */
-export async function fetchSupabaseVideos(): Promise<
-  VideoItem[] | null
-> {
-  if (!isSupabaseConfigured()) {
-    return null;
-  }
-
+export async function fetchSupabaseVideos(): Promise<VideoItem[] | null> {
+  if (!isSupabaseConfigured()) return null;
   try {
-    const { data, error } =
-      await supabase
-        .from('videos')
-        .select('*')
-        .order('created_at', {
-          ascending: false,
-        });
-
-    if (error || !data) {
-      return null;
-    }
-
+    const { data, error } = await supabase
+      .from('videos')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error || !data) return null;
     return data.map((item: any) => ({
       id: item.id,
       title: item.title,
       category: item.category,
       videoUrl: item.video_url,
-      thumbnailUrl:
-        item.thumbnail_url,
-      description:
-        item.description,
-      published:
-        item.published ?? true,
+      thumbnailUrl: item.thumbnail_url,
+      description: item.description,
+      published: item.published ?? true,
       createdAt: item.created_at
-        ? new Date(
-            item.created_at
-          ).getTime()
+        ? new Date(item.created_at).getTime()
         : Date.now(),
       views: item.views || 0,
     }));
@@ -1064,45 +658,25 @@ export async function fetchSupabaseVideos(): Promise<
   }
 }
 
-/**
- * COMMUNITY UPDATES
- */
-export async function fetchSupabaseUpdates(): Promise<
-  CommunityUpdate[] | null
-> {
-  if (!isSupabaseConfigured()) {
-    return null;
-  }
-
+export async function fetchSupabaseUpdates(): Promise<CommunityUpdate[] | null> {
+  if (!isSupabaseConfigured()) return null;
   try {
-    const { data, error } =
-      await supabase
-        .from('updates')
-        .select('*')
-        .order('created_at', {
-          ascending: false,
-        });
-
-    if (error || !data) {
-      return null;
-    }
-
+    const { data, error } = await supabase
+      .from('updates')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error || !data) return null;
     return data.map((item: any) => ({
       id: item.id,
       title: item.title,
       summary: item.summary,
       tag: item.tag,
-      badgeColor:
-        item.badge_color || 'amber',
-      published:
-        item.published ?? true,
-      date:
-        item.date || 'Recent',
+      badgeColor: item.badge_color || 'amber',
+      published: item.published ?? true,
+      date: item.date || 'Recent',
       linkUrl: item.link_url,
       createdAt: item.created_at
-        ? new Date(
-            item.created_at
-          ).getTime()
+        ? new Date(item.created_at).getTime()
         : Date.now(),
     }));
   } catch {
@@ -1110,29 +684,14 @@ export async function fetchSupabaseUpdates(): Promise<
   }
 }
 
-/**
- * BATTLES
- */
-export async function fetchSupabaseBattles(): Promise<
-  BattleEvent[] | null
-> {
-  if (!isSupabaseConfigured()) {
-    return null;
-  }
-
+export async function fetchSupabaseBattles(): Promise<BattleEvent[] | null> {
+  if (!isSupabaseConfigured()) return null;
   try {
-    const { data, error } =
-      await supabase
-        .from('battles')
-        .select('*')
-        .order('created_at', {
-          ascending: false,
-        });
-
-    if (error || !data) {
-      return null;
-    }
-
+    const { data, error } = await supabase
+      .from('battles')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error || !data) return null;
     return data.map((b: any) => ({
       id: b.id,
       title: b.title,
@@ -1140,70 +699,41 @@ export async function fetchSupabaseBattles(): Promise<
       description: b.description,
       optionA: b.option_a,
       optionB: b.option_b,
-      isEnded: Boolean(
-        b.is_ended
-      ),
+      isEnded: Boolean(b.is_ended),
       startsAt: b.starts_at
-        ? new Date(
-            b.starts_at
-          ).getTime()
+        ? new Date(b.starts_at).getTime()
         : Date.now(),
       endsAt: b.ends_at
-        ? new Date(
-            b.ends_at
-          ).getTime()
-        : Date.now() +
-          86400000 * 3,
-      published:
-        b.published ?? true,
-      status:
-        b.status ||
-        (b.is_ended
-          ? 'closed'
-          : 'active'),
-      winnerOptionId:
-        b.winner_option_id,
+        ? new Date(b.ends_at).getTime()
+        : Date.now() + 86400000 * 3,
+      published: b.published ?? true,
+      status: b.status || (b.is_ended ? 'closed' : 'active'),
+      winnerOptionId: b.winner_option_id,
     }));
   } catch {
     return null;
   }
 }
 
-/**
- * WORLD CHAT
- *
- * ONLY the last 10 minutes are loaded.
- */
-export async function fetchSupabaseChatMessages(): Promise<
-  ChatMessage[] | null
-> {
-  if (!isSupabaseConfigured()) {
-    return null;
-  }
+/* ============================================================
+   CHAT
+   ============================================================ */
 
+export async function fetchSupabaseChatMessages(): Promise<ChatMessage[] | null> {
+  if (!isSupabaseConfigured()) return null;
   try {
-    const tenMinutesAgo =
-      new Date(
-        Date.now() -
-          CHAT_MESSAGE_EXPIRATION_MS
-      ).toISOString();
+    const tenMinutesAgo = new Date(
+      Date.now() - CHAT_MESSAGE_EXPIRATION_MS
+    ).toISOString();
 
-    const { data, error } =
-      await supabase
-        .from('chat_messages')
-        .select('*')
-        .gte(
-          'created_at',
-          tenMinutesAgo
-        )
-        .order('created_at', {
-          ascending: true,
-        })
-        .limit(250);
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .select('*')
+      .gte('created_at', tenMinutesAgo)
+      .order('created_at', { ascending: true })
+      .limit(250);
 
-    if (error || !data) {
-      return null;
-    }
+    if (error || !data) return null;
 
     return data
       .map((m: any) => ({
@@ -1214,63 +744,33 @@ export async function fetchSupabaseChatMessages(): Promise<
         userBadge: m.user_badge,
         text: m.text,
         timestamp: m.created_at
-          ? new Date(
-              m.created_at
-            ).getTime()
+          ? new Date(m.created_at).getTime()
           : Date.now(),
-        sticker:
-          m.sticker || undefined,
+        sticker: m.sticker || undefined,
         isAi: Boolean(m.is_ai),
         isVerified:
           Boolean(m.is_verified) ||
-          m.user_id ===
-            'dhoti_aale_ai_official' ||
-          m.user_name ===
-            'DHOTI AALE AI',
+          m.user_id === 'dhoti_aale_ai_official' ||
+          m.user_name === 'DHOTI AALE AI',
       }))
       .filter(
         (message) =>
-          Date.now() -
-            message.timestamp <=
-          CHAT_MESSAGE_EXPIRATION_MS
+          Date.now() - message.timestamp <= CHAT_MESSAGE_EXPIRATION_MS
       );
   } catch {
     return null;
   }
 }
 
-/**
- * INSERT WORLD CHAT MESSAGE
- */
 export async function insertSupabaseChatMessage(
   msg: ChatMessage
 ): Promise<boolean> {
-  if (
-    !isSupabaseConfigured() ||
-    !msg?.userId ||
-    !msg?.id
-  ) {
-    return false;
-  }
-
+  if (!isSupabaseConfigured() || !msg?.userId || !msg?.id) return false;
   try {
-    const createdAt =
-      msg.timestamp || Date.now();
+    const createdAt = msg.timestamp || Date.now();
+    if (Date.now() - createdAt > CHAT_MESSAGE_EXPIRATION_MS) return false;
 
-    /**
-     * Do not allow insertion of an already-expired message.
-     */
-    if (
-      Date.now() - createdAt >
-      CHAT_MESSAGE_EXPIRATION_MS
-    ) {
-      return false;
-    }
-
-    const payload: Record<
-      string,
-      any
-    > = {
+    const payload: Record<string, any> = {
       id: msg.id,
       user_id: msg.userId,
       user_name: msg.userName,
@@ -1279,163 +779,89 @@ export async function insertSupabaseChatMessage(
       text: msg.text || '',
       sticker: msg.sticker || null,
       is_ai: Boolean(msg.isAi),
-      is_verified: Boolean(
-        msg.isVerified
-      ),
-      created_at:
-        new Date(
-          createdAt
-        ).toISOString(),
+      is_verified: Boolean(msg.isVerified),
+      created_at: new Date(createdAt).toISOString(),
     };
 
-    const { error } =
-      await supabase
-        .from('chat_messages')
-        .insert(payload);
+    const { error } = await supabase
+      .from('chat_messages')
+      .insert(payload);
 
     if (error) {
-      console.warn(
-        'Could not insert chat message:',
-        error.message
-      );
-
+      console.warn('Could not insert chat message:', error.message);
       return false;
     }
-
     return true;
   } catch (err) {
-    console.warn(
-      'Chat insert error:',
-      err
-    );
-
+    console.warn('Chat insert error:', err);
     return false;
   }
 }
 
-/**
- * DELETE WORLD CHAT MESSAGE
- */
 export async function deleteSupabaseChatMessage(
   messageId: string
 ): Promise<boolean> {
-  if (
-    !isSupabaseConfigured() ||
-    !messageId
-  ) {
-    return false;
-  }
-
+  if (!isSupabaseConfigured() || !messageId) return false;
   try {
-    const { error } =
-      await supabase
-        .from('chat_messages')
-        .delete()
-        .eq('id', messageId);
-
+    const { error } = await supabase
+      .from('chat_messages')
+      .delete()
+      .eq('id', messageId);
     if (error) {
-      console.warn(
-        'Could not delete chat message:',
-        error.message
-      );
-
+      console.warn('Could not delete chat message:', error.message);
       return false;
     }
-
     return true;
   } catch {
     return false;
   }
 }
 
-/**
- * DELETE ALL EXPIRED WORLD CHAT MESSAGES.
- *
- * Expiration = 10 minutes.
- *
- * This function can be called by:
- * - /api/chat GET
- * - a scheduled Supabase job
- * - an admin cleanup endpoint
- */
 export async function cleanupExpiredSupabaseChatMessages(): Promise<{
   success: boolean;
   deleted?: number;
   error?: string;
 }> {
   if (!isSupabaseConfigured()) {
-    return {
-      success: false,
-      error: 'SUPABASE_NOT_CONFIGURED',
-    };
+    return { success: false, error: 'SUPABASE_NOT_CONFIGURED' };
   }
 
   try {
-    const tenMinutesAgo =
-      new Date(
-        Date.now() -
-          CHAT_MESSAGE_EXPIRATION_MS
-      ).toISOString();
+    const tenMinutesAgo = new Date(
+      Date.now() - CHAT_MESSAGE_EXPIRATION_MS
+    ).toISOString();
 
-    /**
-     * First find expired IDs so we can return a useful count.
-     */
-    const { data: expiredRows } =
-      await supabase
-        .from('chat_messages')
-        .select('id')
-        .lt(
-          'created_at',
-          tenMinutesAgo
-        );
+    const { data: expiredRows } = await supabase
+      .from('chat_messages')
+      .select('id')
+      .lt('created_at', tenMinutesAgo);
 
-    const expiredCount =
-      expiredRows?.length || 0;
-
+    const expiredCount = expiredRows?.length || 0;
     if (expiredCount === 0) {
-      return {
-        success: true,
-        deleted: 0,
-      };
+      return { success: true, deleted: 0 };
     }
 
-    const { error } =
-      await supabase
-        .from('chat_messages')
-        .delete()
-        .lt(
-          'created_at',
-          tenMinutesAgo
-        );
+    const { error } = await supabase
+      .from('chat_messages')
+      .delete()
+      .lt('created_at', tenMinutesAgo);
 
     if (error) {
-      return {
-        success: false,
-        error: error.message,
-      };
+      return { success: false, error: error.message };
     }
-
-    return {
-      success: true,
-      deleted: expiredCount,
-    };
+    return { success: true, deleted: expiredCount };
   } catch (err: any) {
     return {
       success: false,
-      error:
-        err?.message ||
-        'Chat cleanup failed.',
+      error: err?.message || 'Chat cleanup failed.',
     };
   }
 }
 
-/**
- * RECORD BATTLE VOTE
- *
- * NOTE:
- * Real authorization must still happen in the API route.
- * The frontend must never be trusted for voter identity.
- */
+/* ============================================================
+   VOTES (Legacy — Use /api/battles/vote instead)
+   ============================================================ */
+
 export async function recordSupabaseVote(
   battleId: string,
   userEmail: string,
@@ -1447,128 +873,93 @@ export async function recordSupabaseVote(
   alreadyVoted?: boolean;
 }> {
   if (!isSupabaseConfigured()) {
-    return {
-      success: false,
-      error: 'SUPABASE_NOT_CONFIGURED',
-    };
+    return { success: false, error: 'SUPABASE_NOT_CONFIGURED' };
   }
 
-  if (
-    !battleId ||
-    !optionId
-  ) {
+  if (!battleId || !optionId) {
     return {
       success: false,
-      error:
-        'Battle ID and option ID are required.',
+      error: 'Battle ID and option ID are required.',
     };
   }
 
   try {
-    const cleanEmail =
-      userEmail
-        ?.trim()
-        .toLowerCase() || '';
-
-    /**
-     * Prefer the authenticated Supabase user.
-     */
-    const currentUser =
-      await getCurrentSupabaseUser();
-
-    const authenticatedUserId =
-      currentUser?.id ||
-      userId ||
-      null;
+    const cleanEmail = userEmail?.trim().toLowerCase() || '';
+    const currentUser = await getCurrentSupabaseUser();
+    const authenticatedUserId = currentUser?.id || userId || null;
 
     if (!authenticatedUserId) {
-      return {
-        success: false,
-        error: 'User is not authenticated.',
-      };
+      return { success: false, error: 'User is not authenticated.' };
     }
 
-    /**
-     * Check duplicate by authenticated user ID.
-     */
-    const {
-      data: existingByUser,
-    } = await supabase
+    const { data: existingByUser } = await supabase
       .from('battle_votes')
-      .select(
-        'id,option_id'
-      )
-      .eq(
-        'battle_id',
-        battleId
-      )
-      .eq(
-        'user_id',
-        authenticatedUserId
-      )
+      .select('id,option_id')
+      .eq('battle_id', battleId)
+      .eq('user_id', authenticatedUserId)
       .maybeSingle();
 
     if (existingByUser) {
-      return {
-        success: false,
-        alreadyVoted: true,
-      };
+      return { success: false, alreadyVoted: true };
     }
 
-    /**
-     * Insert vote.
-     *
-     * user_id is the important identity.
-     * user_email is retained only for compatibility
-     * with the existing database schema.
-     */
-    const votePayload: Record<
-      string,
-      any
-    > = {
+    const votePayload: Record<string, any> = {
       battle_id: battleId,
-      user_id:
-        authenticatedUserId,
+      user_id: authenticatedUserId,
       option_id: optionId,
-      created_at:
-        new Date().toISOString(),
+      created_at: new Date().toISOString(),
     };
 
     if (cleanEmail) {
-      votePayload.user_email =
-        cleanEmail;
+      votePayload.user_email = cleanEmail;
     }
 
-    const { error } =
-      await supabase
-        .from('battle_votes')
-        .insert(votePayload);
+    const { error } = await supabase
+      .from('battle_votes')
+      .insert(votePayload);
 
     if (error) {
-      if (
-        error.code === '23505'
-      ) {
-        return {
-          success: false,
-          alreadyVoted: true,
-        };
+      if (error.code === '23505') {
+        return { success: false, alreadyVoted: true };
       }
-
-      return {
-        success: false,
-        error: error.message,
-      };
+      return { success: false, error: error.message };
     }
 
-    return {
-      success: true,
-    };
+    return { success: true };
   } catch (err: any) {
     return {
       success: false,
-      error:
-        err?.message ||
-        'Vote failed.',
+      error: err?.message || 'Vote failed.',
     };
+  }
+}
+
+/* ============================================================
+   SITE SETTINGS
+   ============================================================ */
+
+export async function fetchSupabaseSettings(): Promise<SiteSettings | null> {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    const { data, error } = await supabase
+      .from('site_settings')
+      .select('*')
+      .eq('id', 'default')
+      .maybeSingle();
+
+    if (error || !data) return null;
+
+    return {
+      siteTitle: data.site_title || 'DHOTI AALE',
+      siteTagline: data.site_tagline || 'Chat • Battle • AI Assistant',
+      announcementBanner: data.announcement_banner || '',
+      isAnnouncementActive: data.is_announcement_active ?? true,
+      allowWorldChat: data.allow_world_chat ?? true,
+      allowGuestAi: data.allow_guest_ai ?? true,
+      heroBadge: data.hero_badge || 'Pure Desi Vibe • 100% Real Community 👑',
+      contactEmail: data.contact_email || 'rohitdhakaddhoti143@gmail.com',
+    };
+  } catch {
+    return null;
   }
 }

@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import Image from 'next/image';
 import { User } from '@/types';
 import {
   X,
@@ -543,11 +542,12 @@ export function GoogleAuthModal({
                           : 'border-slate-800 bg-slate-950/50 hover:border-slate-700'
                       }`}
                     >
-                      <Image
+                      <img
                         src={p.url}
                         alt={p.name}
                         width={28}
                         height={28}
+                        referrerPolicy="no-referrer"
                         className="rounded-lg object-cover bg-slate-800"
                       />
                       <span className="text-[9px] font-bold text-slate-300 truncate w-full text-center">

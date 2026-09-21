@@ -18,7 +18,6 @@ import {
 import { User, ProblemReport, ReportMessage, ReportStatus } from '@/types';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { SoundEffects } from '@/lib/audio/sound-effects';
-import Image from 'next/image';
 
 interface ReportProblemModalProps {
   currentUser: User | null;
@@ -633,13 +632,11 @@ export function ReportProblemModal({
                       rel="noopener noreferrer"
                       className="inline-block relative rounded-xl overflow-hidden border border-slate-700 group"
                     >
-                      <Image
+                      <img
                         src={selectedReport.attachmentUrl}
                         alt="Report attachment"
-                        width={280}
-                        height={140}
                         referrerPolicy="no-referrer"
-                        className="max-h-36 object-contain rounded-xl bg-slate-950"
+                        className="max-h-36 max-w-full object-contain rounded-xl bg-slate-950"
                       />
                     </a>
                   </div>
@@ -717,13 +714,11 @@ export function ReportProblemModal({
 
                         {msg.attachmentUrl && (
                           <div className="pt-1">
-                            <Image
+                            <img
                               src={msg.attachmentUrl}
                               alt="attachment"
-                              width={240}
-                              height={120}
                               referrerPolicy="no-referrer"
-                              className="max-h-32 rounded-lg border border-slate-700 bg-slate-950 object-contain"
+                              className="max-h-32 max-w-full rounded-lg border border-slate-700 bg-slate-950 object-contain"
                             />
                           </div>
                         )}

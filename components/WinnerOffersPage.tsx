@@ -381,6 +381,7 @@ export function WinnerOffersPage({
                         <img
                           src={offer.winnerPhoto}
                           alt={offer.winnerName}
+                          referrerPolicy="no-referrer"
                           className="h-full w-full object-cover"
                         />
                       ) : (

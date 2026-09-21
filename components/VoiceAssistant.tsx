@@ -293,7 +293,7 @@ export function VoiceAssistant({
         clearTimeout(toolTimerRef.current);
       }
     };
-  }, [onNavigateTab]);
+  }, [onNavigateTab, currentUser?.email]);
 
   /*
    * ---------------------------------------------------------

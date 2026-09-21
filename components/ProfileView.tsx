@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import Image from 'next/image';
 import { User, AppTab } from '@/types';
 import {
   Coins,
@@ -169,7 +168,7 @@ export function ProfileView({
 
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 relative z-10 text-center sm:text-left">
             <div className="relative shrink-0">
-              <Image
+              <img
                 src={currentUser.avatar}
                 alt={currentUser.name}
                 width={96}
@@ -417,11 +416,12 @@ export function ProfileView({
                 
                 <div className="flex items-center gap-4 mb-3">
                   <div className="relative shrink-0">
-                    <Image
+                    <img
                       src={editAvatar || currentUser.avatar}
                       alt={editName || currentUser.name}
                       width={64}
                       height={64}
+                      referrerPolicy="no-referrer"
                       className="h-16 w-16 rounded-2xl object-cover bg-slate-800 border-2 border-amber-400 shadow"
                     />
                   </div>
@@ -455,11 +455,12 @@ export function ProfileView({
                             : 'border-slate-800 bg-slate-950/50 hover:border-slate-700'
                         }`}
                       >
-                        <Image
+                        <img
                           src={p.url}
                           alt={p.name}
                           width={32}
                           height={32}
+                          referrerPolicy="no-referrer"
                           className="rounded-lg object-cover bg-slate-800"
                         />
                         <span className="text-[9px] font-bold text-slate-300 truncate w-full text-center">

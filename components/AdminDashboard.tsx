@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import Image from 'next/image';
 import {
   User,
   AppTab,
@@ -227,7 +226,7 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
       ] = await Promise.all([
         fetch('/api/admin/content?type=overview', { headers, cache: 'no-store' }),
         fetch('/api/reports', { headers, cache: 'no-store' }),
-        fetch('/api/battle', { headers, cache: 'no-store' }),
+        fetch('/api/battles ', { headers, cache: 'no-store' }),
         fetch('/api/admin/content?type=updates', { headers, cache: 'no-store' }),
         fetch('/api/admin/content?type=news', { headers, cache: 'no-store' }),
         fetch('/api/admin/content?type=people', { headers, cache: 'no-store' }),
@@ -1361,7 +1360,7 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
                       {/* Option A */}
                       <div className="flex items-center gap-2.5">
                         {battle.optionA.imageUrl ? (
-                          <Image
+                          <img
                             src={battle.optionA.imageUrl}
                             alt={battle.optionA.label}
                             width={36}
@@ -1387,7 +1386,7 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
                       {/* Option B */}
                       <div className="flex items-center gap-2.5">
                         {battle.optionB.imageUrl ? (
-                          <Image
+                          <img
                             src={battle.optionB.imageUrl}
                             alt={battle.optionB.label}
                             width={36}
@@ -1419,7 +1418,7 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
                       </div>
                       <div className="flex justify-between text-[10px] text-slate-500">
                         <span>Total Votes: {total}</span>
-                        <span>Ends: {new Date(battle.endsAt ?? Date.now()).toLocaleDateString()}</span>
+                        <span>Ends: {battle.endsAt ? new Date(battle.endsAt).toLocaleString() : 'Not set'}</span>
                       </div>
                     </div>
 
@@ -1569,12 +1568,11 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
                   className="rounded-3xl bg-slate-900/90 border border-slate-800 overflow-hidden flex flex-col shadow-xl"
                 >
                   <div className="relative h-44 w-full bg-slate-800">
-                    <Image
+                    <img
                       src={item.imageUrl}
                       alt={item.title}
-                      fill
                       referrerPolicy="no-referrer"
-                      className="object-cover"
+                      className="absolute inset-0 h-full w-full object-cover"
                     />
                     <div className="absolute top-3 left-3 flex items-center gap-2">
                       <span className="px-2.5 py-1 rounded-full bg-slate-950/80 backdrop-blur-md text-[10px] font-bold text-amber-400 border border-amber-500/30">
@@ -1650,7 +1648,7 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
                   className="rounded-3xl bg-slate-900/90 border border-slate-800 p-4 flex flex-col gap-3"
                 >
                   <div className="flex items-center gap-3">
-                    <Image
+                    <img
                       src={person.photoUrl}
                       alt={person.name}
                       width={48}
@@ -1728,7 +1726,7 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
                   className="rounded-3xl bg-slate-900/90 border border-slate-800 p-4 flex flex-col justify-between gap-3"
                 >
                   <div className="flex items-start gap-3">
-                    <Image
+                    <img
                       src={biz.logoUrl}
                       alt={biz.name}
                       width={48}
@@ -1811,12 +1809,11 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
                   className="rounded-3xl bg-slate-900/90 border border-slate-800 overflow-hidden flex flex-col"
                 >
                   <div className="relative h-44 w-full bg-slate-800">
-                    <Image
+                    <img
                       src={img.imageUrl}
                       alt={img.title}
-                      fill
                       referrerPolicy="no-referrer"
-                      className="object-cover"
+                      className="absolute inset-0 h-full w-full object-cover"
                     />
                     <div className="absolute bottom-2 left-2 right-2 p-2 rounded-xl bg-slate-950/80 backdrop-blur-md">
                       <div className="text-xs font-bold text-white truncate">{img.title}</div>
@@ -1880,12 +1877,11 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
                   className="rounded-3xl bg-slate-900/90 border border-slate-800 overflow-hidden flex flex-col"
                 >
                   <div className="relative h-44 w-full bg-slate-800">
-                    <Image
+                    <img
                       src={vid.thumbnailUrl}
                       alt={vid.title}
-                      fill
                       referrerPolicy="no-referrer"
-                      className="object-cover"
+                      className="absolute inset-0 h-full w-full object-cover"
                     />
                     <div className="absolute inset-0 flex items-center justify-center">
                       <div className="h-12 w-12 rounded-full bg-red-600/90 flex items-center justify-center text-white shadow-xl">
@@ -1956,13 +1952,13 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
                       className="p-4 flex items-start justify-between gap-4 hover:bg-slate-800/40 transition-colors"
                     >
                       <div className="flex items-start gap-3 min-w-0">
-                        <Image
+                        <img
                           src={msg.userAvatar}
                           alt={msg.userName}
                           width={36}
                           height={36}
                           referrerPolicy="no-referrer"
-                          className="h-9 w-9 rounded-full bg-slate-800 ring-2 ring-slate-700 shrink-0"
+                          className="h-9 w-9 rounded-full bg-slate-800 ring-2 ring-slate-700 shrink-0 object-cover"
                         />
                         <div className="min-w-0 space-y-0.5">
                           <div className="flex items-center gap-2">
@@ -2047,7 +2043,7 @@ export function AdminDashboard({ currentUser, onOpenAuth, onNavigateTab }: Admin
                     className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-slate-700 transition-colors"
                   >
                     <div className="flex items-start sm:items-center gap-3 min-w-0">
-                      <Image
+                      <img
                         src={u.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(u.email || 'user')}`}
                         alt={u.name || 'User'}
                         width={44}
@@ -2532,7 +2528,8 @@ function BattleForm({
   const [optBEmoji, setOptBEmoji] = useState(initialData?.optionB?.emoji || '⚡');
   const [optBImage, setOptBImage] = useState(initialData?.optionB?.imageUrl || '');
 
-  const [daysDuration, setDaysDuration] = useState(3);
+  const [durationMinutes, setDurationMinutes] = useState(10);
+  const [customDuration, setCustomDuration] = useState(false);
   const [published, setPublished] = useState(initialData?.published ?? true);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -2544,8 +2541,9 @@ function BattleForm({
       category,
       description,
       published,
-      startsAt: Date.now(),
-      endsAt: Date.now() + 1000 * 60 * 60 * 24 * daysDuration,
+      durationMinutes: Math.max(1, Math.round(Number(durationMinutes) || 10)),
+      startsAt: new Date().toISOString(),
+      endsAt: new Date(Date.now() + Math.max(1, Math.round(Number(durationMinutes) || 10)) * 60 * 1000).toISOString(),
       optionA: {
         id: initialData?.optionA?.id || 'opt_a_' + Math.random().toString(36).substring(2, 6),
         label: optALabel,
@@ -2592,15 +2590,43 @@ function BattleForm({
           />
         </div>
         <div>
-          <label className="font-bold text-slate-300 block mb-1">Duration (Days)</label>
-          <input
-            type="number"
-            min={1}
-            max={30}
-            value={daysDuration}
-            onChange={(e) => setDaysDuration(Number(e.target.value))}
+          <label className="font-bold text-slate-300 block mb-1">Battle Duration</label>
+          <select
+            value={customDuration ? 'custom' : String(durationMinutes)}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value === 'custom') {
+                setCustomDuration(true);
+                return;
+              }
+              setCustomDuration(false);
+              setDurationMinutes(Number(value));
+            }}
             className="w-full rounded-xl bg-slate-950 border border-slate-800 p-2.5 text-white focus:outline-none focus:border-amber-500"
-          />
+          >
+            <option value="1">1 minute</option>
+            <option value="5">5 minutes</option>
+            <option value="10">10 minutes</option>
+            <option value="30">30 minutes</option>
+            <option value="60">1 hour</option>
+            <option value="360">6 hours</option>
+            <option value="720">12 hours</option>
+            <option value="1440">24 hours</option>
+            <option value="4320">3 days</option>
+            <option value="10080">7 days</option>
+            <option value="custom">Custom minutes</option>
+          </select>
+          {customDuration && (
+            <input
+              type="number"
+              min={1}
+              max={525600}
+              value={durationMinutes}
+              onChange={(e) => setDurationMinutes(Math.max(1, Number(e.target.value) || 1))}
+              placeholder="Enter minutes"
+              className="w-full mt-2 rounded-xl bg-slate-950 border border-slate-800 p-2.5 text-white focus:outline-none focus:border-amber-500"
+            />
+          )}
         </div>
       </div>
 

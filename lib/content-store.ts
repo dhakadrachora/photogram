@@ -19,6 +19,7 @@ import {
  * - This in-memory store is only a compatibility/runtime layer.
  * - Votes are keyed by authenticated user identity.
  * - Expired battles are NEVER automatically deleted.
+ * - NO seed data exists here. Supabase is the ONLY source of truth.
  */
 export interface BattleEventStore extends BattleEvent {
   votedUserEmails: Set<string>;
@@ -82,242 +83,18 @@ export const WORLD_CHAT_EXPIRATION_MS = minutes(10);
 export const MAX_MEMORY_CHAT_MESSAGES = 100;
 
 /* -------------------------------------------------------------------------- */
-/* Initial News                                                               */
+/* ⚠️ SEED DATA REMOVED                                                       */
 /* -------------------------------------------------------------------------- */
-
-const initialNews: NewsItem[] = [
-  {
-    id: 'news-1',
-    title: 'Dhoti aale Annual Village Fest & Cultural Mela Announced',
-    category: 'Culture & Festival',
-    excerpt:
-      'Gramin sabha has finalized the dates for the grand rural festival with wrestling, kabaddi, and folk music competitions.',
-    content:
-      'The 2026 Dhoti aale Cultural Fest will span three days featuring traditional games, agricultural tech stalls, and an evening desi rap show. Registration for local youth competitions is now live.',
-    imageUrl:
-      'https://images.unsplash.com/photo-1511556532299-8f662fc26c06?w=800&auto=format&fit=crop&q=80',
-    author: 'Dhoti Editorial Desk',
-    published: true,
-    createdAt: now() - days(2),
-    views: 420,
-  },
-  {
-    id: 'news-2',
-    title: 'Rural Youth Solar Initiative Powered by Local Farmers',
-    category: 'Development & Tech',
-    excerpt:
-      'New cooperative solar pump installations set to power over 200 acres of agricultural land across the region.',
-    content:
-      'A community-led cooperative has successfully brought clean solar energy to irrigate fields, cutting diesel costs by 70%. Dhoti aale youth pioneers are actively driving tech adoption.',
-    imageUrl:
-      'https://images.unsplash.com/photo-1497440001374-f26997328c1b?w=800&auto=format&fit=crop&q=80',
-    author: 'Community News Desk',
-    published: true,
-    createdAt: now() - days(5),
-    views: 650,
-  },
-];
-
-/* -------------------------------------------------------------------------- */
-/* Initial People                                                             */
-/* -------------------------------------------------------------------------- */
-
-const initialPeople: PersonProfile[] = [
-  {
-    id: 'person-1',
-    name: 'Kailash Ji Dhakad',
-    designation: 'Village Elder & Community Guide',
-    bio:
-      'Pioneering community welfare for rural areas, cultural heritage preservation, and inspiring local youth.',
-    photoUrl:
-      'https://api.dicebear.com/7.x/bottts/svg?seed=elder-dhoti',
-    achievements:
-      'Lifetime community service, village welfare promoter & patron of folk arts.',
-    category: 'Leadership 👑',
-    published: true,
-    createdAt: now() - days(30),
-  },
-  {
-    id: 'person-2',
-    name: 'Suresh Choudhary',
-    designation: 'Folk Culture & Youth Mentor',
-    bio:
-      'Championing rural rap, grassroots sports, and desi culture storytelling across regional stages.',
-    photoUrl:
-      'https://api.dicebear.com/7.x/bottts/svg?seed=suresh-dhoti',
-    achievements:
-      'National level kabaddi player and traditional music promoter.',
-    category: 'Culture & Arts 🎨',
-    published: true,
-    createdAt: now() - days(30),
-  },
-  {
-    id: 'person-3',
-    name: 'Pooja Choudhary',
-    designation: 'State Wrestling Gold Medalist',
-    bio:
-      'Inspiring young village athletes and leading girls sports mentorship camps across five districts.',
-    photoUrl:
-      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80',
-    achievements:
-      '2x State Champion, National Freestyle silver medalist.',
-    category: 'Sports ⚔️',
-    published: true,
-    createdAt: now() - days(15),
-  },
-];
-
-/* -------------------------------------------------------------------------- */
-/* Initial Business                                                           */
-/* -------------------------------------------------------------------------- */
-
-const initialBusiness: BusinessItem[] = [
-  {
-    id: 'biz-1',
-    name: 'Kisan Organic Dairy & Desi Ghee Farm',
-    category: 'Dairy & Agriculture',
-    phone: '+91 98765 43210',
-    address: 'Main Canal Road, Dhoti Nagar',
-    description:
-      'Pure A2 Gir cow milk, bilona ghee, and fresh organic paneer delivered daily.',
-    logoUrl:
-      'https://images.unsplash.com/photo-1500595046743-cd271d694d30?w=500&auto=format&fit=crop&q=80',
-    verified: true,
-    published: true,
-    createdAt: now() - days(10),
-  },
-  {
-    id: 'biz-2',
-    name: 'Shree Balaji Agro & Tractor Spares',
-    category: 'Machinery & Hardware',
-    phone: '+91 98123 45678',
-    address: 'Kisan Market, Shop No. 12',
-    description:
-      'Genuine spare parts, tractor accessories, solar inverter setups, and harvester rentals.',
-    logoUrl:
-      'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=500&auto=format&fit=crop&q=80',
-    verified: true,
-    published: true,
-    createdAt: now() - days(20),
-  },
-];
-
-/* -------------------------------------------------------------------------- */
-/* Initial Gallery                                                            */
-/* -------------------------------------------------------------------------- */
-
-const initialGallery: GalleryItem[] = [
-  {
-    id: 'gal-1',
-    title: 'Morning Fog in Golden Mustard Fields',
-    category: 'Village Landscapes',
-    imageUrl:
-      'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=800&auto=format&fit=crop&q=80',
-    caption: 'Serene winters in Haryana and Punjab heartland.',
-    published: true,
-    createdAt: now() - days(4),
-  },
-  {
-    id: 'gal-2',
-    title: 'Kisan Mela Tractor Pride',
-    category: 'Community Events',
-    imageUrl:
-      'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop&q=80',
-    caption:
-      'Modified machinery and farmer enthusiasm at the annual fair.',
-    published: true,
-    createdAt: now() - days(7),
-  },
-  {
-    id: 'gal-3',
-    title: 'Desi Akhada Practice Session',
-    category: 'Sports & Swag',
-    imageUrl:
-      'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=800&auto=format&fit=crop&q=80',
-    caption:
-      'Morning soil wrestling drills with village youngsters.',
-    published: true,
-    createdAt: now() - days(9),
-  },
-];
-
-/* -------------------------------------------------------------------------- */
-/* Initial Videos                                                             */
-/* -------------------------------------------------------------------------- */
-
-const initialVideos: VideoItem[] = [
-  {
-    id: 'vid-1',
-    title: 'Dhoti aale Village Rap Cypher 2026',
-    category: 'Rap & Music',
-    videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-    thumbnailUrl:
-      'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800&auto=format&fit=crop&q=80',
-    description:
-      'Local talents dropping verses in pure desi flow with dholak beats.',
-    published: true,
-    createdAt: now() - days(3),
-    views: 1240,
-  },
-  {
-    id: 'vid-2',
-    title: 'Documentary: The Heritage of Desi Dhoti & Pagri',
-    category: 'Cultural Heritage',
-    videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-    thumbnailUrl:
-      'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=800&auto=format&fit=crop&q=80',
-    description:
-      'A deep dive into our ancestors traditions, fabric craftsmanship, and pride.',
-    published: true,
-    createdAt: now() - days(12),
-    views: 2890,
-  },
-];
-
-/* -------------------------------------------------------------------------- */
-/* Initial Community Updates                                                  */
-/* -------------------------------------------------------------------------- */
-
-const initialUpdates: CommunityUpdate[] = [
-  {
-    id: 'upd-1',
-    title:
-      'Official Battle: Chole Bhature vs Cheesy Pizza Voting Is Live!',
-    summary:
-      'Cast your official vote in the community food clash. One vote per verified Google user.',
-    tag: 'Battle Arena',
-    badgeColor: 'amber',
-    published: true,
-    date: 'Today',
-    linkUrl: '#battle',
-    createdAt: now() - hours(2),
-  },
-  {
-    id: 'upd-2',
-    title: 'Dhoti aale AI Voice Assistant Upgrade Released',
-    summary:
-      'Experience faster voice turnaround and bilingual Hindi-English dialect conversation.',
-    tag: 'System Update',
-    badgeColor: 'sky',
-    published: true,
-    date: 'Yesterday',
-    linkUrl: '#assistant',
-    createdAt: now() - days(1),
-  },
-  {
-    id: 'upd-3',
-    title:
-      'DHOTI AALE Launches Full Community Content Admin System',
-    summary:
-      'Direct management of battles, news, village businesses, and world chat moderation is now operational.',
-    tag: 'Community',
-    badgeColor: 'emerald',
-    published: true,
-    date: '2 Days Ago',
-    linkUrl: '#home',
-    createdAt: now() - days(2),
-  },
-];
+/*
+ * ALL hard-coded seed arrays have been DELETED.
+ *
+ * Reason:
+ * - Seed data caused deleted battles to RESURRECT after server restart.
+ * - Seed data caused fake votes (342, 512, 780) to appear.
+ * - Supabase is the SINGLE SOURCE OF TRUTH.
+ *
+ * Everything is now loaded from Supabase in the API routes.
+ */
 
 /* -------------------------------------------------------------------------- */
 /* Battle Helpers                                                             */
@@ -325,10 +102,6 @@ const initialUpdates: CommunityUpdate[] = [
 
 /**
  * Creates a safe battle state.
- *
- * Battle images are normal URLs here.
- * Actual image upload/storage should be handled by the admin API +
- * Supabase Storage/R2 and then saved as imageUrl.
  */
 function createBattle(
   battle: BattleEventStore
@@ -360,11 +133,6 @@ function createBattle(
 
 /**
  * Calculates winner from real persisted vote totals.
- *
- * Returns:
- * - option A id
- * - option B id
- * - null when tied
  */
 export function calculateBattleWinner(
   battle: Pick<BattleEventStore, 'optionA' | 'optionB'>
@@ -409,9 +177,6 @@ export function isBattleExpired(
 
 /**
  * Finalizes a battle in memory.
- *
- * IMPORTANT:
- * It does NOT delete the battle.
  */
 export function finalizeBattle(
   battle: BattleEventStore,
@@ -491,146 +256,6 @@ export function formatBattleCountdown(
 }
 
 /* -------------------------------------------------------------------------- */
-/* Initial Battles                                                            */
-/* -------------------------------------------------------------------------- */
-
-const initialBattles: BattleEventStore[] = [
-  createBattle({
-    id: 'battle-1',
-    title: 'Desi Food Clash: Chole Bhature vs Pizza',
-    category: 'Desi Food 👑',
-    description:
-      'Desi street food king ya Italian cheese feast? Kaun jitega Dhoti aale crown?',
-    optionA: {
-      id: 'chole',
-      label: 'Chole Bhature',
-      tagline: 'Desi Makkhan & Pyaaz Swag',
-      votes: 342,
-      emoji: '🍛',
-      imageUrl:
-        'https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?w=400&auto=format&fit=crop&q=80',
-    },
-    optionB: {
-      id: 'pizza',
-      label: 'Cheesy Pizza',
-      tagline: 'Extra Cheese & Crust Feast',
-      votes: 219,
-      emoji: '🍕',
-      imageUrl:
-        'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&auto=format&fit=crop&q=80',
-    },
-
-    isEnded: false,
-
-    startsAt: now() - hours(24),
-
-    endsAt: now() + days(3),
-
-    durationMs: days(4),
-
-    published: true,
-    status: 'active',
-
-    winnerOptionId: null,
-
-    votedUserEmails: new Set<string>(),
-    userVotes: new Map<string, string>(),
-  }),
-
-  createBattle({
-    id: 'battle-2',
-    title:
-      'Village Swag vs City Hustle: Desi Rap Battle',
-    category: 'Rap & Beats 🎤',
-    description:
-      'Haryanvi & desi folk flow vs Urban club trap rhyme clash!',
-    optionA: {
-      id: 'village',
-      label: 'Village Desi Flow',
-      tagline: 'Systumm Hang & Haryanvi Rhyme',
-      votes: 512,
-      emoji: '🚜',
-      imageUrl:
-        'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400&auto=format&fit=crop&q=80',
-    },
-    optionB: {
-      id: 'city',
-      label: 'City Metro Trap',
-      tagline: 'Fast Delivery & Modern Beats',
-      votes: 388,
-      emoji: '🏙️',
-      imageUrl:
-        'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=400&auto=format&fit=crop&q=80',
-    },
-
-    isEnded: false,
-
-    startsAt: now() - hours(48),
-
-    endsAt: now() + days(2),
-
-    durationMs: days(4),
-
-    published: true,
-    status: 'active',
-
-    winnerOptionId: null,
-
-    votedUserEmails: new Set<string>(),
-    userVotes: new Map<string, string>(),
-  }),
-
-  createBattle({
-    id: 'battle-3',
-    title:
-      'Bullet 350 vs Thar 4x4: The Ultimate Ride',
-    category: 'Swag & Rides ⚔️',
-    description:
-      'Voting has concluded! Winner declared by community majority.',
-    optionA: {
-      id: 'bullet',
-      label: 'Royal Enfield Dug-Dug',
-      tagline:
-        'Classic Heartbeat of Punjab & Haryana',
-      votes: 780,
-      emoji: '🏍️',
-      imageUrl:
-        'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=400&auto=format&fit=crop&q=80',
-    },
-    optionB: {
-      id: 'thar',
-      label: 'Mahindra Thar 4x4',
-      tagline: 'Off-Road Monster King',
-      votes: 695,
-      emoji: '🚙',
-      imageUrl:
-        'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=400&auto=format&fit=crop&q=80',
-    },
-
-    isEnded: true,
-
-    startsAt: now() - hours(96),
-
-    endsAt: now() - hours(4),
-
-    durationMs: days(4),
-
-    published: true,
-    status: 'closed',
-
-    winnerOptionId: 'bullet',
-
-    votedUserEmails: new Set<string>([
-      'sample.user@gmail.com',
-    ]),
-
-    userVotes: new Map<string, string>([
-      ['sample.user@gmail.com', 'bullet'],
-    ]),
-  }),
-];
-
-/* -------------------------------------------------------------------------- */
 /* Initial Settings                                                           */
 /* -------------------------------------------------------------------------- */
 
@@ -655,12 +280,6 @@ const initialSettings: SiteSettings = {
 };
 
 /* -------------------------------------------------------------------------- */
-/* Initial Chat                                                               */
-/* -------------------------------------------------------------------------- */
-
-const initialChatMessages: ChatMessage[] = [];
-
-/* -------------------------------------------------------------------------- */
 /* Global Store                                                               */
 /* -------------------------------------------------------------------------- */
 
@@ -668,46 +287,31 @@ class GlobalContentStore {
   /**
    * Content collections.
    *
-   * Supabase is the production source of truth.
-   * These maps are kept for compatibility with existing server code.
+   * ⚠️ These maps start EMPTY.
+   * They are populated from Supabase in the API routes.
    */
-  news: Map<string, NewsItem> = new Map(
-    initialNews.map((item) => [item.id, item])
-  );
+  news: Map<string, NewsItem> = new Map();
 
-  people: Map<string, PersonProfile> = new Map(
-    initialPeople.map((item) => [item.id, item])
-  );
+  people: Map<string, PersonProfile> = new Map();
 
-  business: Map<string, BusinessItem> = new Map(
-    initialBusiness.map((item) => [item.id, item])
-  );
+  business: Map<string, BusinessItem> = new Map();
 
-  gallery: Map<string, GalleryItem> = new Map(
-    initialGallery.map((item) => [item.id, item])
-  );
+  gallery: Map<string, GalleryItem> = new Map();
 
-  videos: Map<string, VideoItem> = new Map(
-    initialVideos.map((item) => [item.id, item])
-  );
+  videos: Map<string, VideoItem> = new Map();
 
-  updates: Map<string, CommunityUpdate> = new Map(
-    initialUpdates.map((item) => [item.id, item])
-  );
+  updates: Map<string, CommunityUpdate> = new Map();
 
   /**
    * Battles.
    *
-   * IMPORTANT:
+   * ⚠️ Starts EMPTY.
+   * Battles are loaded from Supabase in the API routes.
+   *
    * Expired battles remain in this map.
    * They are only removed when an admin explicitly deletes them.
    */
-  battles: Map<string, BattleEventStore> = new Map(
-    initialBattles.map((battle) => [
-      battle.id,
-      battle,
-    ])
-  );
+  battles: Map<string, BattleEventStore> = new Map();
 
   settings: SiteSettings = {
     ...initialSettings,
@@ -715,19 +319,11 @@ class GlobalContentStore {
 
   /**
    * Legacy/runtime chat cache.
-   *
-   * Production chat is handled through Supabase.
-   * World Chat messages expire after 10 minutes.
    */
-  chatMessages: ChatMessage[] = [
-    ...initialChatMessages,
-  ];
+  chatMessages: ChatMessage[] = [];
 
   /**
    * Admin-verified users.
-   *
-   * This should NOT be treated as an authentication source.
-   * Real authorization must use Supabase Auth + server-side checks.
    */
   verifiedUsers: Set<string> = new Set([
     'rohitdhakaddhoti143@gmail.com',
@@ -736,9 +332,6 @@ class GlobalContentStore {
 
   /**
    * Runtime presence cache.
-   *
-   * Production realtime presence should use Supabase Realtime Presence.
-   * This map is only retained for compatibility with older code.
    */
   activePresence: Map<
     string,
@@ -747,9 +340,6 @@ class GlobalContentStore {
 
   /**
    * AI participant control.
-   *
-   * This is runtime-only control state.
-   * It is NOT authentication and does not contain private user data.
    */
   aiControlState = {
     paused: false,
@@ -760,9 +350,6 @@ class GlobalContentStore {
 
   /**
    * Remove expired in-memory chat messages.
-   *
-   * Production cleanup must also happen in Supabase using
-   * scheduled cleanup/cron because server memory is not persistent.
    */
   cleanupExpiredChatMessages(
     timestamp = Date.now()
@@ -790,8 +377,6 @@ class GlobalContentStore {
 
   /**
    * Add a runtime chat message.
-   *
-   * Authentication must already have happened in the API route.
    */
   addChatMessage(
     message: ChatMessage
@@ -843,8 +428,6 @@ class GlobalContentStore {
 
   /**
    * Put/update a battle.
-   *
-   * This never deletes expired battles.
    */
   setBattle(
     battle: BattleEventStore
@@ -862,8 +445,6 @@ class GlobalContentStore {
 
   /**
    * Finalize a battle if its timer has expired.
-   *
-   * The battle remains stored.
    */
   finalizeBattle(
     battleId: string,
@@ -892,8 +473,6 @@ class GlobalContentStore {
 
   /**
    * Finalize all expired battles in memory.
-   *
-   * Does not delete anything.
    */
   finalizeExpiredBattles(
     timestamp = Date.now()
@@ -943,10 +522,6 @@ class GlobalContentStore {
 
   /**
    * Record a runtime vote.
-   *
-   * IMPORTANT:
-   * Production vote API must independently verify the authenticated
-   * Supabase user and enforce uniqueness in the database.
    */
   recordRuntimeVote(
     battleId: string,
@@ -1052,8 +627,6 @@ class GlobalContentStore {
 
   /**
    * Explicit admin deletion only.
-   *
-   * Timer expiry must NEVER call this automatically.
    */
   deleteBattle(
     battleId: string
@@ -1069,7 +642,6 @@ class GlobalContentStore {
 /* -------------------------------------------------------------------------- */
 
 declare global {
-  // eslint-disable-next-line no-var
   var __DHOTI_STORE__:
     | GlobalContentStore
     | undefined;

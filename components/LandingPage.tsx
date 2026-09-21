@@ -277,7 +277,7 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
                 {visiblePeople.slice(0, 3).map((person) => (
                   <div key={person.userId} className="inline-block h-6 w-6 rounded-full ring-2 ring-white bg-stone-200 overflow-hidden text-[10px] flex items-center justify-center font-bold text-stone-700" title={person.userName}>
                     {person.userAvatar ? (
-                      <img src={person.userAvatar} alt="" className="w-full h-full object-cover" />
+                      <img src={person.userAvatar} alt="" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
                     ) : (
                       person.userName.charAt(0).toUpperCase()
                     )}
@@ -368,7 +368,7 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
                     title={person.userName}
                   >
                     {person.userAvatar ? (
-                      <img src={person.userAvatar} alt="" className="w-full h-full object-cover" />
+                      <img src={person.userAvatar} alt="" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
                     ) : (
                       person.userName.charAt(0).toUpperCase()
                     )}
@@ -538,7 +538,7 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
                 <div key={person.userId} className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200/80 flex items-start gap-3">
                   <div className="relative w-10 h-10 rounded-full overflow-hidden bg-stone-200 border border-stone-200 shrink-0 flex items-center justify-center">
                     {person.userAvatar ? (
-                      <img src={person.userAvatar} alt={person.userName} className="w-full h-full object-cover" />
+                      <img src={person.userAvatar} alt={person.userName} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
                     ) : (
                       <span className="text-sm font-black text-stone-700">{person.userName.charAt(0).toUpperCase()}</span>
                     )}

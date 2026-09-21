@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import Image from 'next/image';
 import { User, AppTab } from '@/types';
 import { isSiteAdmin } from '@/lib/admin-auth';
 import {
@@ -217,13 +216,13 @@ export function Navbar({
                 onClick={() => handleTabClick(isAdmin ? 'admin' : 'profile')}
                 className="flex items-center gap-2 rounded-full bg-slate-900 border border-slate-800 p-1 pr-2.5 cursor-pointer hover:border-slate-700 transition-colors"
               >
-                <Image
+                <img
                   src={currentUser.avatar}
                   alt={currentUser.name}
                   width={28}
                   height={28}
                   referrerPolicy="no-referrer"
-                  className="rounded-full bg-slate-800 border border-amber-400/40 object-cover"
+                  className="rounded-full bg-slate-800 border border-amber-400/40 object-cover h-7 w-7"
                 />
                 <span className="text-xs font-semibold text-white hidden sm:inline max-w-[100px] truncate">
                   {currentUser.name}
