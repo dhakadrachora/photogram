@@ -88,8 +88,7 @@ export type AppTab =
   | 'worldchat'
   | 'battle'
   | 'assistant'
-  | 'profile'
-  | 'admin';
+  | 'profile';
 
 export interface ToolCall {
   id: string;

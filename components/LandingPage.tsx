@@ -128,7 +128,7 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
             <PWAInstallButton variant="header" />
             {currentUser && (
               <div
-                onClick={() => onNavigateTab(isAdmin ? 'admin' : 'profile')}
+                onClick={() => onNavigateTab('profile')}
                 className="flex items-center gap-1.5 cursor-pointer bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 rounded-full text-xs font-bold text-amber-900 shadow-xs"
               >
                 <span className="max-w-[80px] truncate text-[11px]">{currentUser.name}</span>
@@ -198,7 +198,7 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
             onClick={() => {
               SoundEffects.playBell();
               if (currentUser) {
-                onNavigateTab(isAdmin ? 'admin' : 'profile');
+                onNavigateTab('profile');
               } else {
                 onOpenAuth();
               }

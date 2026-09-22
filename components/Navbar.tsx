@@ -13,7 +13,6 @@ import {
   LogOut,
   Menu,
   X,
-  Crown,
   AlertCircle,
 } from 'lucide-react';
 
@@ -178,22 +177,6 @@ export function Navbar({
               <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-sky-400 rounded-full shadow-[0_0_8px_rgba(56,189,248,0.8)]" />
             )}
           </button>
-
-          {/* Admin Tab (VISIBLE EXCLUSIVELY TO SITE OWNER / ADMIN) */}
-          {isAdmin && (
-            <button
-              id="nav-admin-tab"
-              onClick={() => handleTabClick('admin')}
-              className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
-                activeTab === 'admin'
-                  ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.5)]'
-                  : 'bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20'
-              }`}
-            >
-              <Crown className="h-3.5 w-3.5" />
-              <span>Admin Panel 👑</span>
-            </button>
-          )}
         </nav>
 
         {/* Right: Google Sign in Pill or User Profile */}
@@ -213,7 +196,7 @@ export function Navbar({
               {/* Avatar Pill */}
               <div
                 id="user-profile-button"
-                onClick={() => handleTabClick(isAdmin ? 'admin' : 'profile')}
+                onClick={() => handleTabClick('profile')}
                 className="flex items-center gap-2 rounded-full bg-slate-900 border border-slate-800 p-1 pr-2.5 cursor-pointer hover:border-slate-700 transition-colors"
               >
                 <img
@@ -338,20 +321,6 @@ export function Navbar({
             </button>
           )}
 
-          {/* Admin in Mobile Menu */}
-          {isAdmin && (
-            <button
-              onClick={() => handleTabClick('admin')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold ${
-                activeTab === 'admin'
-                  ? 'bg-amber-500 text-slate-950'
-                  : 'bg-amber-500/10 text-amber-300 border border-amber-500/30'
-              }`}
-            >
-              <Crown className="h-4 w-4" />
-              <span>Admin Panel 👑</span>
-            </button>
-          )}
         </div>
       )}
     </header>

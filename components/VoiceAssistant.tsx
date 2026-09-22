@@ -253,7 +253,6 @@ export function VoiceAssistant({
                 'battle',
                 'assistant',
                 'profile',
-                'admin',
               ].includes(targetTab)
             ) {
               onNavigateTab(
