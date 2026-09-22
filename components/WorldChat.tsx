@@ -104,6 +104,7 @@ export function WorldChat({
   const shouldAutoScrollRef = useRef(true);
   const initialLoadRef = useRef(true);
   const expiryTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const channelRef = useRef<any>(null);
 
   const quickStickers = [
     'Systumm Hang! 🚜',
@@ -346,14 +347,28 @@ export function WorldChat({
     }, 15000);
 
     /*
-     * Polling fallback: ensures all clients receive new messages even if
+     * Fast polling fallback: ensures all clients receive new messages even if
      * websocket/realtime reconnects or is temporarily delayed.
      */
     const pollInterval = setInterval(() => {
       if (mounted) {
         void fetchMessages();
       }
-    }, 4000);
+    }, 2500);
+
+    /*
+     * Window focus / tab visibility sync:
+     * When user switches back to the tab, immediately fetch latest messages.
+     */
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && mounted) {
+        void fetchMessages();
+        void fetchPresence();
+      }
+    };
+
+    window.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleVisibilityChange);
 
     /*
      * Remove messages from UI every 10 seconds after 24 hours.
@@ -363,17 +378,49 @@ export function WorldChat({
     }, 10000);
 
     /*
-     * Supabase Realtime.
-     *
-     * INSERT = new message
-     * DELETE = deleted message
+     * Supabase Realtime Channel:
+     * Supports both instant WebSocket broadcast AND database postgres_changes.
      */
     let channel: any = null;
 
     if (isSupabaseConfigured()) {
       try {
-        channel = supabase
-          .channel('world-chat-realtime')
+        channel = supabase.channel('world-chat-live-room', {
+          config: {
+            broadcast: { self: false },
+          },
+        });
+        channelRef.current = channel;
+
+        channel
+          .on(
+            'broadcast',
+            { event: 'new_message' },
+            (payload: any) => {
+              if (!mounted || !payload?.payload) return;
+              const incoming = payload.payload;
+              setMessages((previous) =>
+                mergeMessages(previous, [incoming])
+              );
+
+              if (shouldAutoScrollRef.current) {
+                requestAnimationFrame(() => {
+                  scrollToBottom('smooth');
+                });
+              }
+            }
+          )
+          .on(
+            'broadcast',
+            { event: 'delete_message' },
+            (payload: any) => {
+              if (!mounted || !payload?.payload?.id) return;
+              const deletedId = String(payload.payload.id);
+              setMessages((previous) =>
+                previous.filter((m) => m.id !== deletedId)
+              );
+            }
+          )
           .on(
             'postgres_changes',
             {
@@ -381,7 +428,7 @@ export function WorldChat({
               schema: 'public',
               table: 'chat_messages',
             },
-            (payload) => {
+            (payload: any) => {
               if (!mounted || !payload.new) return;
 
               const incomingMessage = mapRealtimeMessage(
@@ -397,9 +444,6 @@ export function WorldChat({
                 return merged;
               });
 
-              /*
-               * Only auto-scroll if user was already near bottom.
-               */
               if (shouldAutoScrollRef.current) {
                 requestAnimationFrame(() => {
                   scrollToBottom('smooth');
@@ -414,7 +458,7 @@ export function WorldChat({
               schema: 'public',
               table: 'chat_messages',
             },
-            (payload) => {
+            (payload: any) => {
               if (!mounted || !payload.old) return;
 
               const deletedId = String(
@@ -449,6 +493,8 @@ export function WorldChat({
 
       clearInterval(presenceInterval);
       clearInterval(pollInterval);
+      window.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
 
       if (expiryTimerRef.current) {
         clearInterval(expiryTimerRef.current);
@@ -456,6 +502,7 @@ export function WorldChat({
       }
 
       if (channel) {
+        channelRef.current = null;
         void supabase.removeChannel(channel);
       }
 
@@ -598,12 +645,31 @@ export function WorldChat({
         setMessages((previous) =>
           mergeMessages(previous, [data.message])
         );
+
+        // Instant Realtime Broadcast to everyone in the room
+        try {
+          channelRef.current?.send({
+            type: 'broadcast',
+            event: 'new_message',
+            payload: data.message,
+          });
+        } catch (bcastErr) {
+          console.warn('Realtime broadcast warning:', bcastErr);
+        }
       }
 
       if (data.aiMessage) {
         setMessages((previous) =>
           mergeMessages(previous, [data.aiMessage])
         );
+
+        try {
+          channelRef.current?.send({
+            type: 'broadcast',
+            event: 'new_message',
+            payload: data.aiMessage,
+          });
+        } catch {}
 
         SoundEffects.playWhistle();
       }

@@ -8,6 +8,7 @@ import {
   deleteSupabaseChatMessage,
   cleanupExpiredSupabaseChatMessages,
   isSupabaseConfigured,
+  createServerClient,
   supabase,
 } from '@/lib/supabase';
 import { ChatMessage } from '@/types';
@@ -479,9 +480,10 @@ export async function DELETE(req: NextRequest) {
     const isAdmin = isSiteAdmin(userEmail);
 
     /*
-     * Get message owner directly from Supabase.
+     * Get message owner directly from Supabase via server client.
      */
-    const { data: dbMessage, error: findError } = await supabase
+    const client = createServerClient();
+    const { data: dbMessage, error: findError } = await client
       .from('chat_messages')
       .select('id,user_id')
       .eq('id', messageId)
