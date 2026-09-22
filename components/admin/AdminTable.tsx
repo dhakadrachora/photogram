@@ -44,18 +44,18 @@ export function AdminTable<T extends Record<string, any>>({
   }
 
   return (
-    <div className="relative overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900 shadow-xl">
+    <div className="relative overflow-x-auto rounded-2xl border border-slate-800/80 bg-slate-900/70 backdrop-blur-md shadow-2xl shadow-black/40 ring-1 ring-white/5">
       {isLoading && (
-        <div className="absolute inset-0 z-10 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center">
-          <div className="flex items-center gap-2 text-xs font-bold text-amber-400 bg-slate-900/90 border border-slate-700 px-4 py-2 rounded-xl shadow-lg">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span>Updating...</span>
+        <div className="absolute inset-0 z-10 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center transition-all">
+          <div className="flex items-center gap-2.5 text-xs font-bold text-amber-400 bg-slate-900/95 border border-amber-500/30 px-4 py-2.5 rounded-xl shadow-xl shadow-amber-500/10 animate-pulse">
+            <Loader2 className="h-4 w-4 animate-spin text-amber-400" />
+            <span className="tracking-wide">Syncing data...</span>
           </div>
         </div>
       )}
 
       <table className="w-full text-left border-collapse text-xs">
-        <thead className="bg-slate-950/80 border-b border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+        <thead className="bg-slate-950/90 border-b border-slate-800/80 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
           <tr>
             {columns.map((col) => (
               <th key={col.key} className={`px-4 py-3.5 ${col.className || ''}`}>
@@ -64,13 +64,13 @@ export function AdminTable<T extends Record<string, any>>({
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-800/60 font-medium text-slate-300">
+        <tbody className="divide-y divide-slate-800/50 font-medium text-slate-300">
           {data.map((item, idx) => {
             const key = item[keyField] ? String(item[keyField]) : String(idx);
             return (
               <tr
                 key={key}
-                className="hover:bg-slate-800/40 transition-colors group"
+                className="hover:bg-slate-800/40 hover:backdrop-blur-sm transition-colors duration-150 group"
               >
                 {columns.map((col) => (
                   <td key={col.key} className={`px-4 py-3.5 ${col.className || ''}`}>
