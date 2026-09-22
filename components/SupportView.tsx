@@ -448,13 +448,13 @@ export function SupportView({
             {/* Quick Emergency Contact options */}
             <div className="mt-12 pt-8 border-t border-slate-800/80 w-full max-w-lg grid grid-cols-1 sm:grid-cols-2 gap-4">
               <a
-                href="mailto:rohitdhakaddhoti143@gmail.com"
+                href="mailto:rohitdhakaddhoti132@gmail.com"
                 className="p-4 rounded-2xl bg-slate-900 border border-slate-800 hover:border-amber-500/40 text-left transition-colors group flex items-start gap-3"
               >
                 <Mail className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
                 <div>
                   <div className="text-xs font-bold text-white group-hover:text-amber-300">ईमेल सपोर्ट</div>
-                  <div className="text-[11px] text-slate-400">rohitdhakaddhoti143@gmail.com</div>
+                  <div className="text-[11px] text-slate-400">rohitdhakaddhoti132@gmail.com</div>
                 </div>
               </a>
               <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 text-left flex items-start gap-3">

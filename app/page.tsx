@@ -698,10 +698,6 @@ export default function Home() {
               dbUser.phone ||
               appUser.phone,
 
-            badge:
-              dbUser.badge ||
-              appUser.badge,
-
             coins:
               dbUser.coins ??
               dbUser.dhoti_coins ??
@@ -724,12 +720,15 @@ export default function Home() {
               dbUser.rank ||
               appUser.rank,
 
+            badge:
+              isSiteAdmin(appUser.email)
+                ? 'Site Owner & Admin 👑'
+                : (dbUser.badge?.includes('Owner') ? 'Dhoti Resident' : (dbUser.badge || appUser.badge)),
+
             role:
-              dbUser.role ||
-              appUser.role,
+              isSiteAdmin(appUser.email) ? 'admin' : 'resident',
 
             isAdmin:
-              Boolean(dbUser.is_admin) ||
               isSiteAdmin(appUser.email),
 
             isVerified:

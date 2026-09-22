@@ -221,7 +221,6 @@ export async function signUpWithEmail({
           id: data.user.id,
           email: cleanEmail,
           name: cleanName,
-          phone: cleanPhone,
           avatar: cleanAvatar,
           updated_at: new Date().toISOString(),
         },
@@ -291,26 +290,26 @@ export async function signInWithEmail({
       const { data: dbUser, error: dbError } = await supabase
         .from('users')
         .select(
-          'id,name,email,phone,avatar,badge,coins,wins,battles,rank,role,is_admin,created_at'
+          'id,name,email,avatar,badge,coins,wins,battles,rank,role,is_admin,created_at'
         )
         .eq('id', data.user.id)
         .maybeSingle();
 
       if (!dbError && dbUser) {
         const isAdmin =
-          isSiteAdmin(cleanEmail) || Boolean(dbUser.is_admin);
+          isSiteAdmin(cleanEmail);
 
         appUser = {
           ...appUser,
           name: dbUser.name || appUser.name,
           avatar: dbUser.avatar || appUser.avatar,
-          phone: dbUser.phone || appUser.phone,
-          badge: dbUser.badge || appUser.badge,
+          phone: appUser.phone,
+          badge: isAdmin ? 'Site Owner & Admin 👑' : (dbUser.badge?.includes('Owner') ? 'Dhoti Resident' : (dbUser.badge || appUser.badge)),
           coins: dbUser.coins ?? appUser.coins,
           wins: dbUser.wins ?? appUser.wins,
           battles: dbUser.battles ?? appUser.battles,
-          rank: dbUser.rank || appUser.rank,
-          role: dbUser.role || appUser.role,
+          rank: isAdmin ? 'Super Admin 👑' : (dbUser.rank || appUser.rank),
+          role: isAdmin ? 'admin' : 'resident',
           isAdmin,
           createdAt: dbUser.created_at || appUser.createdAt,
         };
@@ -430,7 +429,6 @@ export async function syncUserProfile(user: User): Promise<void> {
         email: user.email?.toLowerCase().trim() || null,
         name: user.name,
         avatar: user.avatar,
-        phone: user.phone || null,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'id' }
@@ -485,7 +483,6 @@ export async function updateUserProfileDetails(
       updated_at: new Date().toISOString(),
     };
     if (cleanName !== undefined) dbPayload.name = cleanName;
-    if (cleanPhone !== undefined) dbPayload.phone = cleanPhone;
     if (cleanAvatar !== undefined) dbPayload.avatar = cleanAvatar;
 
     const { error: dbError } = await supabase
@@ -514,7 +511,7 @@ export async function fetchSupabaseRegisteredUsers(): Promise<any[] | null> {
     const { data, error } = await supabase
       .from('users')
       .select(
-        'id,name,email,phone,avatar,badge,rank,role,is_admin,coins,wins,battles,created_at'
+        'id,name,email,avatar,badge,rank,role,is_admin,coins,wins,battles,created_at'
       )
       .order('created_at', { ascending: false });
     if (error || !data) return null;

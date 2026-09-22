@@ -129,9 +129,7 @@ export async function POST(
      * If the profile does not exist yet, create a
      * minimal application user from Supabase Auth data.
      */
-    const adminUser =
-      isSiteAdmin(email) ||
-      Boolean(dbUser?.is_admin);
+    const adminUser = isSiteAdmin(email);
 
     const appUser: User = {
       id: authUser.id,
@@ -147,14 +145,13 @@ export async function POST(
           email
         )}`,
       phone:
-        dbUser?.phone ||
         authUser.phone ||
+        authUser.user_metadata?.phone ||
         undefined,
       badge:
-        dbUser?.badge ||
-        (adminUser
+        adminUser
           ? 'Site Owner & Admin 👑'
-          : 'Dhoti Resident'),
+          : (dbUser?.badge?.includes('Owner') ? 'Dhoti Resident' : (dbUser?.badge || 'Dhoti Resident')),
       coins:
         typeof dbUser?.coins === 'number'
           ? dbUser.coins
@@ -168,10 +165,11 @@ export async function POST(
           ? dbUser.battles
           : 0,
       rank:
-        dbUser?.rank ||
-        'Resident',
+        adminUser
+          ? 'Super Admin 👑'
+          : (dbUser?.rank || 'Resident'),
       role:
-        dbUser?.role === 'admin' || adminUser
+        adminUser
           ? 'admin'
           : 'resident',
       isAdmin: adminUser,

@@ -764,8 +764,7 @@ export function WorldChat({
 
                   {(currentUser.isVerified ||
                     String(currentUser.badge || '').toLowerCase().includes('verified') ||
-                    currentUser.email === 'rohitdhakaddhoti132@gmail.com' ||
-                    currentUser.email === 'rohitdhakaddhoti143@gmail.com') && (
+                    currentUser.email === 'rohitdhakaddhoti132@gmail.com') && (
                     <VerifiedTick size={12} />
                   )}
                 </div>
@@ -863,8 +862,7 @@ export function WorldChat({
                   (isMe && (
                     currentUser?.isVerified ||
                     String(currentUser?.badge || '').toLowerCase().includes('verified') ||
-                    currentUser?.email === 'rohitdhakaddhoti132@gmail.com' ||
-                    currentUser?.email === 'rohitdhakaddhoti143@gmail.com'
+                    currentUser?.email === 'rohitdhakaddhoti132@gmail.com'
                   ))
               );
 
@@ -1209,8 +1207,7 @@ export function WorldChat({
                             (isMe && (
                               currentUser?.isVerified ||
                               String(currentUser?.badge || '').toLowerCase().includes('verified') ||
-                              currentUser?.email === 'rohitdhakaddhoti132@gmail.com' ||
-                              currentUser?.email === 'rohitdhakaddhoti143@gmail.com'
+                              currentUser?.email === 'rohitdhakaddhoti132@gmail.com'
                             ))) && (
                             <VerifiedTick size={12} />
                           )}

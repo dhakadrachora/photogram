@@ -69,7 +69,6 @@ async function savePublicUser(
           id: appUser.id,
           email: appUser.email,
           name: appUser.name,
-          phone: appUser.phone || null,
           avatar: appUser.avatar,
           badge: appUser.badge,
           coins: appUser.coins ?? 50,

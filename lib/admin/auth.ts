@@ -5,17 +5,14 @@ export const PRIMARY_OWNER_EMAIL = 'rohitdhakaddhoti132@gmail.com';
 
 export const OWNER_EMAILS = [
   PRIMARY_OWNER_EMAIL.toLowerCase(),
-  'rohitdhakaddhoti143@gmail.com',
-  'rohitdhakaddhoti@gmail.com',
-  ...(process.env.ADMIN_EMAILS ? process.env.ADMIN_EMAILS.split(',').map((e) => e.trim().toLowerCase()) : []),
 ];
 
 /**
- * Checks if an email is in the owner/admin allowlist.
+ * Checks if an email belongs to the sole site owner.
  */
 export function isEmailInAdminAllowlist(email?: string | null): boolean {
   if (!email || typeof email !== 'string') return false;
-  return OWNER_EMAILS.includes(email.trim().toLowerCase());
+  return email.trim().toLowerCase() === PRIMARY_OWNER_EMAIL.toLowerCase();
 }
 
 /**
@@ -64,41 +61,20 @@ export async function verifyAdminRequest(req: Request): Promise<{
 
     const email = user.email.toLowerCase().trim();
 
-    // 1. Check Allowlist
+    // Check if user is the sole site owner
     if (isEmailInAdminAllowlist(email)) {
       return {
         isAdmin: true,
         user: {
           id: user.id,
           email,
-          name: user.user_metadata?.full_name || user.user_metadata?.name || email.split('@')[0],
+          name: user.user_metadata?.full_name || user.user_metadata?.name || 'Rohit Dhakad',
           role: 'owner',
         },
       };
     }
 
-    // 2. Check Database users table
-    const { data: dbUser, error: dbErr } = await sb
-      .from('users')
-      .select('id, email, name, role, is_admin')
-      .eq('id', user.id)
-      .maybeSingle();
-
-    if (!dbErr && dbUser) {
-      if (dbUser.is_admin === true || dbUser.role === 'admin' || dbUser.role === 'owner') {
-        return {
-          isAdmin: true,
-          user: {
-            id: user.id,
-            email,
-            name: dbUser.name || email.split('@')[0],
-            role: dbUser.role || 'admin',
-          },
-        };
-      }
-    }
-
-    return { isAdmin: false, user: null, error: 'Forbidden: Insufficient privileges' };
+    return { isAdmin: false, user: null, error: 'Forbidden: Only authorized Site Owner can access this panel.' };
   } catch (err: any) {
     console.error('[Admin Auth Verification Error]:', err);
     return { isAdmin: false, user: null, error: 'Internal auth verification error' };
@@ -125,34 +101,15 @@ export async function getClientAdminSession(): Promise<AdminUserSession | null> 
       localStorage.setItem('dhoti_admin_token', session.access_token);
     } catch {}
 
-    // If owner email, instant grant
+    // If owner email, grant access; otherwise strictly deny
     if (isOwner) {
       return {
         id: session.user.id,
         email,
-        name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || email.split('@')[0],
+        name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || 'Rohit Dhakad',
         avatar: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture,
         role: 'owner',
         isOwner: true,
-        token: session.access_token,
-      };
-    }
-
-    // Check DB
-    const { data: dbUser } = await supabase
-      .from('users')
-      .select('id, email, name, avatar, role, is_admin')
-      .eq('id', session.user.id)
-      .maybeSingle();
-
-    if (dbUser && (dbUser.is_admin === true || dbUser.role === 'admin' || dbUser.role === 'owner')) {
-      return {
-        id: session.user.id,
-        email,
-        name: dbUser.name || email.split('@')[0],
-        avatar: dbUser.avatar || session.user.user_metadata?.avatar_url,
-        role: dbUser.role === 'owner' ? 'owner' : 'admin',
-        isOwner: false,
         token: session.access_token,
       };
     }

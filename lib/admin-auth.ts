@@ -3,9 +3,6 @@ import { supabase, isSupabaseConfigured } from './supabase';
 export const SITE_OWNER_EMAIL = 'rohitdhakaddhoti132@gmail.com';
 export const SITE_OWNER_EMAILS = [
   SITE_OWNER_EMAIL.toLowerCase(),
-  'rohitdhakaddhoti143@gmail.com',
-  'rohitdhakaddhoti@gmail.com',
-  ...(process.env.ADMIN_EMAILS ? process.env.ADMIN_EMAILS.split(',').map((e) => e.trim().toLowerCase()) : []),
 ];
 
 /**
@@ -50,17 +47,7 @@ export async function verifyAdminRequestAsync(req: Request): Promise<boolean> {
     const { data: { user }, error } = await supabase.auth.getUser(token);
     if (error || !user || !user.email) return false;
     if (isSiteAdmin(user.email)) return true;
-
-    // Also check database user role/is_admin
-    const { createServerClient } = await import('./supabase');
-    const sb = createServerClient();
-    const { data: dbUser } = await sb
-      .from('users')
-      .select('is_admin, role')
-      .eq('id', user.id)
-      .maybeSingle();
-
-    return dbUser?.is_admin === true || dbUser?.role === 'admin' || dbUser?.role === 'owner';
+    return false;
   } catch (e) {
     console.warn('Error verifying Supabase admin token:', e);
     return false;
