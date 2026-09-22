@@ -119,3 +119,60 @@ export async function getClientAdminSession(): Promise<AdminUserSession | null> 
     return null;
   }
 }
+
+export interface AdminAuthCheckResult {
+  session: AdminUserSession | null;
+  currentEmail: string | null;
+  status: 'authenticated_admin' | 'unauthenticated' | 'unauthorized_user';
+  error?: string;
+}
+
+export async function checkAdminDetailedSession(): Promise<AdminAuthCheckResult> {
+  if (typeof window === 'undefined') {
+    return { session: null, currentEmail: null, status: 'unauthenticated' };
+  }
+
+  try {
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !session || !session.user || !session.user.email) {
+      return { session: null, currentEmail: null, status: 'unauthenticated' };
+    }
+
+    const email = session.user.email.toLowerCase().trim();
+    const isOwner = isEmailInAdminAllowlist(email);
+
+    if (isOwner) {
+      try {
+        localStorage.setItem('dhoti_admin_token', session.access_token);
+      } catch {}
+
+      return {
+        status: 'authenticated_admin',
+        currentEmail: email,
+        session: {
+          id: session.user.id,
+          email,
+          name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || 'Rohit Dhakad',
+          avatar: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture,
+          role: 'owner',
+          isOwner: true,
+          token: session.access_token,
+        },
+      };
+    }
+
+    return {
+      status: 'unauthorized_user',
+      currentEmail: email,
+      session: null,
+      error: `वर्तमान में आप "${email}" से लॉगिन हैं। यह एडमिन पैनल केवल ${PRIMARY_OWNER_EMAIL} के लिए है।`,
+    };
+  } catch (err: any) {
+    return {
+      status: 'unauthenticated',
+      currentEmail: null,
+      session: null,
+      error: err?.message || 'Failed to authenticate session',
+    };
+  }
+}
