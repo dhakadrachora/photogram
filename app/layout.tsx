@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
+import { PostHogProvider } from '@/components/PostHogProvider';
 import './globals.css';
 
 export const viewport: Viewport = {
@@ -83,7 +84,9 @@ export default function RootLayout({
   return (
     <html lang="hi">
       <body suppressHydrationWarning>
-        {children}
+        <PostHogProvider>
+          {children}
+        </PostHogProvider>
 
         <Script
           src="https://accounts.google.com/gsi/client"

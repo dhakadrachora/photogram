@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Call Gemini API if available, else high-quality fallback generator
-    const geminiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+    const geminiKey = process.env.GEMINI_API_KEY;
 
     let responseText = '';
 
