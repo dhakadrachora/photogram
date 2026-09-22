@@ -35,7 +35,7 @@ export function PeopleForm({ isOpen, onClose, onSuccess, initialData }: PeopleFo
         designation: initialData.designation || '',
         category: initialData.category || 'Gram Panchayat 🏛️',
         bio: initialData.bio || '',
-        photoUrl: initialData.photoUrl || '',
+        photoUrl: initialData.photoUrl || (initialData as any).photo_url || '',
         achievements: initialData.achievements || '',
         published: initialData.published !== false,
       });

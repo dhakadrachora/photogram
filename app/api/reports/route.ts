@@ -38,14 +38,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    return NextResponse.json({ report });
+    return NextResponse.json({ success: true, report });
   }
 
   // Listing reports
   const isAdmin = await verifyAdminRequestAsync(req);
   if (isAdmin) {
     const reports = await fetchAllProblemReports();
-    return NextResponse.json({ reports });
+    return NextResponse.json({ success: true, reports });
   }
 
   // Normal user
@@ -58,13 +58,13 @@ export async function GET(req: NextRequest) {
 
   if (!resolvedUserId && !resolvedUserEmail) {
     return NextResponse.json(
-      { error: 'Unauthorized: Authentication required to view your reports' },
+      { success: false, error: 'Unauthorized: Authentication required to view your reports' },
       { status: 401 }
     );
   }
 
   const reports = await fetchUserProblemReports(resolvedUserId || '', resolvedUserEmail || undefined);
-  return NextResponse.json({ reports });
+  return NextResponse.json({ success: true, reports });
 }
 
 // POST /api/reports (Create report)

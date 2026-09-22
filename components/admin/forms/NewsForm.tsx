@@ -35,7 +35,7 @@ export function NewsForm({ isOpen, onClose, onSuccess, initialData }: NewsFormPr
         category: initialData.category || 'Village Notice 📢',
         excerpt: initialData.excerpt || '',
         content: initialData.content || '',
-        imageUrl: initialData.imageUrl || '',
+        imageUrl: initialData.imageUrl || (initialData as any).image_url || '',
         author: initialData.author || 'DHOTI AALE',
         published: initialData.published !== false,
       });

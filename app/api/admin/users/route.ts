@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
     const enrichedUsers = (data || []).map((u: any) => ({
       ...u,
       phone: authUserMap[u.id]?.phone || u.phone || '',
-      is_admin: isSiteAdmin(u.email) || Boolean(u.is_admin),
+      is_admin: isSiteAdmin(u.email),
       isOwner: isSiteAdmin(u.email),
     }));
 

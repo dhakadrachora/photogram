@@ -37,7 +37,7 @@ export function BusinessForm({ isOpen, onClose, onSuccess, initialData }: Busine
         phone: initialData.phone || '',
         address: initialData.address || '',
         description: initialData.description || '',
-        logoUrl: initialData.logoUrl || '',
+        logoUrl: initialData.logoUrl || (initialData as any).logo_url || '',
         verified: initialData.verified !== false,
         published: initialData.published !== false,
       });

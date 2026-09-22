@@ -18,6 +18,130 @@ const TYPE_TO_TABLE: Record<string, string> = {
   users: 'users',
 };
 
+function sanitizeAndMapToDb(type: string, body: Record<string, any>): Record<string, any> {
+  const result: Record<string, any> = {};
+
+  if (type === 'news') {
+    if (body.title !== undefined) result.title = body.title;
+    if (body.category !== undefined) result.category = body.category;
+    if (body.excerpt !== undefined) result.excerpt = body.excerpt;
+    if (body.content !== undefined) result.content = body.content;
+    if (body.imageUrl !== undefined || body.image_url !== undefined) {
+      result.image_url = body.image_url || body.imageUrl || null;
+    }
+    if (body.author !== undefined) result.author = body.author;
+    if (body.published !== undefined) result.published = Boolean(body.published);
+    if (body.views !== undefined) result.views = Number(body.views) || 0;
+  } else if (type === 'people') {
+    if (body.name !== undefined) result.name = body.name;
+    if (body.designation !== undefined) result.designation = body.designation;
+    if (body.bio !== undefined) result.bio = body.bio;
+    if (body.photoUrl !== undefined || body.photo_url !== undefined) {
+      result.photo_url = body.photo_url || body.photoUrl || null;
+    }
+    if (body.achievements !== undefined) result.achievements = body.achievements;
+    if (body.category !== undefined) result.category = body.category;
+    if (body.published !== undefined) result.published = Boolean(body.published);
+  } else if (type === 'business') {
+    if (body.name !== undefined) result.name = body.name;
+    if (body.category !== undefined) result.category = body.category;
+    if (body.phone !== undefined) result.phone = body.phone;
+    if (body.address !== undefined) result.address = body.address;
+    if (body.description !== undefined) result.description = body.description;
+    if (body.logoUrl !== undefined || body.logo_url !== undefined) {
+      result.logo_url = body.logo_url || body.logoUrl || null;
+    }
+    if (body.verified !== undefined) result.verified = Boolean(body.verified);
+    if (body.published !== undefined) result.published = Boolean(body.published);
+  } else if (type === 'gallery') {
+    if (body.title !== undefined) result.title = body.title;
+    if (body.category !== undefined) result.category = body.category;
+    if (body.imageUrl !== undefined || body.image_url !== undefined) {
+      result.image_url = body.image_url || body.imageUrl || null;
+    }
+    if (body.caption !== undefined) result.caption = body.caption;
+    if (body.published !== undefined) result.published = Boolean(body.published);
+  } else if (type === 'videos') {
+    if (body.title !== undefined) result.title = body.title;
+    if (body.category !== undefined) result.category = body.category;
+    if (body.videoUrl !== undefined || body.video_url !== undefined) {
+      result.video_url = body.video_url || body.videoUrl || null;
+    }
+    if (body.thumbnailUrl !== undefined || body.thumbnail_url !== undefined) {
+      result.thumbnail_url = body.thumbnail_url || body.thumbnailUrl || null;
+    }
+    if (body.description !== undefined) result.description = body.description;
+    if (body.published !== undefined) result.published = Boolean(body.published);
+    if (body.views !== undefined) result.views = Number(body.views) || 0;
+  } else if (type === 'updates') {
+    if (body.title !== undefined) result.title = body.title;
+    if (body.summary !== undefined) result.summary = body.summary;
+    if (body.tag !== undefined) result.tag = body.tag;
+    if (body.badgeColor !== undefined || body.badge_color !== undefined) {
+      result.badge_color = body.badge_color || body.badgeColor || 'amber';
+    }
+    if (body.published !== undefined) result.published = Boolean(body.published);
+    if (body.date !== undefined) result.date = body.date;
+    if (body.linkUrl !== undefined || body.link_url !== undefined) {
+      result.link_url = body.link_url || body.linkUrl || null;
+    }
+  } else if (type === 'settings') {
+    if (body.site_title !== undefined) result.site_title = body.site_title;
+    if (body.site_tagline !== undefined) result.site_tagline = body.site_tagline;
+    if (body.announcement_banner !== undefined) result.announcement_banner = body.announcement_banner;
+    if (body.is_announcement_active !== undefined) result.is_announcement_active = Boolean(body.is_announcement_active);
+    if (body.allow_world_chat !== undefined) result.allow_world_chat = Boolean(body.allow_world_chat);
+    if (body.allow_guest_ai !== undefined) result.allow_guest_ai = Boolean(body.allow_guest_ai);
+    if (body.hero_badge !== undefined) result.hero_badge = body.hero_badge;
+    if (body.contact_email !== undefined) result.contact_email = body.contact_email;
+  }
+
+  return result;
+}
+
+function formatContentItem(type: string, item: any): any {
+  if (!item) return item;
+  if (type === 'news') {
+    return {
+      ...item,
+      imageUrl: item.image_url || item.imageUrl || '',
+    };
+  }
+  if (type === 'people') {
+    return {
+      ...item,
+      photoUrl: item.photo_url || item.photoUrl || '',
+    };
+  }
+  if (type === 'business') {
+    return {
+      ...item,
+      logoUrl: item.logo_url || item.logoUrl || '',
+    };
+  }
+  if (type === 'gallery') {
+    return {
+      ...item,
+      imageUrl: item.image_url || item.imageUrl || '',
+    };
+  }
+  if (type === 'videos') {
+    return {
+      ...item,
+      videoUrl: item.video_url || item.videoUrl || '',
+      thumbnailUrl: item.thumbnail_url || item.thumbnailUrl || '',
+    };
+  }
+  if (type === 'updates') {
+    return {
+      ...item,
+      badgeColor: item.badge_color || item.badgeColor || 'amber',
+      linkUrl: item.link_url || item.linkUrl || '',
+    };
+  }
+  return item;
+}
+
 export async function GET(req: NextRequest) {
   const auth = await verifyAdminRequest(req);
   if (!auth.isAdmin) {
@@ -93,10 +217,11 @@ export async function GET(req: NextRequest) {
 
     const total = count || 0;
     const totalPages = Math.ceil(total / limit);
+    const formattedData = (data || []).map((item: any) => formatContentItem(type, item));
 
     return NextResponse.json({
       success: true,
-      data: data || [],
+      data: formattedData,
       pagination: {
         page,
         pageSize: limit,
@@ -133,8 +258,10 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const id = body.id || `${type}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
+    const sanitized = sanitizeAndMapToDb(type, body);
+
     const row = {
-      ...body,
+      ...sanitized,
       id,
       created_at: body.created_at || new Date().toISOString(),
     };
@@ -145,7 +272,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       message: `${type} item created successfully`,
-      data,
+      data: formatContentItem(type, data),
     });
   } catch (err: any) {
     console.error(`[ADMIN_CONTENT_POST_${type}]`, err);
@@ -176,9 +303,10 @@ export async function PUT(req: NextRequest) {
     const body = await req.json();
 
     if (type === 'settings') {
+      const sanitizedSettings = sanitizeAndMapToDb('settings', body);
       const { data, error } = await sb
         .from('site_settings')
-        .upsert({ ...body, id: 'default', updated_at: new Date().toISOString() })
+        .upsert({ ...sanitizedSettings, id: 'default', updated_at: new Date().toISOString() })
         .select()
         .single();
 
@@ -191,9 +319,11 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Item ID is required for update' }, { status: 400 });
     }
 
+    const sanitized = sanitizeAndMapToDb(type, body);
+
     const { data, error } = await sb
       .from(table)
-      .update(body)
+      .update(sanitized)
       .eq('id', id)
       .select()
       .single();
@@ -203,7 +333,7 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({
       success: true,
       message: 'Item updated successfully',
-      data,
+      data: formatContentItem(type, data),
     });
   } catch (err: any) {
     console.error(`[ADMIN_CONTENT_PUT_${type}]`, err);

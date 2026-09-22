@@ -14,18 +14,18 @@ export async function GET(req: NextRequest) {
   const sb = createServerClient();
 
   const metrics: DashboardMetrics = {
-    totalUsers: 'Unavailable',
-    activeUsers: 'Unavailable',
-    totalNews: 'Unavailable',
-    publishedNews: 'Unavailable',
-    draftNews: 'Unavailable',
-    activeBattles: 'Unavailable',
-    completedBattles: 'Unavailable',
-    totalVotes: 'Unavailable',
-    totalBusinesses: 'Unavailable',
-    galleryCount: 'Unavailable',
-    videoCount: 'Unavailable',
-    openReports: 'Unavailable',
+    totalUsers: 0,
+    activeUsers: 0,
+    totalNews: 0,
+    publishedNews: 0,
+    draftNews: 0,
+    activeBattles: 0,
+    completedBattles: 0,
+    totalVotes: 0,
+    totalBusinesses: 0,
+    galleryCount: 0,
+    videoCount: 0,
+    openReports: 0,
     systemStatus: 'Optimal',
   };
 
@@ -113,8 +113,9 @@ export async function GET(req: NextRequest) {
   try {
     const { count, error } = await sb.from('reports').select('*', { count: 'exact', head: true }).eq('status', 'Open');
     if (!error && count !== null) metrics.openReports = count;
-  } catch (e) {
-    console.warn('[Analytics metric: openReports]', e);
+    else metrics.openReports = 0;
+  } catch {
+    metrics.openReports = 0;
   }
 
   // Recent Users

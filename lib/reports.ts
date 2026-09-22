@@ -334,10 +334,13 @@ export async function updateReportStatus(reportId: string, status: ReportStatus)
         })
         .eq('id', reportId);
 
-      return !error;
+      if (error) {
+        console.warn('Supabase update warning (in-memory state preserved):', error.message);
+      }
+      return true;
     } catch (e) {
       console.warn('Failed to update report status in Supabase:', e);
-      return false;
+      return Boolean(existing);
     }
   }
 

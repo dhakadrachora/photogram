@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from './supabase';
+import { supabase, createServerClient, isSupabaseConfigured } from './supabase';
 
 export const SITE_OWNER_EMAIL = 'rohitdhakaddhoti143@gmail.com';
 export const SITE_OWNER_EMAILS = [
@@ -44,7 +44,8 @@ export async function verifyAdminRequestAsync(req: Request): Promise<boolean> {
   }
 
   try {
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    const sb = createServerClient();
+    const { data: { user }, error } = await sb.auth.getUser(token);
     if (error || !user || !user.email) return false;
     if (isSiteAdmin(user.email)) return true;
     return false;
@@ -58,17 +59,33 @@ export async function verifyAdminRequestAsync(req: Request): Promise<boolean> {
  * Extracts and verifies the authenticated user from a Bearer token in the request.
  */
 export async function getAuthenticatedUser(req: Request) {
+  let token = '';
   const authHeader = req.headers.get('authorization') || req.headers.get('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.replace('Bearer ', '').trim();
+  } else {
+    const cookieHeader = req.headers.get('cookie') || '';
+    const match = cookieHeader.match(/sb-[^;]+-auth-token=([^;]+)/) || cookieHeader.match(/sb-access-token=([^;]+)/);
+    if (match && match[1]) {
+      try {
+        const decoded = decodeURIComponent(match[1]);
+        if (decoded.startsWith('[') || decoded.startsWith('{')) {
+          const parsed = JSON.parse(decoded);
+          token = Array.isArray(parsed) ? parsed[0] : (parsed.access_token || parsed.token || '');
+        } else {
+          token = decoded;
+        }
+      } catch {}
+    }
   }
-  const token = authHeader.replace('Bearer ', '').trim();
+
   if (!token || !isSupabaseConfigured()) {
     return null;
   }
 
   try {
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    const sb = createServerClient();
+    const { data: { user }, error } = await sb.auth.getUser(token);
     if (error || !user) return null;
     return user;
   } catch {

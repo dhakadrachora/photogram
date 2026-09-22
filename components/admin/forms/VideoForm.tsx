@@ -32,8 +32,8 @@ export function VideoForm({ isOpen, onClose, onSuccess, initialData }: VideoForm
       setFormData({
         title: initialData.title || '',
         category: initialData.category || 'Cultural Events 🎭',
-        videoUrl: initialData.videoUrl || '',
-        thumbnailUrl: initialData.thumbnailUrl || '',
+        videoUrl: initialData.videoUrl || (initialData as any).video_url || '',
+        thumbnailUrl: initialData.thumbnailUrl || (initialData as any).thumbnail_url || '',
         description: initialData.description || '',
         published: initialData.published !== false,
       });
