@@ -22,6 +22,7 @@ export const revalidate = 0;
  * Every message expires after 24 hours.
  */
 const MESSAGE_EXPIRATION_MS = 24 * 60 * 60 * 1000;
+let lastChatExpiryCleanup = 0;
 
 /* -------------------------------------------------------------------------- */
 /* Helpers                                                                    */
@@ -176,12 +177,13 @@ export async function GET(req: NextRequest) {
     }
 
     /*
-     * Clean up messages older than 24 hours.
+     * Clean up messages older than 24 hours (throttled to at most once per 15 mins)
      */
-    try {
-      await cleanupExpiredSupabaseChatMessages();
-    } catch (error) {
-      console.warn('World Chat expiry cleanup warning:', error);
+    if (Date.now() - lastChatExpiryCleanup > 15 * 60 * 1000) {
+      lastChatExpiryCleanup = Date.now();
+      cleanupExpiredSupabaseChatMessages().catch((error) => {
+        console.warn('World Chat expiry cleanup warning:', error);
+      });
     }
 
     const cutoffTime = Date.now() - MESSAGE_EXPIRATION_MS;

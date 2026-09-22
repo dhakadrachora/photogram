@@ -65,7 +65,14 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
       }
     }
 
+    let isPresenceLoading = false;
+
     async function loadPresence() {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+        return;
+      }
+      if (isPresenceLoading) return;
+      isPresenceLoading = true;
       try {
         const res = await fetch('/api/presence', {
           method: 'GET',
@@ -78,19 +85,28 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
         }
       } catch (e) {
         console.warn('Could not load online users', e);
+      } finally {
+        isPresenceLoading = false;
       }
     }
 
     void loadData();
     void loadPresence();
 
-    // app/page.tsx owns the authenticated heartbeat.
-    // LandingPage only reads the public online list.
-    presenceTimer = setInterval(() => void loadPresence(), 5000);
+    // Refresh presence periodically only when visible
+    presenceTimer = setInterval(() => void loadPresence(), 15000);
+
+    const handleVisibilityChange = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible' && isSubscribed) {
+        void loadPresence();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       isSubscribed = false;
       if (presenceTimer) clearInterval(presenceTimer);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 

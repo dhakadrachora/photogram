@@ -1147,7 +1147,11 @@ export default function Home() {
           MAIN CONTENT
           ====================================================== */}
 
-      <main className="flex w-full flex-1 flex-col pb-16">
+      <main
+        className={`flex w-full flex-1 flex-col ${
+          activeTab === 'worldchat' ? 'pb-0' : 'pb-16'
+        }`}
+      >
 
         {/* ====================================================
             HOME / LANDING
@@ -1333,104 +1337,110 @@ export default function Home() {
       </main>
 
       {/* ======================================================
-          BOTTOM NAVIGATION
+          BOTTOM NAVIGATION (Hidden in World Chat for mobile-friendly typing)
           ====================================================== */}
 
-      <nav
-        className="fixed inset-x-0 bottom-0 z-30 w-full border-t border-stone-200 bg-white/95 shadow-lg backdrop-blur-md"
-        data-purpose="mobile-bottom-nav"
-      >
-        <div className="mx-auto flex max-w-xl items-center justify-between px-5 py-2">
+      {activeTab !== 'worldchat' && (
+        <nav
+          className="fixed inset-x-0 bottom-0 z-30 w-full border-t border-stone-200 bg-white/95 shadow-lg backdrop-blur-md"
+          data-purpose="mobile-bottom-nav"
+        >
+          <div className="mx-auto flex max-w-xl items-center justify-between px-5 py-2">
 
-          {/* HOME */}
-          <button
-            type="button"
-            onClick={() =>
-              setActiveTab('home')
-            }
-            className={`flex flex-col items-center gap-1 transition-colors ${
-              activeTab === 'home'
-                ? 'font-medium text-[#2D7D46]'
-                : 'text-stone-400 hover:text-stone-700'
-            }`}
-          >
-            <HomeIcon className="h-5 w-5" />
-
-            <span className="text-[10px]">
-              Home
-            </span>
-          </button>
-
-          {/* EXPLORE */}
-          <button
-            type="button"
-            onClick={() => {
-              if (
+            {/* HOME */}
+            <button
+              type="button"
+              onClick={() =>
+                setActiveTab('home')
+              }
+              className={`flex flex-col items-center gap-1 transition-colors ${
                 activeTab === 'home'
-              ) {
-                const el =
-                  document.getElementById(
-                    'features-section'
-                  );
+                  ? 'font-medium text-[#2D7D46]'
+                  : 'text-stone-400 hover:text-stone-700'
+              }`}
+            >
+              <HomeIcon className="h-5 w-5" />
 
-                if (el) {
-                  el.scrollIntoView({
-                    behavior: 'smooth',
-                  });
-                } else {
-                  const rewards =
+              <span className="text-[10px]">
+                Home
+              </span>
+            </button>
+
+            {/* EXPLORE */}
+            <button
+              type="button"
+              onClick={() => {
+                if (
+                  activeTab === 'home'
+                ) {
+                  const el =
                     document.getElementById(
-                      'winner-rewards'
+                      'features-section'
                     );
 
-                  rewards?.scrollIntoView({
-                    behavior: 'smooth',
-                  });
+                  if (el) {
+                    el.scrollIntoView({
+                      behavior: 'smooth',
+                    });
+                  } else {
+                    const rewards =
+                      document.getElementById(
+                        'winner-rewards'
+                      );
+
+                    rewards?.scrollIntoView({
+                      behavior: 'smooth',
+                    });
+                  }
+                } else {
+                  setActiveTab('home');
                 }
-              } else {
-                setActiveTab('home');
+              }}
+              className="flex flex-col items-center gap-1 text-stone-400 transition-colors hover:text-stone-700"
+            >
+              <Compass className="h-5 w-5" />
+
+              <span className="text-[10px]">
+                Explore
+              </span>
+            </button>
+
+            {/* WORLD CHAT */}
+            <button
+              type="button"
+              onClick={() =>
+                setActiveTab('worldchat')
               }
-            }}
-            className="flex flex-col items-center gap-1 text-stone-400 transition-colors hover:text-stone-700"
-          >
-            <Compass className="h-5 w-5" />
+              className="relative flex flex-col items-center gap-1 transition-colors text-stone-400 hover:text-stone-700"
+            >
+              <MessageSquare className="h-5 w-5" />
 
-            <span className="text-[10px]">
-              Explore
-            </span>
-          </button>
+              <span className="text-[10px]">
+                Chaupal
+              </span>
 
-          {/* WORLD CHAT */}
-          <button
-            type="button"
-            onClick={() =>
-              setActiveTab('worldchat')
-            }
-            className={`relative flex flex-col items-center gap-1 transition-colors ${
-              activeTab === 'worldchat'
-                ? 'font-medium text-[#2D7D46]'
-                : 'text-stone-400 hover:text-stone-700'
-            }`}
-          >
-            <MessageSquare className="h-5 w-5" />
+              <span className="absolute right-1.5 top-0 h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+            </button>
 
-            <span className="text-[10px]">
-              Chaupal
-            </span>
+            {/* REWARDS */}
+            <button
+              type="button"
+              onClick={() => {
+                if (
+                  activeTab !== 'home'
+                ) {
+                  setActiveTab('home');
 
-            <span className="absolute right-1.5 top-0 h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-          </button>
-
-          {/* REWARDS */}
-          <button
-            type="button"
-            onClick={() => {
-              if (
-                activeTab !== 'home'
-              ) {
-                setActiveTab('home');
-
-                setTimeout(() => {
+                  window.setTimeout(() => {
+                    document
+                      .getElementById(
+                        'winner-rewards'
+                      )
+                      ?.scrollIntoView({
+                        behavior: 'smooth',
+                      });
+                  }, 120);
+                } else {
                   document
                     .getElementById(
                       'winner-rewards'
@@ -1438,72 +1448,62 @@ export default function Home() {
                     ?.scrollIntoView({
                       behavior: 'smooth',
                     });
-                }, 100);
-              } else {
-                document
-                  .getElementById(
-                    'winner-rewards'
-                  )
-                  ?.scrollIntoView({
-                    behavior: 'smooth',
-                  });
-              }
-            }}
-            className="flex flex-col items-center gap-1 text-amber-500 transition-colors hover:text-amber-700"
-          >
-            <Gift className="h-5 w-5" />
+                }
+              }}
+              className="flex flex-col items-center gap-1 text-stone-400 transition-colors hover:text-stone-700"
+            >
+              <Gift className="h-5 w-5" />
 
-            <span className="text-[10px]">
-              Rewards
-            </span>
-          </button>
+              <span className="text-[10px]">
+                Rewards
+              </span>
+            </button>
 
-          {/* PROFILE */}
-          <button
-            type="button"
-            onClick={() => {
-              if (!currentUser) {
-                setIsAuthModalOpen(
-                  true
-                );
-              } else {
-                setActiveTab(
-                  'profile'
-                );
-              }
-            }}
-            className={`flex flex-col items-center gap-1 transition-colors ${
-              activeTab === 'profile'
-                ? 'font-medium text-[#2D7D46]'
-                : 'text-stone-400 hover:text-stone-700'
-            }`}
-          >
-            <UserIcon className="h-5 w-5" />
+            {/* PROFILE */}
+            <button
+              type="button"
+              onClick={() => {
+                if (!currentUser) {
+                  setIsAuthModalOpen(true);
+                } else {
+                  setActiveTab(
+                    'profile'
+                  );
+                }
+              }}
+              className={`flex flex-col items-center gap-1 transition-colors ${
+                activeTab === 'profile'
+                  ? 'font-medium text-[#2D7D46]'
+                  : 'text-stone-400 hover:text-stone-700'
+              }`}
+            >
+              <UserIcon className="h-5 w-5" />
 
-            <span className="text-[10px]">
-              Profile
-            </span>
-          </button>
+              <span className="text-[10px]">
+                Profile
+              </span>
+            </button>
 
-          {/* SUPPORT */}
-          <button
-            type="button"
-            onClick={() => setActiveTab('support')}
-            className={`flex flex-col items-center gap-1 transition-colors ${
-              activeTab === 'support'
-                ? 'font-medium text-amber-500'
-                : 'text-stone-400 hover:text-stone-700'
-            }`}
-          >
-            <Headphones className="h-5 w-5" />
+            {/* SUPPORT */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('support')}
+              className={`flex flex-col items-center gap-1 transition-colors ${
+                activeTab === 'support'
+                  ? 'font-medium text-amber-500'
+                  : 'text-stone-400 hover:text-stone-700'
+              }`}
+            >
+              <Headphones className="h-5 w-5" />
 
-            <span className="text-[10px]">
-              Support
-            </span>
-          </button>
+              <span className="text-[10px]">
+                Support
+              </span>
+            </button>
 
-        </div>
-      </nav>
+          </div>
+        </nav>
+      )}
 
       {/* ======================================================
           GOOGLE AUTH MODAL

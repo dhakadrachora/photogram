@@ -107,6 +107,10 @@ export function WorldChat({
   const initialLoadRef = useRef(true);
   const expiryTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const channelRef = useRef<any>(null);
+  const isFetchingMessagesRef = useRef(false);
+  const isFetchingPresenceRef = useRef(false);
+  const currentUserRef = useRef<User | null>(currentUser);
+  currentUserRef.current = currentUser;
 
   const quickStickers = [
     'Systumm Hang! 🚜',
@@ -195,6 +199,9 @@ export function WorldChat({
    */
 
   const fetchMessages = useCallback(async () => {
+    if (isFetchingMessagesRef.current) return;
+    isFetchingMessagesRef.current = true;
+
     try {
       const accessToken = await getAccessToken();
 
@@ -228,12 +235,17 @@ export function WorldChat({
 
       if (Array.isArray(data.messages)) {
         setMessages((previous) => {
-          const merged = mergeMessages(
-            previous,
-            data.messages
-          );
+          // Skip setting state if message list has not changed (prevents freezing/thrashing)
+          if (
+            previous.length === data.messages.length &&
+            previous.length > 0 &&
+            previous[previous.length - 1]?.id ===
+              data.messages[data.messages.length - 1]?.id
+          ) {
+            return previous;
+          }
 
-          return merged;
+          return mergeMessages(previous, data.messages);
         });
       }
 
@@ -241,6 +253,7 @@ export function WorldChat({
     } catch (error) {
       console.warn('World Chat fetch error:', error);
     } finally {
+      isFetchingMessagesRef.current = false;
       setIsLoadingMessages(false);
     }
   }, [getAccessToken]);
@@ -249,12 +262,19 @@ export function WorldChat({
    * ------------------------------------------------------------
    * PRESENCE
    * ------------------------------------------------------------
-   *
-   * Presence is kept separate from World Chat.
-   * It will be secured properly in the presence API.
    */
 
   const fetchPresence = useCallback(async () => {
+    if (isFetchingPresenceRef.current) return;
+    if (
+      typeof document !== 'undefined' &&
+      document.visibilityState !== 'visible'
+    ) {
+      return;
+    }
+
+    isFetchingPresenceRef.current = true;
+
     try {
       const res = await fetch('/api/presence', {
         cache: 'no-store',
@@ -272,54 +292,14 @@ export function WorldChat({
       }
     } catch (error) {
       console.warn('Presence fetch error:', error);
+    } finally {
+      isFetchingPresenceRef.current = false;
     }
   }, []);
 
-  const sendPresenceHeartbeat = useCallback(async () => {
-    if (!currentUser) {
-      await fetchPresence();
-      return;
-    }
-
-    try {
-      const accessToken = await getAccessToken();
-
-      if (!accessToken) {
-        await fetchPresence();
-        return;
-      }
-
-      const res = await fetch('/api/presence', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({}),
-      });
-
-      if (!res.ok) {
-        await fetchPresence();
-        return;
-      }
-
-      const data = await res.json();
-
-      if (typeof data.count === 'number') {
-        setOnlineCount(Math.max(0, data.count));
-        setOnlineUsers(
-          Array.isArray(data.users) ? data.users : []
-        );
-      }
-    } catch (error) {
-      console.warn('Presence heartbeat error:', error);
-      await fetchPresence();
-    }
-  }, [currentUser, fetchPresence, getAccessToken]);
-
   /*
    * ------------------------------------------------------------
-   * INITIAL LOAD + REALTIME
+   * INITIAL LOAD + REALTIME (STABLE MOUNT)
    * ------------------------------------------------------------
    */
 
@@ -338,46 +318,80 @@ export function WorldChat({
     void load();
 
     /*
-     * Presence heartbeat for logged-in users; periodic check for guests.
+     * Periodic active users check (15s when visible)
      */
     const presenceInterval = setInterval(() => {
-      if (currentUser) {
-        void sendPresenceHeartbeat();
-      } else {
+      if (
+        mounted &&
+        typeof document !== 'undefined' &&
+        document.visibilityState === 'visible'
+      ) {
         void fetchPresence();
       }
     }, 15000);
 
     /*
-     * Fast polling fallback: ensures all clients receive new messages even if
-     * websocket/realtime reconnects or is temporarily delayed.
+     * Safety polling fallback (12s when visible)
      */
     const pollInterval = setInterval(() => {
-      if (mounted) {
+      if (
+        mounted &&
+        typeof document !== 'undefined' &&
+        document.visibilityState === 'visible'
+      ) {
         void fetchMessages();
       }
-    }, 2500);
+    }, 12000);
 
     /*
      * Window focus / tab visibility sync:
      * When user switches back to the tab, immediately fetch latest messages.
      */
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && mounted) {
+      if (
+        typeof document !== 'undefined' &&
+        document.visibilityState === 'visible' &&
+        mounted
+      ) {
         void fetchMessages();
         void fetchPresence();
       }
     };
 
-    window.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', handleVisibilityChange);
 
     /*
-     * Remove messages from UI every 10 seconds after 24 hours.
+     * Mobile Visual Viewport listener:
+     * When the virtual keyboard appears or disappears, scroll smoothly to bottom
+     */
+    const handleViewportResize = () => {
+      if (shouldAutoScrollRef.current) {
+        requestAnimationFrame(() => {
+          scrollToBottom('smooth');
+        });
+      }
+    };
+
+    if (typeof window !== 'undefined' && window.visualViewport) {
+      window.visualViewport.addEventListener(
+        'resize',
+        handleViewportResize
+      );
+      window.visualViewport.addEventListener(
+        'scroll',
+        handleViewportResize
+      );
+    }
+
+    /*
+     * Remove messages from UI every 60 seconds after 24 hours.
      */
     expiryTimerRef.current = setInterval(() => {
-      removeExpiredFromUI();
-    }, 10000);
+      if (mounted) {
+        removeExpiredFromUI();
+      }
+    }, 60000);
 
     /*
      * Supabase Realtime Channel:
@@ -476,12 +490,7 @@ export function WorldChat({
               );
             }
           )
-          .subscribe((status: string) => {
-            console.log(
-              'World Chat realtime status:',
-              status
-            );
-          });
+          .subscribe();
       } catch (error) {
         console.warn(
           'World Chat realtime setup error:',
@@ -495,8 +504,22 @@ export function WorldChat({
 
       clearInterval(presenceInterval);
       clearInterval(pollInterval);
-      window.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener(
+        'visibilitychange',
+        handleVisibilityChange
+      );
       window.removeEventListener('focus', handleVisibilityChange);
+
+      if (typeof window !== 'undefined' && window.visualViewport) {
+        window.visualViewport.removeEventListener(
+          'resize',
+          handleViewportResize
+        );
+        window.visualViewport.removeEventListener(
+          'scroll',
+          handleViewportResize
+        );
+      }
 
       if (expiryTimerRef.current) {
         clearInterval(expiryTimerRef.current);
@@ -507,22 +530,10 @@ export function WorldChat({
         channelRef.current = null;
         void supabase.removeChannel(channel);
       }
-
-      if (currentUser) {
-        void fetch('/api/presence', {
-          method: 'DELETE',
-          headers: {
-            'x-user-id': currentUser.id,
-          },
-          keepalive: true,
-        }).catch(() => {});
-      }
     };
   }, [
-    currentUser,
     fetchMessages,
     fetchPresence,
-    sendPresenceHeartbeat,
     removeExpiredFromUI,
     scrollToBottom,
   ]);
@@ -717,31 +728,30 @@ export function WorldChat({
    */
 
   return (
-    <div className="relative min-h-[calc(100vh-4rem)] w-full flex flex-col p-3 sm:p-6 max-w-6xl mx-auto">
+    <div className="relative h-[calc(100dvh-50px)] sm:h-auto sm:min-h-[calc(100vh-4rem)] w-full flex flex-col p-1.5 sm:p-6 max-w-6xl mx-auto overflow-hidden sm:overflow-visible">
       {/* HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-3">
-        <div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-              Dhoti aale World Chat
+      <div className="flex items-center justify-between pb-2 sm:pb-4 border-b border-slate-800 gap-2 shrink-0">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <h1 className="text-base sm:text-2xl font-black text-white tracking-tight truncate">
+              गाँव चौपाल (World Chat)
             </h1>
 
             <div
-              className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400"
+              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400"
               title="Real active users"
             >
-              <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse ring-4 ring-emerald-400/25" />
+              <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse ring-2 ring-emerald-400/25" />
 
-              <span className="text-xs font-bold tracking-wide">
+              <span className="text-[11px] sm:text-xs font-bold tracking-wide">
                 {onlineCountText}
               </span>
             </div>
           </div>
 
-          <p className="text-xs text-slate-400 mt-1 flex items-center gap-1.5">
+          <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 hidden sm:flex items-center gap-1.5">
             <span>
-              Public community choupal • banter, battle challenges
-              & live discussion
+              Public community choupal • banter, battle challenges & live discussion
             </span>
 
             <span className="text-slate-600">•</span>
@@ -752,14 +762,14 @@ export function WorldChat({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {currentUser ? (
-            <div className="flex items-center gap-2 bg-slate-900 border border-emerald-500/30 rounded-2xl px-3 py-1.5">
-              <ShieldCheck className="h-4 w-4 text-emerald-400" />
+            <div className="flex items-center gap-1.5 sm:gap-2 bg-slate-900 border border-emerald-500/30 rounded-xl sm:rounded-2xl px-2 sm:px-3 py-1 sm:py-1.5">
+              <ShieldCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-400 shrink-0" />
 
               <div className="text-left">
                 <div className="flex items-center gap-1">
-                  <span className="text-[11px] font-bold text-white block leading-tight truncate max-w-[120px]">
+                  <span className="text-[11px] font-bold text-white block leading-tight truncate max-w-[85px] sm:max-w-[120px]">
                     {currentUser.name}
                   </span>
 
@@ -770,7 +780,7 @@ export function WorldChat({
                   )}
                 </div>
 
-                <span className="text-[9px] text-amber-400 font-semibold block leading-none">
+                <span className="text-[8px] sm:text-[9px] text-amber-400 font-semibold block leading-none truncate max-w-[85px]">
                   {currentUser.badge}
                 </span>
               </div>
@@ -778,10 +788,10 @@ export function WorldChat({
           ) : (
             <button
               onClick={onOpenAuth}
-              className="flex items-center gap-1.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-3.5 py-1.5 text-xs shadow-md transition-all active:scale-95"
+              className="flex items-center gap-1 sm:gap-1.5 rounded-xl sm:rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-3 py-1.5 text-xs shadow-md transition-all active:scale-95 shrink-0"
             >
               <LogIn className="h-3.5 w-3.5" />
-              <span>Login to Join</span>
+              <span>Login</span>
             </button>
           )}
         </div>
@@ -789,7 +799,7 @@ export function WorldChat({
 
       {/* AUTH ERROR */}
       {authError && (
-        <div className="my-2 rounded-xl bg-red-500/20 border border-red-500/40 p-2.5 text-xs text-red-300 flex items-center justify-between gap-3">
+        <div className="my-1.5 rounded-xl bg-red-500/20 border border-red-500/40 p-2 sm:p-2.5 text-xs text-red-300 flex items-center justify-between gap-3 shrink-0">
           <span>{authError}</span>
 
           <button
@@ -802,14 +812,14 @@ export function WorldChat({
       )}
 
       {/* MAIN */}
-      <div className="mt-4 flex-1 grid grid-cols-1 lg:grid-cols-4 gap-4 min-h-0 lg:min-h-[520px]">
+      <div className="mt-1.5 sm:mt-4 flex-1 grid grid-cols-1 lg:grid-cols-4 gap-2.5 sm:gap-4 min-h-0 lg:min-h-[520px] overflow-hidden">
         {/* CHAT */}
-        <div className="lg:col-span-3 min-h-0 flex flex-col rounded-3xl bg-slate-950/80 border border-slate-800 overflow-hidden shadow-2xl relative">
+        <div className="lg:col-span-3 min-h-0 flex-1 flex flex-col rounded-2xl sm:rounded-3xl bg-slate-950/90 border border-slate-800 overflow-hidden shadow-2xl relative">
           {/* IMPORTANT: FIXED/FLEXIBLE SCROLL AREA */}
           <div
             ref={chatScrollRef}
             onScroll={handleChatScroll}
-            className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 space-y-4 overscroll-contain scroll-smooth"
+            className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-2.5 sm:p-4 space-y-3 sm:space-y-4 overscroll-contain"
             style={{
               WebkitOverflowScrolling: 'touch',
             }}
@@ -870,7 +880,7 @@ export function WorldChat({
               return (
                 <div
                   key={msg.id}
-                  className={`flex items-start gap-3 ${
+                  className={`flex items-start gap-2.5 sm:gap-3 ${
                     isMe ? 'flex-row-reverse' : ''
                   }`}
                 >
@@ -885,7 +895,7 @@ export function WorldChat({
                       width={36}
                       height={36}
                       referrerPolicy="no-referrer"
-                      className={`h-9 w-9 rounded-full bg-slate-800 object-cover ring-2 ${
+                      className={`h-8 w-8 sm:h-9 sm:w-9 rounded-full bg-slate-800 object-cover ring-2 ${
                         isAiParticipant
                           ? 'ring-amber-500/70'
                           : showVerifiedTick
@@ -906,7 +916,7 @@ export function WorldChat({
 
                   {/* MESSAGE */}
                   <div
-                    className={`flex flex-col max-w-[82%] ${
+                    className={`flex flex-col max-w-[85%] sm:max-w-[82%] ${
                       isMe ? 'items-end' : 'items-start'
                     }`}
                   >
@@ -915,7 +925,7 @@ export function WorldChat({
                         <span>{msg.userName}</span>
 
                         {showVerifiedTick && (
-                          <VerifiedTick size={14} />
+                          <VerifiedTick size={13} />
                         )}
                       </span>
 
@@ -942,7 +952,7 @@ export function WorldChat({
                     </div>
 
                     <div
-                      className={`rounded-2xl px-4 py-2.5 text-xs sm:text-sm leading-relaxed shadow-sm break-words whitespace-pre-wrap ${
+                      className={`rounded-2xl px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm leading-relaxed shadow-sm break-words whitespace-pre-wrap ${
                         isMe
                           ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-medium rounded-tr-none'
                           : isAiParticipant
@@ -995,9 +1005,9 @@ export function WorldChat({
 
           {/* INPUT */}
           {currentUser ? (
-            <div className="shrink-0 p-3 sm:p-4 bg-slate-900/90 border-t border-slate-800">
+            <div className="shrink-0 p-2 sm:p-3.5 bg-slate-900 border-t border-slate-800 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
               {showStickers && (
-                <div className="mb-3 flex flex-wrap gap-1.5 p-2.5 bg-slate-800/90 rounded-2xl border border-slate-700">
+                <div className="mb-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
                   {quickStickers.map((sticker) => (
                     <button
                       key={sticker}
@@ -1008,7 +1018,7 @@ export function WorldChat({
                         )
                       }
                       disabled={isSending}
-                      className="rounded-xl bg-slate-900 hover:bg-amber-500/20 border border-slate-700 hover:border-amber-500/40 px-3 py-1.5 text-xs font-bold text-amber-300 transition-colors disabled:opacity-50"
+                      className="shrink-0 rounded-xl bg-slate-800 hover:bg-amber-500/20 border border-slate-700 hover:border-amber-500/40 px-2.5 py-1 text-xs font-bold text-amber-300 transition-colors disabled:opacity-50"
                     >
                       {sticker}
                     </button>
@@ -1016,33 +1026,38 @@ export function WorldChat({
                 </div>
               )}
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 <button
                   type="button"
                   onClick={() =>
                     setShowStickers(!showStickers)
                   }
-                  className={`rounded-2xl p-2.5 sm:p-3 border ${
+                  className={`shrink-0 rounded-2xl p-2.5 sm:p-3 border transition-colors ${
                     showStickers
                       ? 'bg-amber-500 text-slate-950 border-amber-400'
                       : 'bg-slate-800 text-slate-300 border-slate-700 hover:text-white'
                   }`}
                   title="Desi Stickers"
                 >
-                  <Smile className="h-4 w-4" />
+                  <Smile className="h-5 w-5" />
                 </button>
 
-                <div className="relative flex-1">
+                <div className="relative flex-1 min-w-0">
                   <input
                     id="world-chat-input"
                     type="text"
                     maxLength={1000}
-                    placeholder="Type message in World Chat..."
+                    placeholder="संदेश लिखें / Type message..."
                     value={inputMessage}
                     disabled={isSending}
                     onChange={(e) =>
                       setInputMessage(e.target.value)
                     }
+                    onFocus={() => {
+                      setTimeout(() => {
+                        scrollToBottom('smooth');
+                      }, 250);
+                    }}
                     onKeyDown={(e) => {
                       if (
                         e.key === 'Enter' &&
@@ -1056,7 +1071,7 @@ export function WorldChat({
                         );
                       }
                     }}
-                    className="w-full rounded-2xl bg-slate-800 border border-slate-700 px-4 py-3 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/60 disabled:opacity-60"
+                    className="w-full rounded-2xl bg-slate-800 border border-slate-700 px-3.5 py-2.5 sm:py-3 text-base sm:text-sm text-white placeholder-slate-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/40 disabled:opacity-60"
                   />
                 </div>
 
@@ -1071,39 +1086,38 @@ export function WorldChat({
                     isSending ||
                     !inputMessage.trim()
                   }
-                  className="rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 p-3 text-slate-950 font-bold shadow-md transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="shrink-0 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 p-2.5 sm:p-3 text-slate-950 font-bold shadow-md transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Send Message"
                 >
-                  <Send className="h-4 w-4" />
+                  <Send className="h-5 w-5" />
                 </button>
               </div>
             </div>
           ) : (
             <div
-              className="shrink-0 p-4 sm:p-5 bg-slate-900/98 border-t border-amber-500/30 flex flex-col sm:flex-row items-center justify-between gap-3"
+              className="shrink-0 p-3 sm:p-5 bg-slate-900/98 border-t border-amber-500/30 flex flex-col sm:flex-row items-center justify-between gap-2.5 pb-[max(0.6rem,env(safe-area-inset-bottom))]"
             >
-              <div className="flex items-center gap-3 text-center sm:text-left">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                  <Lock className="h-5 w-5" />
+              <div className="flex items-center gap-2.5 text-left">
+                <div className="flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl sm:rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                  <Lock className="h-4 w-4 sm:h-5 sm:w-5" />
                 </div>
 
                 <div>
-                  <h4 className="text-sm sm:text-base font-black text-white">
+                  <h4 className="text-xs sm:text-base font-black text-white">
                     चौपाल में संदेश भेजने के लिए लॉगिन करें
                   </h4>
 
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    सभी संदेश 24 घंटे तक सभी को दिखाई देते हैं। बातचीत में हिस्सा लेने के लिए लॉगिन करें।
+                  <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5">
+                    बातचीत में हिस्सा लेने के लिए एक क्लिक में लॉगिन करें।
                   </p>
                 </div>
               </div>
 
               <button
                 onClick={onOpenAuth}
-                className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 px-5 py-2.5 text-xs sm:text-sm font-black shadow-xl transition-transform active:scale-95 shrink-0"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl sm:rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 px-4 py-2 sm:px-5 sm:py-2.5 text-xs sm:text-sm font-black shadow-xl transition-transform active:scale-95 shrink-0"
               >
                 <LogIn className="h-4 w-4" />
-
                 <span>लॉगिन करें / Login to Chat</span>
               </button>
             </div>
