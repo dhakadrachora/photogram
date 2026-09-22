@@ -53,8 +53,10 @@ export function Navbar({
 
   const handleOpenReport = () => {
     setMobileMenuOpen(false);
-    if (onOpenReportModal) {
-      onOpenReportModal();
+    if (setActiveTab) {
+      setActiveTab('support');
+    } else {
+      window.location.href = '/support';
     }
   };
 
@@ -238,17 +240,19 @@ export function Navbar({
             </button>
           )}
 
-          {/* Quick Report a Problem Icon Button */}
-          {onOpenReportModal && (
-            <button
-              onClick={handleOpenReport}
-              title="समस्या रिपोर्ट करें / Report a Problem"
-              className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-slate-900 border border-slate-800 hover:border-amber-500/50 text-slate-300 hover:text-amber-400 text-xs font-semibold transition-colors"
-            >
-              <AlertCircle className="h-3.5 w-3.5 text-amber-400" />
-              <span>रिपोर्ट / सहायता</span>
-            </button>
-          )}
+          {/* Quick Report / 24/7 Support Button */}
+          <button
+            onClick={handleOpenReport}
+            title="सहायता व सपोर्ट / 24/7 Support"
+            className={`hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold transition-colors ${
+              activeTab === 'support'
+                ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
+                : 'bg-slate-900 border-slate-800 hover:border-amber-500/50 text-slate-300 hover:text-amber-400'
+            }`}
+          >
+            <AlertCircle className="h-3.5 w-3.5 text-amber-400" />
+            <span>सपोर्ट / सहायता</span>
+          </button>
 
           {/* Mobile Hamburger Toggle */}
           <button
@@ -310,16 +314,18 @@ export function Navbar({
             <span>Profile</span>
           </button>
 
-          {/* Report a problem in mobile menu */}
-          {onOpenReportModal && (
-            <button
-              onClick={handleOpenReport}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-amber-400 hover:bg-slate-800"
-            >
-              <AlertCircle className="h-4 w-4 text-amber-400" />
-              <span>समस्या रिपोर्ट करें (Report a Problem)</span>
-            </button>
-          )}
+          {/* Support in mobile drawer */}
+          <button
+            onClick={handleOpenReport}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
+              activeTab === 'support'
+                ? 'bg-amber-500/20 text-amber-400'
+                : 'text-amber-400/90 hover:bg-slate-800'
+            }`}
+          >
+            <AlertCircle className="h-4 w-4 text-amber-400" />
+            <span>सहायता व शिकायत (24/7 Support)</span>
+          </button>
 
         </div>
       )}

@@ -22,7 +22,8 @@ import {
   Phone,
   MapPin,
   Building,
-  UserCheck
+  UserCheck,
+  Headphones,
 } from 'lucide-react';
 import { User, AppTab, NewsItem, CommunityUpdate, PresenceUser } from '@/types';
 import { SoundEffects } from '@/lib/audio/sound-effects';
@@ -416,6 +417,31 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
           <p className="text-[11px] text-stone-600 font-hindi mt-1">
             गाँव चौपाल, प्रतियोगिता और एआई मददगार के साथ अपनी आवाज को मंच दें।
           </p>
+        </div>
+
+        {/* Support Helpdesk Link Banner */}
+        <div 
+          onClick={() => {
+            SoundEffects.playTap();
+            onNavigateTab('support');
+          }}
+          className="mt-3 rounded-2xl bg-slate-900 border border-amber-500/30 p-3.5 flex items-center justify-between cursor-pointer hover:border-amber-500/60 hover:bg-slate-800 transition-all shadow-sm group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
+              <Headphones className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-white group-hover:text-amber-300 transition-colors flex items-center gap-2">
+                <span>सहायता व समाधान केंद्र (24/7 Support)</span>
+                <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Live Chat</span>
+              </div>
+              <p className="text-[11px] text-slate-400 font-hindi">
+                कोई समस्या, सिक्के की दिक्कत या सवाल? सीधा एडमिन से चैट करें।
+              </p>
+            </div>
+          </div>
+          <ChevronRight className="h-4 w-4 text-amber-400 group-hover:translate-x-1 transition-transform" />
         </div>
       </main>
       {/* END: VillageCommunityFeaturesGrid */}

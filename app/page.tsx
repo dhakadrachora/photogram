@@ -12,6 +12,7 @@ import { LandingPage } from '@/components/LandingPage';
 import { WorldChat } from '@/components/WorldChat';
 import { BattleArena } from '@/components/BattleArena';
 import { ProfileView } from '@/components/ProfileView';
+import { SupportView } from '@/components/SupportView';
 
 import { VoiceAssistant } from '@/components/VoiceAssistant';
 import GoogleAuthModal from '@/components/GoogleAuthModal';
@@ -42,6 +43,7 @@ import {
   Eye,
   Loader2,
   RefreshCw,
+  Headphones,
 } from 'lucide-react';
 
 /* ============================================================
@@ -1103,6 +1105,8 @@ export default function Home() {
               ? 'AI Assistant 🔒'
               : activeTab === 'profile'
               ? 'Profile'
+              : activeTab === 'support'
+              ? 'सहायता व सपोर्ट (Support 24/7)'
               : 'Admin Panel 👑'}
 
           </span>
@@ -1304,7 +1308,17 @@ export default function Home() {
           />
         )}
 
+        {/* ====================================================
+            SUPPORT & HELP
+            ==================================================== */}
 
+        {activeTab === 'support' && (
+          <SupportView
+            currentUser={currentUser}
+            onNavigateTab={setActiveTab}
+            onOpenAuth={() => setIsAuthModalOpen(true)}
+          />
+        )}
 
       </main>
 
@@ -1461,7 +1475,22 @@ export default function Home() {
             </span>
           </button>
 
+          {/* SUPPORT */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('support')}
+            className={`flex flex-col items-center gap-1 transition-colors ${
+              activeTab === 'support'
+                ? 'font-medium text-amber-500'
+                : 'text-stone-400 hover:text-stone-700'
+            }`}
+          >
+            <Headphones className="h-5 w-5" />
 
+            <span className="text-[10px]">
+              Support
+            </span>
+          </button>
 
         </div>
       </nav>

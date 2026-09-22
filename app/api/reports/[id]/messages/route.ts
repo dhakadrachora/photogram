@@ -12,7 +12,14 @@ export async function POST(
   const user = await getAuthenticatedUser(req);
   const isAdmin = await verifyAdminRequestAsync(req);
 
-  if (!user && !isAdmin) {
+  const headerUserId = req.headers.get('x-user-id');
+  const headerEmail = req.headers.get('x-user-email');
+  const headerName = req.headers.get('x-user-name');
+
+  const resolvedUserId = user?.id || headerUserId;
+  const resolvedUserEmail = user?.email || headerEmail;
+
+  if (!resolvedUserId && !isAdmin) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -22,7 +29,11 @@ export async function POST(
   }
 
   // If not admin, must be report owner
-  if (!isAdmin && user?.id !== report.userId) {
+  const isOwner =
+    Boolean(resolvedUserId && resolvedUserId === report.userId) ||
+    Boolean(resolvedUserEmail && report.userEmail && resolvedUserEmail.toLowerCase() === report.userEmail.toLowerCase());
+
+  if (!isAdmin && !isOwner) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
@@ -37,14 +48,14 @@ export async function POST(
     const senderRole: 'user' | 'admin' = isAdmin ? 'admin' : 'user';
     const senderName = isAdmin
       ? 'Admin 👑'
-      : user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'User';
+      : user?.user_metadata?.full_name || user?.user_metadata?.name || headerName || resolvedUserEmail?.split('@')[0] || 'User';
     const senderEmail = isAdmin
       ? 'rohitdhakaddhoti143@gmail.com'
-      : user?.email || '';
+      : user?.email || resolvedUserEmail || '';
 
     const newMsg = await addReportMessage({
       reportId: id,
-      senderId: isAdmin ? 'admin' : (user?.id || 'user'),
+      senderId: isAdmin ? 'admin' : (resolvedUserId || 'user'),
       senderName,
       senderEmail,
       senderRole,

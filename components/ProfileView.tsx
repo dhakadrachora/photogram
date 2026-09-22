@@ -244,15 +244,19 @@ export function ProfileView({
                 <Share2 className="h-4 w-4" />
                 <span>Share Profile</span>
               </button>
-              {onOpenReportModal && (
-                <button
-                  onClick={onOpenReportModal}
-                  className="flex items-center justify-center gap-2 rounded-xl bg-slate-800 hover:bg-amber-500/10 hover:border-amber-500/30 px-4 py-2.5 text-xs font-bold text-amber-300 border border-slate-700 transition-colors"
-                >
-                  <AlertCircle className="h-4 w-4 text-amber-400" />
-                  <span>Report a Problem</span>
-                </button>
-              )}
+              <button
+                onClick={() => {
+                  if (onNavigateTab) {
+                    onNavigateTab('support');
+                  } else {
+                    window.location.href = '/support';
+                  }
+                }}
+                className="flex items-center justify-center gap-2 rounded-xl bg-slate-800 hover:bg-amber-500/15 hover:border-amber-500/40 px-4 py-2.5 text-xs font-bold text-amber-300 border border-slate-700 transition-colors shadow-sm"
+              >
+                <AlertCircle className="h-4 w-4 text-amber-400" />
+                <span>सहायता व सपोर्ट / 24/7 Support</span>
+              </button>
               <button
                 onClick={onLogout}
                 className="flex items-center justify-center gap-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 px-4 py-2.5 text-xs font-bold text-red-400 border border-red-500/30 transition-colors"
