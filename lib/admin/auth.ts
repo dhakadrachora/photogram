@@ -163,9 +163,9 @@ export async function checkAdminDetailedSession(): Promise<AdminAuthCheckResult>
 
     return {
       status: 'unauthorized_user',
-      currentEmail: email,
+      currentEmail: null,
       session: null,
-      error: `वर्तमान में आप "${email}" से लॉगिन हैं। यह एडमिन पैनल केवल ${PRIMARY_OWNER_EMAIL} के लिए है।`,
+      error: 'अनाधिकृत खाता। यह पैनल केवल अधिकृत सिस्टम एडमिनिस्ट्रेटर के लिए सुरक्षित है।',
     };
   } catch (err: any) {
     return {
