@@ -134,7 +134,7 @@ export async function POST(req: NextRequest) {
     };
 
     const sb = createServerClient();
-    const { data, error } = await sb.from('battles').insert(row).select().single();
+    const { data, error } = await sb.from('battles').insert(row).select().maybeSingle();
 
     if (error) {
       console.error('[BATTLE CREATE]', error);
@@ -209,7 +209,7 @@ export async function PUT(req: NextRequest) {
       .update(updateData)
       .eq('id', id)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });

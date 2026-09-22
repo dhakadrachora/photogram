@@ -138,7 +138,7 @@ export async function PATCH(req: NextRequest) {
       .update(safeUpdates)
       .eq('id', userId)
       .select('id, name, email, avatar, badge, rank, role, is_admin, coins, wins, battles, created_at')
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
 

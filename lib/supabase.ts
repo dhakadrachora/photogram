@@ -18,7 +18,10 @@ import { isSiteAdmin } from './admin-auth';
    ============================================================ */
 
 const FALLBACK_SUPABASE_URL = 'https://zlngcbefvdtbihndaeun.supabase.co';
-const FALLBACK_SUPABASE_ANON_KEY = 'sb_publishable_JxGddMQ5KqRFTANuZG2TGg_I05TTskS';
+const FALLBACK_SUPABASE_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpsbmdjYmVmdmR0YmlobmRhZXVuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk3OTkzNDEsImV4cCI6MjEwNTM3NTM0MX0.1yCJ7K0wI3mw79oyPP2lnBvq_R7Q6huq2uH7qC0jQOE';
+const FALLBACK_SUPABASE_SERVICE_ROLE_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpsbmdjYmVmdmR0YmlobmRhZXVuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4OTc5OTM0MSwiZXhwIjoyMTA1Mzc1MzQxfQ.z2cOrURJGJr8JcGow7gTCON1sEsHa-J8gDvk4d-F4Nc';
 
 const supabaseUrl =
   process.env.NEXT_PUBLIC_SUPABASE_URL || FALLBACK_SUPABASE_URL;
@@ -26,7 +29,10 @@ const supabaseUrl =
 const supabaseAnonKey =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || FALLBACK_SUPABASE_ANON_KEY;
 
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const supabaseServiceKey =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SUPABASE_SERVICE_KEY ||
+  FALLBACK_SUPABASE_SERVICE_ROLE_KEY;
 
 export const CHAT_MESSAGE_EXPIRATION_MS = 24 * 60 * 60 * 1000; // 24 Hours
 

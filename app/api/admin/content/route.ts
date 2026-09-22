@@ -266,7 +266,7 @@ export async function POST(req: NextRequest) {
       created_at: body.created_at || new Date().toISOString(),
     };
 
-    const { data, error } = await sb.from(table).insert(row).select().single();
+    const { data, error } = await sb.from(table).insert(row).select().maybeSingle();
     if (error) throw error;
 
     return NextResponse.json({
@@ -308,7 +308,7 @@ export async function PUT(req: NextRequest) {
         .from('site_settings')
         .upsert({ ...sanitizedSettings, id: 'default', updated_at: new Date().toISOString() })
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       return NextResponse.json({ success: true, message: 'Settings updated', data });
@@ -326,7 +326,7 @@ export async function PUT(req: NextRequest) {
       .update(sanitized)
       .eq('id', id)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
 
