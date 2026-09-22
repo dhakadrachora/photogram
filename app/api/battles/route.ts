@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase';
-import { verifyAdminRequest } from '@/lib/admin-auth';
+import { verifyAdminRequest } from '@/lib/admin/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,7 +40,8 @@ function formatBattle(battle: any) {
 
 export async function GET(req: NextRequest) {
   try {
-    const isAdmin = verifyAdminRequest(req);
+    const auth = await verifyAdminRequest(req);
+    const isAdmin = auth.isAdmin;
     const sb = createServerClient();
 
     let query = sb.from('battles').select('*').order('created_at', { ascending: false });
@@ -69,7 +70,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!verifyAdminRequest(req)) {
+  const auth = await verifyAdminRequest(req);
+  if (!auth.isAdmin) {
     return NextResponse.json({ error: 'Only Super Admin can create battles.' }, { status: 403 });
   }
 
@@ -157,7 +159,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  if (!verifyAdminRequest(req)) {
+  const auth = await verifyAdminRequest(req);
+  if (!auth.isAdmin) {
     return NextResponse.json({ error: 'Only Super Admin can update battles.' }, { status: 403 });
   }
 
@@ -219,7 +222,8 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  if (!verifyAdminRequest(req)) {
+  const auth = await verifyAdminRequest(req);
+  if (!auth.isAdmin) {
     return NextResponse.json({ error: 'Only Super Admin can delete battles.' }, { status: 403 });
   }
 
