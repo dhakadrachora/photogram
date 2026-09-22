@@ -599,6 +599,15 @@ export default function Home() {
   const [selectedOpponent, setSelectedOpponent] =
     useState<string | undefined>(undefined);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('openAuth') === 'true' || params.get('login') === 'admin') {
+        setIsAuthModalOpen(true);
+      }
+    }
+  }, []);
+
   const isMounted = useIsMounted();
 
   const rawUserStr = useSyncExternalStore(

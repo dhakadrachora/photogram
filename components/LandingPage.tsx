@@ -126,12 +126,24 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
           <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-2">
             <PWAInstallButton variant="header" />
             {currentUser && (
-              <div
-                onClick={() => onNavigateTab('profile')}
-                className="flex items-center gap-1.5 cursor-pointer bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 rounded-full text-xs font-bold text-amber-900 shadow-xs"
-              >
-                <span className="max-w-[80px] truncate text-[11px]">{currentUser.name}</span>
-                {isAdmin && <Crown className="h-3.5 w-3.5 text-amber-600" />}
+              <div className="flex items-center gap-1.5">
+                {isAdmin && (
+                  <a
+                    href="/admin"
+                    id="landing-admin-btn"
+                    className="flex items-center gap-1 bg-amber-500 hover:bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full text-[10px] font-black shadow-xs transition-transform active:scale-95"
+                    title="Admin Control Center"
+                  >
+                    <span>👑 Admin</span>
+                  </a>
+                )}
+                <div
+                  onClick={() => onNavigateTab('profile')}
+                  className="flex items-center gap-1.5 cursor-pointer bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 rounded-full text-xs font-bold text-amber-900 shadow-xs"
+                >
+                  <span className="max-w-[80px] truncate text-[11px]">{currentUser.name}</span>
+                  {isAdmin && <Crown className="h-3.5 w-3.5 text-amber-600" />}
+                </div>
               </div>
             )}
           </div>

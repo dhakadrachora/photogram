@@ -219,6 +219,19 @@ export function Navbar({
                 )}
               </div>
 
+              {isAdmin && (
+                <a
+                  href="/admin"
+                  id="nav-admin-portal-link"
+                  className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 px-3 py-1.5 text-xs font-black text-slate-950 shadow-md shadow-amber-500/20 transition-all active:scale-95"
+                  title="Open Admin Control Center"
+                >
+                  <CrownIcon className="w-3.5 h-3.5 text-slate-950" />
+                  <span className="hidden sm:inline">Admin Panel</span>
+                  <span className="sm:hidden text-[10px]">Admin</span>
+                </a>
+              )}
+
               <button
                 id="logout-button"
                 onClick={onLogout}
@@ -313,6 +326,16 @@ export function Navbar({
             <UserIcon className="h-4 w-4" />
             <span>Profile</span>
           </button>
+
+          {isAdmin && (
+            <a
+              href="/admin"
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-black bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md shadow-amber-500/20"
+            >
+              <CrownIcon className="h-4 w-4 text-slate-950" />
+              <span>एडमिन पैनल (Admin Panel 👑)</span>
+            </a>
+          )}
 
           {/* Support in mobile drawer */}
           <button

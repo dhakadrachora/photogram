@@ -78,13 +78,21 @@ export function AdminGuard({ children }: AdminGuardProps) {
             {error || 'Access Denied: You do not possess administrator credentials.'}
           </p>
 
-          <div className="pt-2 space-y-2">
+          <div className="pt-2 space-y-2.5">
+            <Link
+              href="/?openAuth=true"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 transition-all shadow-md active:scale-95"
+            >
+              <Lock className="h-3.5 w-3.5 text-slate-950" />
+              <span>साइन-इन करें (Login as Site Owner)</span>
+            </Link>
+
             <Link
               href="/"
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all shadow-md active:scale-95"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all active:scale-95"
             >
-              <ArrowLeft className="h-4 w-4" />
-              <span>Return to Public Website</span>
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span>वेबसाइट पर वापस जाएँ (Return to Home)</span>
             </Link>
           </div>
         </div>

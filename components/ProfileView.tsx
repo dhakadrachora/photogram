@@ -30,6 +30,7 @@ import {
 import { SoundEffects } from '@/lib/audio/sound-effects';
 import { PWAInstallButton } from './PWAInstallButton';
 import { updateUserProfileDetails } from '@/lib/supabase';
+import { isSiteAdmin } from '@/lib/admin-auth';
 
 interface ProfileViewProps {
   currentUser: User | null;
@@ -58,6 +59,7 @@ export function ProfileView({
 }: ProfileViewProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(currentUser?.name || '');
+  const isAdmin = isSiteAdmin(currentUser?.email);
   const [editPhone, setEditPhone] = useState(currentUser?.phone || '');
   const [editAvatar, setEditAvatar] = useState(currentUser?.avatar || '');
   const [isSaving, setIsSaving] = useState(false);
@@ -228,6 +230,18 @@ export function ProfileView({
             </div>
 
             <div className="flex flex-col gap-2 shrink-0">
+              {/* Admin Panel button for site owner */}
+              {isAdmin && (
+                <a
+                  href="/admin"
+                  id="profile-admin-panel-link"
+                  className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 px-4 py-2.5 text-xs font-black text-slate-950 transition-all shadow-md shadow-amber-500/25 active:scale-95"
+                >
+                  <Crown className="h-4 w-4 text-slate-950" />
+                  <span>एडमिन पैनल खोलें (Admin Panel 👑)</span>
+                </a>
+              )}
+
               {/* Edit Profile Button */}
               <button
                 onClick={handleOpenEdit}
