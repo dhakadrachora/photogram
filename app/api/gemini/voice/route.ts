@@ -348,7 +348,7 @@ RESPONSE FORMAT:
         });
 
         const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('TTS timeout')), 2500)
+          setTimeout(() => reject(new Error('TTS timeout')), 6000)
         );
 
         const ttsResponse: any = await Promise.race([ttsPromise, timeoutPromise]);

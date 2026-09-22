@@ -12,7 +12,8 @@ import { LandingPage } from '@/components/LandingPage';
 import { WorldChat } from '@/components/WorldChat';
 import { BattleArena } from '@/components/BattleArena';
 import { ProfileView } from '@/components/ProfileView';
-import { AdminDashboard } from '@/components/AdminDashboard';
+
+import { VoiceAssistant } from '@/components/VoiceAssistant';
 import GoogleAuthModal from '@/components/GoogleAuthModal';
 import { PWAInstallBanner } from '@/components/PWAInstallBanner';
 
@@ -1057,7 +1058,7 @@ export default function Home() {
      AI VOICE ASSISTANT — TEMPORARILY LOCKED
      ========================================================== */
 
-  const AI_VOICE_LOCKED = true;
+  const AI_VOICE_LOCKED = false;
 
   const openVoiceLockedScreen =
     () => {
@@ -1166,6 +1167,14 @@ export default function Home() {
         {/* ====================================================
             AI VOICE — LOCKED
             ==================================================== */}
+
+        {activeTab === 'assistant' && !AI_VOICE_LOCKED && (
+          <VoiceAssistant 
+            currentUser={currentUser} 
+            onNavigateTab={setActiveTab} 
+            onOpenAuth={() => setIsAuthModalOpen(true)} 
+          />
+        )}
 
         {activeTab === 'assistant' &&
           AI_VOICE_LOCKED && (
@@ -1295,21 +1304,7 @@ export default function Home() {
           />
         )}
 
-        {/* ====================================================
-            ADMIN
-            ==================================================== */}
 
-        {activeTab === 'admin' && (
-          <AdminDashboard
-            currentUser={currentUser}
-            onOpenAuth={() =>
-              setIsAuthModalOpen(true)
-            }
-            onNavigateTab={
-              setActiveTab
-            }
-          />
-        )}
 
       </main>
 
@@ -1466,28 +1461,7 @@ export default function Home() {
             </span>
           </button>
 
-          {/* ADMIN */}
-          {isAdmin && (
-            <button
-              type="button"
-              onClick={() =>
-                setActiveTab(
-                  'admin'
-                )
-              }
-              className={`flex flex-col items-center gap-1 transition-colors ${
-                activeTab === 'admin'
-                  ? 'font-bold text-amber-600'
-                  : 'text-amber-500/70 hover:text-amber-600'
-              }`}
-            >
-              <Crown className="h-5 w-5" />
 
-              <span className="text-[10px]">
-                Admin 👑
-              </span>
-            </button>
-          )}
 
         </div>
       </nav>

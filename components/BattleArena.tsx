@@ -34,9 +34,12 @@ interface BattleArenaProps {
   isAdmin?: boolean;
   currentUser?: any;
   onOpenAuth?: () => void;
+  selectedOpponent?: string;
+  onUpdateUser?: any;
+  onNavigateTab?: any;
 }
 
-export default function BattleArena({
+export function BattleArena({
   userEmail,
   isAdmin = false,
   currentUser,

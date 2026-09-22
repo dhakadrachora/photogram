@@ -56,6 +56,16 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+
+      /*
+       * Supabase Storage — battle-image bucket & other uploads
+       */
+      {
+        protocol: 'https',
+        hostname: 'zlngcbefvdtbihndaeun.supabase.co',
+        port: '',
+        pathname: '/storage/**',
+      },
     ],
   },
 

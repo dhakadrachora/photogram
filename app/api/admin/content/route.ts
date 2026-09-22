@@ -465,30 +465,7 @@ export async function GET(
     if (type === 'users') {
       const { data, error } = await supabase
         .from('users')
-        .select(
-          `
-          id,
-          name,
-          email,
-          phone,
-          avatar,
-          badge,
-          rank,
-          role,
-          is_admin,
-          coins,
-          wins,
-          battles,
-          is_verified,
-          is_blocked,
-          blocked_at,
-          blocked_reason,
-          chat_blocked,
-          voting_blocked,
-          created_at,
-          updated_at
-        `
-        )
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (error) {

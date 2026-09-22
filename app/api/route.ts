@@ -17,7 +17,7 @@ function formatBattleForClient(
 
   const isEnded =
     battle.isEnded ||
-    Date.now() >= battle.endsAt ||
+    (battle.endsAt && Date.now() >= battle.endsAt) ||
     battle.status === 'closed';
 
   let winnerOptionId: string | undefined;
@@ -267,7 +267,7 @@ export async function POST(req: NextRequest) {
     const isEnded =
       battle.isEnded ||
       battle.status === 'closed' ||
-      now >= battle.endsAt;
+      (battle.endsAt && now >= battle.endsAt);
 
     if (isEnded) {
       /*
