@@ -1,6 +1,6 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 
-export const SITE_OWNER_EMAIL = 'rohitdhakaddhoti132@gmail.com';
+export const SITE_OWNER_EMAIL = 'rohitdhakaddhoti143@gmail.com';
 export const SITE_OWNER_EMAILS = [
   SITE_OWNER_EMAIL.toLowerCase(),
 ];
@@ -35,7 +35,7 @@ export async function verifyAdminRequestAsync(req: Request): Promise<boolean> {
         } else {
           token = decoded;
         }
-      } catch {}
+      } catch { }
     }
   }
 

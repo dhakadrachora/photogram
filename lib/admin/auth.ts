@@ -1,7 +1,7 @@
 import { supabase, createServerClient, isSupabaseConfigured } from '@/lib/supabase';
 import { AdminUserSession } from './types';
 
-export const PRIMARY_OWNER_EMAIL = 'rohitdhakaddhoti132@gmail.com';
+export const PRIMARY_OWNER_EMAIL = 'rohitdhakaddhoti143@gmail.com';
 
 export const OWNER_EMAILS = [
   PRIMARY_OWNER_EMAIL.toLowerCase(),
@@ -99,7 +99,7 @@ export async function getClientAdminSession(): Promise<AdminUserSession | null> 
     // Cache token in localStorage for instant access across admin components
     try {
       localStorage.setItem('dhoti_admin_token', session.access_token);
-    } catch {}
+    } catch { }
 
     // If owner email, grant access; otherwise strictly deny
     if (isOwner) {
@@ -144,7 +144,7 @@ export async function checkAdminDetailedSession(): Promise<AdminAuthCheckResult>
     if (isOwner) {
       try {
         localStorage.setItem('dhoti_admin_token', session.access_token);
-      } catch {}
+      } catch { }
 
       return {
         status: 'authenticated_admin',

@@ -5,6 +5,7 @@ import { User, ChatMessage, PresenceUser } from '@/types';
 import { SoundEffects } from '@/lib/audio/sound-effects';
 import { VerifiedTick } from '@/components/VerifiedTick';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { isSiteAdmin } from '@/lib/admin-auth';
 
 import {
   Send,
@@ -764,7 +765,7 @@ export function WorldChat({
 
                   {(currentUser.isVerified ||
                     String(currentUser.badge || '').toLowerCase().includes('verified') ||
-                    currentUser.email === 'rohitdhakaddhoti132@gmail.com') && (
+                    isSiteAdmin(currentUser.email)) && (
                     <VerifiedTick size={12} />
                   )}
                 </div>
@@ -862,7 +863,7 @@ export function WorldChat({
                   (isMe && (
                     currentUser?.isVerified ||
                     String(currentUser?.badge || '').toLowerCase().includes('verified') ||
-                    currentUser?.email === 'rohitdhakaddhoti132@gmail.com'
+                    isSiteAdmin(currentUser?.email)
                   ))
               );
 
@@ -1207,7 +1208,7 @@ export function WorldChat({
                             (isMe && (
                               currentUser?.isVerified ||
                               String(currentUser?.badge || '').toLowerCase().includes('verified') ||
-                              currentUser?.email === 'rohitdhakaddhoti132@gmail.com'
+                              isSiteAdmin(currentUser?.email)
                             ))) && (
                             <VerifiedTick size={12} />
                           )}
