@@ -28,7 +28,7 @@ const supabaseAnonKey =
 
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-export const CHAT_MESSAGE_EXPIRATION_MS = 10 * 60 * 1000;
+export const CHAT_MESSAGE_EXPIRATION_MS = 24 * 60 * 60 * 1000; // 24 Hours
 
 export const isSupabaseConfigured = (): boolean => {
   return Boolean(
@@ -716,20 +716,21 @@ export async function fetchSupabaseBattles(): Promise<BattleEvent[] | null> {
 }
 
 /* ============================================================
-   CHAT
+   CHAT (24-Hour Choupal)
    ============================================================ */
 
 export async function fetchSupabaseChatMessages(): Promise<ChatMessage[] | null> {
   if (!isSupabaseConfigured()) return null;
   try {
-    const tenMinutesAgo = new Date(
+    const client = createServerClient();
+    const twentyFourHoursAgo = new Date(
       Date.now() - CHAT_MESSAGE_EXPIRATION_MS
     ).toISOString();
 
-    const { data, error } = await supabase
+    const { data, error } = await client
       .from('chat_messages')
       .select('*')
-      .gte('created_at', tenMinutesAgo)
+      .gte('created_at', twentyFourHoursAgo)
       .order('created_at', { ascending: true })
       .limit(250);
 
@@ -767,6 +768,7 @@ export async function insertSupabaseChatMessage(
 ): Promise<boolean> {
   if (!isSupabaseConfigured() || !msg?.userId || !msg?.id) return false;
   try {
+    const client = createServerClient();
     const createdAt = msg.timestamp || Date.now();
     if (Date.now() - createdAt > CHAT_MESSAGE_EXPIRATION_MS) return false;
 
@@ -779,11 +781,10 @@ export async function insertSupabaseChatMessage(
       text: msg.text || '',
       sticker: msg.sticker || null,
       is_ai: Boolean(msg.isAi),
-      is_verified: Boolean(msg.isVerified),
       created_at: new Date(createdAt).toISOString(),
     };
 
-    const { error } = await supabase
+    const { error } = await client
       .from('chat_messages')
       .insert(payload);
 
@@ -803,7 +804,8 @@ export async function deleteSupabaseChatMessage(
 ): Promise<boolean> {
   if (!isSupabaseConfigured() || !messageId) return false;
   try {
-    const { error } = await supabase
+    const client = createServerClient();
+    const { error } = await client
       .from('chat_messages')
       .delete()
       .eq('id', messageId);
@@ -827,24 +829,25 @@ export async function cleanupExpiredSupabaseChatMessages(): Promise<{
   }
 
   try {
-    const tenMinutesAgo = new Date(
+    const client = createServerClient();
+    const twentyFourHoursAgo = new Date(
       Date.now() - CHAT_MESSAGE_EXPIRATION_MS
     ).toISOString();
 
-    const { data: expiredRows } = await supabase
+    const { data: expiredRows } = await client
       .from('chat_messages')
       .select('id')
-      .lt('created_at', tenMinutesAgo);
+      .lt('created_at', twentyFourHoursAgo);
 
     const expiredCount = expiredRows?.length || 0;
     if (expiredCount === 0) {
       return { success: true, deleted: 0 };
     }
 
-    const { error } = await supabase
+    const { error } = await client
       .from('chat_messages')
       .delete()
-      .lt('created_at', tenMinutesAgo);
+      .lt('created_at', twentyFourHoursAgo);
 
     if (error) {
       return { success: false, error: error.message };

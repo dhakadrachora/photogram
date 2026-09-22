@@ -25,7 +25,7 @@ interface WorldChatProps {
   onStartBattleInvite: (opponentName: string) => void;
 }
 
-const MESSAGE_EXPIRATION_MS = 10 * 60 * 1000;
+const MESSAGE_EXPIRATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 function getMessageTimestamp(message: ChatMessage) {
   return Number(message.timestamp || 0);
@@ -192,40 +192,21 @@ export function WorldChat({
    */
 
   const fetchMessages = useCallback(async () => {
-    if (!currentUser) {
-      setMessages([]);
-      setIsLoadingMessages(false);
-      return;
-    }
-
     try {
       const accessToken = await getAccessToken();
 
-      if (!accessToken) {
-        setMessages([]);
-        setAuthError('Please login again to enter World Chat.');
-        setIsLoadingMessages(false);
-        return;
+      const headers: Record<string, string> = {};
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
       }
 
       const res = await fetch('/api/chat', {
         method: 'GET',
         cache: 'no-store',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
+        headers,
       });
 
       const data = await res.json().catch(() => ({}));
-
-      if (res.status === 401) {
-        setAuthError(
-          'Your login session expired. Please login again.'
-        );
-        setMessages([]);
-        setIsLoadingMessages(false);
-        return;
-      }
 
       if (res.status === 403) {
         setAuthError(
@@ -259,7 +240,7 @@ export function WorldChat({
     } finally {
       setIsLoadingMessages(false);
     }
-  }, [currentUser, getAccessToken]);
+  }, [getAccessToken]);
 
   /*
    * ------------------------------------------------------------
@@ -342,14 +323,6 @@ export function WorldChat({
   useEffect(() => {
     let mounted = true;
 
-    if (!currentUser) {
-      setMessages([]);
-      setOnlineUsers([]);
-      setOnlineCount(0);
-      setIsLoadingMessages(false);
-      return;
-    }
-
     const load = async () => {
       if (!mounted) return;
 
@@ -362,20 +335,32 @@ export function WorldChat({
     void load();
 
     /*
-     * Presence heartbeat.
+     * Presence heartbeat for logged-in users; periodic check for guests.
      */
     const presenceInterval = setInterval(() => {
-      void sendPresenceHeartbeat();
+      if (currentUser) {
+        void sendPresenceHeartbeat();
+      } else {
+        void fetchPresence();
+      }
     }, 15000);
 
     /*
-     * Remove messages from UI every second.
-     *
-     * Database cleanup is handled separately by Supabase cleanup.
+     * Polling fallback: ensures all clients receive new messages even if
+     * websocket/realtime reconnects or is temporarily delayed.
+     */
+    const pollInterval = setInterval(() => {
+      if (mounted) {
+        void fetchMessages();
+      }
+    }, 4000);
+
+    /*
+     * Remove messages from UI every 10 seconds after 24 hours.
      */
     expiryTimerRef.current = setInterval(() => {
       removeExpiredFromUI();
-    }, 1000);
+    }, 10000);
 
     /*
      * Supabase Realtime.
@@ -463,6 +448,7 @@ export function WorldChat({
       mounted = false;
 
       clearInterval(presenceInterval);
+      clearInterval(pollInterval);
 
       if (expiryTimerRef.current) {
         clearInterval(expiryTimerRef.current);
@@ -473,17 +459,15 @@ export function WorldChat({
         void supabase.removeChannel(channel);
       }
 
-      /*
-       * Do not send user identity in headers.
-       * Presence API should derive identity from Supabase session.
-       */
-      void fetch('/api/presence', {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${''}`,
-        },
-        keepalive: true,
-      }).catch(() => {});
+      if (currentUser) {
+        void fetch('/api/presence', {
+          method: 'DELETE',
+          headers: {
+            'x-user-id': currentUser.id,
+          },
+          keepalive: true,
+        }).catch(() => {});
+      }
     };
   }, [
     currentUser,
@@ -548,21 +532,31 @@ export function WorldChat({
     try {
       const accessToken = await getAccessToken();
 
-      if (!accessToken) {
-        setAuthError(
-          'Your login session expired. Please login again.'
-        );
-        setIsSending(false);
-        onOpenAuth();
-        return;
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+      }
+
+      // Resilient fallback headers in case session token is renewing
+      if (currentUser?.id) {
+        headers['x-user-id'] = currentUser.id;
+      }
+      if (currentUser?.name) {
+        headers['x-user-name'] = encodeURIComponent(currentUser.name);
+      }
+      if (currentUser?.email) {
+        headers['x-user-email'] = encodeURIComponent(currentUser.email);
+      }
+      if (currentUser?.avatar) {
+        headers['x-user-avatar'] = encodeURIComponent(currentUser.avatar);
       }
 
       const res = await fetch('/api/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
+        headers,
         body: JSON.stringify({
           text: trimmed,
           sticker: stickerText || undefined,
@@ -764,19 +758,18 @@ export function WorldChat({
               )}
 
             {!isLoadingMessages &&
-              messages.length === 0 &&
-              currentUser && (
+              messages.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                   <div className="h-14 w-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-3">
                     <Bot className="h-7 w-7 text-amber-400" />
                   </div>
 
                   <p className="text-sm font-bold text-slate-300">
-                    World Chat is empty
+                    चौपाल में अभी कोई संदेश नहीं है (World Chat is empty)
                   </p>
 
                   <p className="text-xs text-slate-500 mt-1">
-                    Be the first to start the conversation.
+                    संदेश 24 घंटे तक लाइव रहते हैं। बातचीत शुरू करने के लिए संदेश भेजें!
                   </p>
                 </div>
               )}
@@ -1014,31 +1007,31 @@ export function WorldChat({
             </div>
           ) : (
             <div
-              className="shrink-0 p-6 bg-slate-900/98 border-t border-amber-500/30 flex flex-col sm:flex-row items-center justify-between gap-4"
+              className="shrink-0 p-4 sm:p-5 bg-slate-900/98 border-t border-amber-500/30 flex flex-col sm:flex-row items-center justify-between gap-3"
             >
-              <div className="flex items-center gap-3.5 text-center sm:text-left">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                  <Lock className="h-6 w-6" />
+              <div className="flex items-center gap-3 text-center sm:text-left">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                  <Lock className="h-5 w-5" />
                 </div>
 
                 <div>
                   <h4 className="text-sm sm:text-base font-black text-white">
-                    Login to join World Chat
+                    चौपाल में संदेश भेजने के लिए लॉगिन करें
                   </h4>
 
                   <p className="text-xs text-slate-400 mt-0.5">
-                    Login required to view and send messages.
+                    सभी संदेश 24 घंटे तक सभी को दिखाई देते हैं। बातचीत में हिस्सा लेने के लिए लॉगिन करें।
                   </p>
                 </div>
               </div>
 
               <button
                 onClick={onOpenAuth}
-                className="flex items-center gap-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 px-6 py-3 text-xs sm:text-sm font-black shadow-xl"
+                className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 px-5 py-2.5 text-xs sm:text-sm font-black shadow-xl transition-transform active:scale-95 shrink-0"
               >
                 <LogIn className="h-4 w-4" />
 
-                <span>Login to join World Chat</span>
+                <span>लॉगिन करें / Login to Chat</span>
               </button>
             </div>
           )}
