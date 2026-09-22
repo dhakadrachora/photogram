@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Loader2, Upload, Check } from 'lucide-react';
 import { NewsItem } from '@/types';
-import { adminFetch } from '@/lib/admin/api';
+import { adminFetch, adminUploadFile } from '@/lib/admin/api';
 import { useToast } from '@/components/admin/Toast';
 
 interface NewsFormProps {
@@ -20,11 +20,11 @@ export function NewsForm({ isOpen, onClose, onSuccess, initialData }: NewsFormPr
 
   const [formData, setFormData] = useState({
     title: '',
-    category: 'गाँव समाचार',
+    category: 'Village Notice 📢',
     excerpt: '',
     content: '',
     imageUrl: '',
-    author: 'DHOTI AALE सम्पादक',
+    author: 'DHOTI AALE',
     published: true,
   });
 
@@ -32,21 +32,21 @@ export function NewsForm({ isOpen, onClose, onSuccess, initialData }: NewsFormPr
     if (initialData) {
       setFormData({
         title: initialData.title || '',
-        category: initialData.category || 'गाँव समाचार',
+        category: initialData.category || 'Village Notice 📢',
         excerpt: initialData.excerpt || '',
         content: initialData.content || '',
         imageUrl: initialData.imageUrl || '',
-        author: initialData.author || 'DHOTI AALE सम्पादक',
+        author: initialData.author || 'DHOTI AALE',
         published: initialData.published !== false,
       });
     } else {
       setFormData({
         title: '',
-        category: 'गाँव समाचार',
+        category: 'Village Notice 📢',
         excerpt: '',
         content: '',
         imageUrl: '',
-        author: 'DHOTI AALE सम्पादक',
+        author: 'DHOTI AALE',
         published: true,
       });
     }
@@ -59,21 +59,13 @@ export function NewsForm({ isOpen, onClose, onSuccess, initialData }: NewsFormPr
     if (!file) return;
 
     setIsUploading(true);
-    const body = new FormData();
-    body.append('file', file);
-    body.append('folder', 'news');
-
     try {
-      const res = await fetch('/api/admin/upload', {
-        method: 'POST',
-        body,
-      });
-      const json = await res.json();
-      if (json.success && json.publicUrl) {
-        setFormData((prev) => ({ ...prev, imageUrl: json.publicUrl }));
-        success('News image uploaded successfully');
+      const res = await adminUploadFile(file, 'news');
+      if (res.success && res.publicUrl) {
+        setFormData((prev) => ({ ...prev, imageUrl: res.publicUrl! }));
+        success('News image uploaded successfully to battle-image bucket');
       } else {
-        toastError(json.error || 'Failed to upload image');
+        toastError(res.error || 'Failed to upload image');
       }
     } catch (err: any) {
       toastError(err?.message || 'Upload error');

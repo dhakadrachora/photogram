@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Loader2, Upload } from 'lucide-react';
 import { VideoItem } from '@/types';
-import { adminFetch } from '@/lib/admin/api';
+import { adminFetch, adminUploadFile } from '@/lib/admin/api';
 import { useToast } from '@/components/admin/Toast';
 
 interface VideoFormProps {
@@ -20,7 +20,7 @@ export function VideoForm({ isOpen, onClose, onSuccess, initialData }: VideoForm
 
   const [formData, setFormData] = useState({
     title: '',
-    category: 'गाँव दर्शन',
+    category: 'Cultural Events 🎭',
     videoUrl: '',
     thumbnailUrl: '',
     description: '',
@@ -31,7 +31,7 @@ export function VideoForm({ isOpen, onClose, onSuccess, initialData }: VideoForm
     if (initialData) {
       setFormData({
         title: initialData.title || '',
-        category: initialData.category || 'गाँव दर्शन',
+        category: initialData.category || 'Cultural Events 🎭',
         videoUrl: initialData.videoUrl || '',
         thumbnailUrl: initialData.thumbnailUrl || '',
         description: initialData.description || '',
@@ -40,7 +40,7 @@ export function VideoForm({ isOpen, onClose, onSuccess, initialData }: VideoForm
     } else {
       setFormData({
         title: '',
-        category: 'गाँव दर्शन',
+        category: 'Cultural Events 🎭',
         videoUrl: '',
         thumbnailUrl: '',
         description: '',
@@ -56,21 +56,13 @@ export function VideoForm({ isOpen, onClose, onSuccess, initialData }: VideoForm
     if (!file) return;
 
     setIsUploading(true);
-    const body = new FormData();
-    body.append('file', file);
-    body.append('folder', 'videos');
-
     try {
-      const res = await fetch('/api/admin/upload', {
-        method: 'POST',
-        body,
-      });
-      const json = await res.json();
-      if (json.success && json.publicUrl) {
-        setFormData((prev) => ({ ...prev, thumbnailUrl: json.publicUrl }));
-        success('Thumbnail uploaded successfully');
+      const res = await adminUploadFile(file, 'videos');
+      if (res.success && res.publicUrl) {
+        setFormData((prev) => ({ ...prev, thumbnailUrl: res.publicUrl! }));
+        success('Thumbnail uploaded successfully to battle-image bucket');
       } else {
-        toastError(json.error || 'Failed to upload thumbnail');
+        toastError(res.error || 'Failed to upload thumbnail');
       }
     } catch (err: any) {
       toastError(err?.message || 'Upload error');

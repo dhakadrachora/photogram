@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Image as ImageIcon, Plus, Search, Trash2, Eye, EyeOff, Upload, Loader2, X } from 'lucide-react';
 import { GalleryItem } from '@/types';
-import { adminFetch } from '@/lib/admin/api';
+import { adminFetch, adminUploadFile } from '@/lib/admin/api';
 import { ConfirmDialog } from '@/components/admin/ConfirmDialog';
 import { useToast } from '@/components/admin/Toast';
 
@@ -12,23 +12,27 @@ export default function AdminGalleryPage() {
   const [items, setItems] = useState<GalleryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
 
-  // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [title, setTitle] = useState('');
-  const [category, setCategory] = useState('गाँव दर्शन');
-  const [caption, setCaption] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
 
-  // Delete state
+  // Form State
+  const [title, setTitle] = useState('');
+  const [caption, setCaption] = useState('');
+  const [category, setCategory] = useState('Festivals 🪔');
+  const [imageUrl, setImageUrl] = useState('');
+  const [published, setPublished] = useState(true);
+
+  // Delete
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchGallery = useCallback(async () => {
     setIsLoading(true);
-    const res = await adminFetch(`/api/admin/content?type=gallery&limit=50`);
+    const res = await adminFetch('/api/admin/content?type=gallery&limit=100');
     setIsLoading(false);
 
     if (res.success && res.data) {
@@ -39,7 +43,7 @@ export default function AdminGalleryPage() {
         }))
       );
     } else {
-      toastError(res.error || 'Failed to load gallery photos');
+      toastError(res.error || 'Failed to load gallery');
     }
   }, [toastError]);
 
@@ -52,21 +56,13 @@ export default function AdminGalleryPage() {
     if (!file) return;
 
     setIsUploading(true);
-    const body = new FormData();
-    body.append('file', file);
-    body.append('folder', 'gallery');
-
     try {
-      const res = await fetch('/api/admin/upload', {
-        method: 'POST',
-        body,
-      });
-      const json = await res.json();
-      if (json.success && json.publicUrl) {
-        setImageUrl(json.publicUrl);
-        success('Photo uploaded to storage');
+      const res = await adminUploadFile(file, 'gallery');
+      if (res.success && res.publicUrl) {
+        setImageUrl(res.publicUrl);
+        success('Photo uploaded to battle-image bucket');
       } else {
-        toastError(json.error || 'Upload failed');
+        toastError(res.error || 'Upload failed');
       }
     } catch (err: any) {
       toastError(err?.message || 'Upload error');

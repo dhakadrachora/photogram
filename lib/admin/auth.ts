@@ -5,6 +5,7 @@ export const PRIMARY_OWNER_EMAIL = 'rohitdhakaddhoti143@gmail.com';
 
 export const OWNER_EMAILS = [
   PRIMARY_OWNER_EMAIL.toLowerCase(),
+  'rohitdhakaddhoti@gmail.com',
   ...(process.env.ADMIN_EMAILS ? process.env.ADMIN_EMAILS.split(',').map((e) => e.trim().toLowerCase()) : []),
 ];
 
@@ -25,14 +26,31 @@ export async function verifyAdminRequest(req: Request): Promise<{
   user: { id: string; email: string; name?: string; role?: string } | null;
   error?: string;
 }> {
+  let token = '';
   const authHeader = req.headers.get('authorization') || req.headers.get('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return { isAdmin: false, user: null, error: 'Missing or malformed Authorization header' };
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.replace('Bearer ', '').trim();
+  } else {
+    // Cookie fallback for browser clients
+    const cookieHeader = req.headers.get('cookie') || '';
+    const match = cookieHeader.match(/sb-[^;]+-auth-token=([^;]+)/) || cookieHeader.match(/sb-access-token=([^;]+)/);
+    if (match && match[1]) {
+      try {
+        const decoded = decodeURIComponent(match[1]);
+        if (decoded.startsWith('[') || decoded.startsWith('{')) {
+          const parsed = JSON.parse(decoded);
+          token = Array.isArray(parsed) ? parsed[0] : (parsed.access_token || parsed.token || '');
+        } else {
+          token = decoded;
+        }
+      } catch {
+        // ignore cookie parse error
+      }
+    }
   }
 
-  const token = authHeader.replace('Bearer ', '').trim();
   if (!token || !isSupabaseConfigured()) {
-    return { isAdmin: false, user: null, error: 'Invalid token or Supabase not configured' };
+    return { isAdmin: false, user: null, error: 'Missing or malformed Authorization token' };
   }
 
   try {

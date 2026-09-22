@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { HardDrive, Upload, ExternalLink, Copy, Check, Folder, RefreshCw, Loader2 } from 'lucide-react';
-import { adminFetch } from '@/lib/admin/api';
+import { adminFetch, adminUploadFile } from '@/lib/admin/api';
 import { useToast } from '@/components/admin/Toast';
 
 interface StorageFile {
@@ -18,19 +18,20 @@ export default function AdminStoragePage() {
   const [files, setFiles] = useState<StorageFile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
-  const [selectedFolder, setSelectedFolder] = useState<string>('');
+  const [selectedFolder, setSelectedFolder] = useState('battles');
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
 
-  const fetchStorageFiles = useCallback(async (folder = '') => {
+  const folders = ['battles', 'news', 'people', 'business', 'gallery', 'videos', 'media'];
+
+  const fetchStorageFiles = useCallback(async (folder: string) => {
     setIsLoading(true);
-    const query = folder ? `?folder=${folder}` : '';
-    const res = await adminFetch(`/api/admin/upload${query}`);
+    const res = await adminFetch(`/api/admin/upload?folder=${folder}`);
     setIsLoading(false);
 
     if (res.success && res.files) {
       setFiles(res.files);
     } else {
-      toastError(res.error || 'Failed to list storage items');
+      toastError(res.error || 'Failed to list bucket files');
     }
   }, [toastError]);
 
@@ -43,21 +44,13 @@ export default function AdminStoragePage() {
     if (!file) return;
 
     setIsUploading(true);
-    const body = new FormData();
-    body.append('file', file);
-    body.append('folder', selectedFolder || 'media');
-
     try {
-      const res = await fetch('/api/admin/upload', {
-        method: 'POST',
-        body,
-      });
-      const json = await res.json();
-      if (json.success) {
+      const res = await adminUploadFile(file, selectedFolder || 'media');
+      if (res.success) {
         success('File uploaded to storage bucket successfully');
         fetchStorageFiles(selectedFolder);
       } else {
-        toastError(json.error || 'Upload failed');
+        toastError(res.error || 'Upload failed');
       }
     } catch (err: any) {
       toastError(err?.message || 'Upload error');

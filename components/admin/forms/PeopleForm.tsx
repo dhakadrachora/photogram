@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Loader2, Upload } from 'lucide-react';
 import { PersonProfile } from '@/types';
-import { adminFetch } from '@/lib/admin/api';
+import { adminFetch, adminUploadFile } from '@/lib/admin/api';
 import { useToast } from '@/components/admin/Toast';
 
 interface PeopleFormProps {
@@ -21,10 +21,10 @@ export function PeopleForm({ isOpen, onClose, onSuccess, initialData }: PeopleFo
   const [formData, setFormData] = useState({
     name: '',
     designation: '',
+    category: 'Gram Panchayat 🏛️',
     bio: '',
     photoUrl: '',
     achievements: '',
-    category: 'सम्मानित व्यक्तित्व',
     published: true,
   });
 
@@ -33,20 +33,20 @@ export function PeopleForm({ isOpen, onClose, onSuccess, initialData }: PeopleFo
       setFormData({
         name: initialData.name || '',
         designation: initialData.designation || '',
+        category: initialData.category || 'Gram Panchayat 🏛️',
         bio: initialData.bio || '',
         photoUrl: initialData.photoUrl || '',
-        achievements: Array.isArray(initialData.achievements) ? initialData.achievements.join(', ') : (initialData.achievements || ''),
-        category: initialData.category || 'सम्मानित व्यक्तित्व',
+        achievements: initialData.achievements || '',
         published: initialData.published !== false,
       });
     } else {
       setFormData({
         name: '',
         designation: '',
+        category: 'Gram Panchayat 🏛️',
         bio: '',
         photoUrl: '',
         achievements: '',
-        category: 'सम्मानित व्यक्तित्व',
         published: true,
       });
     }
@@ -59,21 +59,13 @@ export function PeopleForm({ isOpen, onClose, onSuccess, initialData }: PeopleFo
     if (!file) return;
 
     setIsUploading(true);
-    const body = new FormData();
-    body.append('file', file);
-    body.append('folder', 'people');
-
     try {
-      const res = await fetch('/api/admin/upload', {
-        method: 'POST',
-        body,
-      });
-      const json = await res.json();
-      if (json.success && json.publicUrl) {
-        setFormData((prev) => ({ ...prev, photoUrl: json.publicUrl }));
-        success('Profile photo uploaded successfully');
+      const res = await adminUploadFile(file, 'people');
+      if (res.success && res.publicUrl) {
+        setFormData((prev) => ({ ...prev, photoUrl: res.publicUrl! }));
+        success('Profile photo uploaded successfully to battle-image bucket');
       } else {
-        toastError(json.error || 'Failed to upload photo');
+        toastError(res.error || 'Failed to upload photo');
       }
     } catch (err: any) {
       toastError(err?.message || 'Upload error');

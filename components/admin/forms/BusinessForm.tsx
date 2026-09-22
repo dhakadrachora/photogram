@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Loader2, Upload } from 'lucide-react';
 import { BusinessItem } from '@/types';
-import { adminFetch } from '@/lib/admin/api';
+import { adminFetch, adminUploadFile } from '@/lib/admin/api';
 import { useToast } from '@/components/admin/Toast';
 
 interface BusinessFormProps {
@@ -20,9 +20,9 @@ export function BusinessForm({ isOpen, onClose, onSuccess, initialData }: Busine
 
   const [formData, setFormData] = useState({
     name: '',
-    category: 'दुकान एवं व्यापार',
+    category: 'General Store 🏪',
     phone: '',
-    address: 'ढोटी, राजस्थान',
+    address: '',
     description: '',
     logoUrl: '',
     verified: true,
@@ -33,9 +33,9 @@ export function BusinessForm({ isOpen, onClose, onSuccess, initialData }: Busine
     if (initialData) {
       setFormData({
         name: initialData.name || '',
-        category: initialData.category || 'दुकान एवं व्यापार',
+        category: initialData.category || 'General Store 🏪',
         phone: initialData.phone || '',
-        address: initialData.address || 'ढोटी, राजस्थान',
+        address: initialData.address || '',
         description: initialData.description || '',
         logoUrl: initialData.logoUrl || '',
         verified: initialData.verified !== false,
@@ -44,9 +44,9 @@ export function BusinessForm({ isOpen, onClose, onSuccess, initialData }: Busine
     } else {
       setFormData({
         name: '',
-        category: 'दुकान एवं व्यापार',
+        category: 'General Store 🏪',
         phone: '',
-        address: 'ढोटी, राजस्थान',
+        address: '',
         description: '',
         logoUrl: '',
         verified: true,
@@ -62,21 +62,13 @@ export function BusinessForm({ isOpen, onClose, onSuccess, initialData }: Busine
     if (!file) return;
 
     setIsUploading(true);
-    const body = new FormData();
-    body.append('file', file);
-    body.append('folder', 'business');
-
     try {
-      const res = await fetch('/api/admin/upload', {
-        method: 'POST',
-        body,
-      });
-      const json = await res.json();
-      if (json.success && json.publicUrl) {
-        setFormData((prev) => ({ ...prev, logoUrl: json.publicUrl }));
-        success('Business logo uploaded successfully');
+      const res = await adminUploadFile(file, 'business');
+      if (res.success && res.publicUrl) {
+        setFormData((prev) => ({ ...prev, logoUrl: res.publicUrl! }));
+        success('Business logo uploaded successfully to battle-image bucket');
       } else {
-        toastError(json.error || 'Failed to upload logo');
+        toastError(res.error || 'Failed to upload logo');
       }
     } catch (err: any) {
       toastError(err?.message || 'Upload error');

@@ -91,3 +91,53 @@ export async function adminFetch<T = any>(
     };
   }
 }
+
+/**
+ * Uploads a file to Supabase storage via the authenticated /api/admin/upload route.
+ * Automatically injects the Supabase session Bearer token and lets the browser
+ * compute the multipart/form-data boundary.
+ */
+export async function adminUploadFile(
+  file: File,
+  folder: string = 'uploads'
+): Promise<{ success: boolean; publicUrl?: string; error?: string }> {
+  try {
+    let token: string | null = null;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      token = session?.access_token || null;
+    } catch {
+      // ignore
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('folder', folder);
+
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const res = await fetch('/api/admin/upload', {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    const data = await res.json().catch(() => null);
+    if (res.ok && data?.success && data?.publicUrl) {
+      return { success: true, publicUrl: data.publicUrl };
+    }
+
+    return {
+      success: false,
+      error: data?.error || `Upload failed with status ${res.status}`,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Upload network error occurred',
+    };
+  }
+}

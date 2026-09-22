@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Loader2, Upload, Swords } from 'lucide-react';
 import { BattleEvent } from '@/types';
-import { adminFetch } from '@/lib/admin/api';
+import { adminFetch, adminUploadFile } from '@/lib/admin/api';
 import { useToast } from '@/components/admin/Toast';
 
 interface BattleFormProps {
@@ -96,31 +96,23 @@ export function BattleForm({ isOpen, onClose, onSuccess, initialData }: BattleFo
     if (isA) setIsUploadingA(true);
     else setIsUploadingB(true);
 
-    const body = new FormData();
-    body.append('file', file);
-    body.append('folder', 'battles');
-
     try {
-      const res = await fetch('/api/admin/upload', {
-        method: 'POST',
-        body,
-      });
-      const json = await res.json();
-      if (json.success && json.publicUrl) {
+      const res = await adminUploadFile(file, 'battles');
+      if (res.success && res.publicUrl) {
         if (isA) {
           setFormData((prev) => ({
             ...prev,
-            optionA: { ...prev.optionA, imageUrl: json.publicUrl },
+            optionA: { ...prev.optionA, imageUrl: res.publicUrl! },
           }));
         } else {
           setFormData((prev) => ({
             ...prev,
-            optionB: { ...prev.optionB, imageUrl: json.publicUrl },
+            optionB: { ...prev.optionB, imageUrl: res.publicUrl! },
           }));
         }
-        success(`Option ${side} image uploaded to battle-image bucket`);
+        success(`Option ${side} image uploaded successfully to battle-image bucket`);
       } else {
-        toastError(json.error || `Failed to upload Option ${side} image`);
+        toastError(res.error || `Failed to upload Option ${side} image`);
       }
     } catch (err: any) {
       toastError(err?.message || 'Upload error');

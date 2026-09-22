@@ -78,6 +78,13 @@ export function BattleForm({
           try {
             const { data: { session } } = await supabase.auth.getSession();
             token = session?.access_token || '';
+            if (!token) {
+              const { data: { user } } = await supabase.auth.getUser();
+              if (user) {
+                const { data: refreshed } = await supabase.auth.refreshSession();
+                token = refreshed.session?.access_token || '';
+              }
+            }
           } catch {}
         }
 
@@ -87,10 +94,10 @@ export function BattleForm({
           body: formData,
         });
 
-        const uploadData = await uploadRes.json();
+        const uploadData = await uploadRes.json().catch(() => ({}));
         
         if (!uploadRes.ok) {
-          throw new Error(uploadData.error || 'Failed to upload images to Supabase');
+          throw new Error(uploadData.error || uploadData.details || 'Failed to upload images to Supabase storage');
         }
 
         if (uploadData.optionAUrl) finalAUrl = uploadData.optionAUrl;
