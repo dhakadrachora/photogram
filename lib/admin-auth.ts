@@ -1,8 +1,9 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 
-export const SITE_OWNER_EMAIL = 'rohitdhakaddhoti143@gmail.com';
+export const SITE_OWNER_EMAIL = 'rohitdhakaddhoti132@gmail.com';
 export const SITE_OWNER_EMAILS = [
   SITE_OWNER_EMAIL.toLowerCase(),
+  'rohitdhakaddhoti143@gmail.com',
   'rohitdhakaddhoti@gmail.com',
   ...(process.env.ADMIN_EMAILS ? process.env.ADMIN_EMAILS.split(',').map((e) => e.trim().toLowerCase()) : []),
 ];

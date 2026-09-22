@@ -81,7 +81,8 @@ function mapRealtimeMessage(record: any): ChatMessage {
       Boolean(record.is_verified) ||
       record.user_id === 'dhoti_aale_ai_official' ||
       record.user_name === 'DHOTI AALE AI' ||
-      String(record.user_badge || '').includes('Site Owner'),
+      String(record.user_badge || '').toLowerCase().includes('site owner') ||
+      String(record.user_badge || '').toLowerCase().includes('verified'),
   };
 }
 
@@ -762,8 +763,9 @@ export function WorldChat({
                   </span>
 
                   {(currentUser.isVerified ||
-                    currentUser.email ===
-                      'rohitdhakaddhoti143@gmail.com') && (
+                    String(currentUser.badge || '').toLowerCase().includes('verified') ||
+                    currentUser.email === 'rohitdhakaddhoti132@gmail.com' ||
+                    currentUser.email === 'rohitdhakaddhoti143@gmail.com') && (
                     <VerifiedTick size={12} />
                   )}
                 </div>
@@ -856,8 +858,14 @@ export function WorldChat({
               const showVerifiedTick = Boolean(
                 isAiParticipant ||
                   msg.isVerified ||
-                  (isMe && currentUser?.isVerified) ||
-                  msg.userBadge?.includes('Site Owner')
+                  String(msg.userBadge || '').toLowerCase().includes('verified') ||
+                  String(msg.userBadge || '').toLowerCase().includes('site owner') ||
+                  (isMe && (
+                    currentUser?.isVerified ||
+                    String(currentUser?.badge || '').toLowerCase().includes('verified') ||
+                    currentUser?.email === 'rohitdhakaddhoti132@gmail.com' ||
+                    currentUser?.email === 'rohitdhakaddhoti143@gmail.com'
+                  ))
               );
 
               return (
@@ -1195,7 +1203,15 @@ export function WorldChat({
                             {isMe ? '(You)' : ''}
                           </span>
 
-                          {u.isVerified && (
+                          {(u.isVerified ||
+                            String(u.userBadge || '').toLowerCase().includes('verified') ||
+                            String(u.userBadge || '').toLowerCase().includes('site owner') ||
+                            (isMe && (
+                              currentUser?.isVerified ||
+                              String(currentUser?.badge || '').toLowerCase().includes('verified') ||
+                              currentUser?.email === 'rohitdhakaddhoti132@gmail.com' ||
+                              currentUser?.email === 'rohitdhakaddhoti143@gmail.com'
+                            ))) && (
                             <VerifiedTick size={12} />
                           )}
                         </div>

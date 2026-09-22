@@ -733,7 +733,9 @@ export default function Home() {
               isSiteAdmin(appUser.email),
 
             isVerified:
+              isSiteAdmin(appUser.email) ||
               Boolean(dbUser.is_verified) ||
+              String(dbUser.badge || '').toLowerCase().includes('verified') ||
               Boolean(appUser.isVerified),
 
             isBlocked:

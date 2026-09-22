@@ -1,10 +1,11 @@
 import { supabase, createServerClient, isSupabaseConfigured } from '@/lib/supabase';
 import { AdminUserSession } from './types';
 
-export const PRIMARY_OWNER_EMAIL = 'rohitdhakaddhoti143@gmail.com';
+export const PRIMARY_OWNER_EMAIL = 'rohitdhakaddhoti132@gmail.com';
 
 export const OWNER_EMAILS = [
   PRIMARY_OWNER_EMAIL.toLowerCase(),
+  'rohitdhakaddhoti143@gmail.com',
   'rohitdhakaddhoti@gmail.com',
   ...(process.env.ADMIN_EMAILS ? process.env.ADMIN_EMAILS.split(',').map((e) => e.trim().toLowerCase()) : []),
 ];
