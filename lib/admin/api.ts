@@ -5,19 +5,76 @@ interface FetchOptions extends RequestInit {
   timeoutMs?: number;
 }
 
+/**
+ * Resolves the active Admin Bearer token using multi-tiered fallback:
+ * 1. Active Supabase auth session
+ * 2. Session refresh attempt
+ * 3. Dedicated dhoti_admin_token in localStorage
+ * 4. Automatic scanning of Supabase storage keys in localStorage
+ */
+export async function getValidAdminToken(): Promise<string | null> {
+  if (typeof window === 'undefined') return null;
+
+  // 1. Try active Supabase session
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      try {
+        localStorage.setItem('dhoti_admin_token', session.access_token);
+      } catch {}
+      return session.access_token;
+    }
+  } catch {}
+
+  // 2. Try session refresh
+  try {
+    const { data: refreshed } = await supabase.auth.refreshSession();
+    if (refreshed.session?.access_token) {
+      try {
+        localStorage.setItem('dhoti_admin_token', refreshed.session.access_token);
+      } catch {}
+      return refreshed.session.access_token;
+    }
+  } catch {}
+
+  // 3. Try dedicated admin token in localStorage
+  try {
+    const stored = localStorage.getItem('dhoti_admin_token');
+    if (stored && stored !== 'undefined' && stored !== 'null' && stored.length > 20) {
+      return stored;
+    }
+  } catch {}
+
+  // 4. Scan localStorage for Supabase session keys
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith('sb-') && key.endsWith('-auth-token'))) {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const t = parsed?.access_token || (Array.isArray(parsed) ? parsed[0] : null);
+          if (t && typeof t === 'string' && t.length > 20) {
+            try {
+              localStorage.setItem('dhoti_admin_token', t);
+            } catch {}
+            return t;
+          }
+        }
+      }
+    }
+  } catch {}
+
+  return null;
+}
+
 export async function adminFetch<T = any>(
   url: string,
   options: FetchOptions = {}
 ): Promise<ApiResponse<T>> {
   const { timeoutMs = 15000, headers = {}, ...rest } = options;
 
-  let token: string | null = null;
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    token = session?.access_token || null;
-  } catch {
-    // ignore
-  }
+  const token = await getValidAdminToken();
 
   const reqHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -102,13 +159,7 @@ export async function adminUploadFile(
   folder: string = 'uploads'
 ): Promise<{ success: boolean; publicUrl?: string; error?: string }> {
   try {
-    let token: string | null = null;
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      token = session?.access_token || null;
-    } catch {
-      // ignore
-    }
+    const token = await getValidAdminToken();
 
     const formData = new FormData();
     formData.append('file', file);

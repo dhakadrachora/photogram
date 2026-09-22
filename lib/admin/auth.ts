@@ -49,13 +49,13 @@ export async function verifyAdminRequest(req: Request): Promise<{
     }
   }
 
-  if (!token || !isSupabaseConfigured()) {
+  if (!token || token === 'undefined' || token === 'null' || !isSupabaseConfigured()) {
     return { isAdmin: false, user: null, error: 'Missing or malformed Authorization token' };
   }
 
   try {
     const sb = createServerClient();
-    const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
+    const { data: { user }, error: authErr } = await sb.auth.getUser(token);
 
     if (authErr || !user || !user.email) {
       return { isAdmin: false, user: null, error: 'Unauthorized token' };
@@ -118,6 +118,11 @@ export async function getClientAdminSession(): Promise<AdminUserSession | null> 
 
     const email = session.user.email.toLowerCase().trim();
     const isOwner = isEmailInAdminAllowlist(email);
+
+    // Cache token in localStorage for instant access across admin components
+    try {
+      localStorage.setItem('dhoti_admin_token', session.access_token);
+    } catch {}
 
     // If owner email, instant grant
     if (isOwner) {
