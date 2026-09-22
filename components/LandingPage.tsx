@@ -108,11 +108,9 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
       >
         <div className="w-full max-w-5xl mx-auto flex items-center justify-between relative">
           <div className="flex items-center gap-2.5 mx-auto text-center" data-purpose="brand-logo">
-            {/* Stylized Rajasthani Pagri / Turban Motif */}
-            <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-[#C25E29] border border-amber-300 shadow-sm">
-              <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
-                <path d="M12 2C8.5 2 5.5 3.5 4 6c0 0 2.5 1.5 5 1 2.5-.5 5-2 7-1s3 3 4 3c-1.5-4-4.5-7-8-7zm-7.8 7c-.1.5-.2 1-.2 1.6 0 3.5 3.5 6.4 8 6.4 2.2 0 4.2-.7 5.7-1.9-1.2-.8-2.6-1.3-4.2-1.3-2.9 0-5.5 1.4-7.3-1.8zM12 18.5c-3.1 0-5.8-1.5-7.1-3.7-.6.9-.9 2-.9 3.2 0 2.2 3.6 4 8 4s8-1.8 8-4c0-1.1-.3-2.2-.9-3.1-1.4 2.1-4 3.6-7.1 3.6z" />
-              </svg>
+            {/* Official DHOTI AALE App Logo */}
+            <div className="w-10 h-10 rounded-2xl overflow-hidden border border-amber-400/50 shadow-sm shrink-0 bg-slate-900">
+              <img src="/app-logo.png" alt="DHOTI AALE" className="w-full h-full object-cover" />
             </div>
             <div className="flex flex-col text-left leading-none">
               <span className="font-heritage tracking-widest text-base text-stone-900 font-bold uppercase">

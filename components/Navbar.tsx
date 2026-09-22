@@ -69,8 +69,8 @@ export function Navbar({
           onClick={() => handleTabClick('home')}
           className="flex items-center gap-3 cursor-pointer select-none group"
         >
-          <div className="relative flex items-center justify-center h-10 w-10 rounded-2xl bg-gradient-to-tr from-amber-500 via-yellow-400 to-amber-600 shadow-md group-hover:scale-105 transition-transform">
-            <CrownIcon className="w-5 h-5 text-slate-950 drop-shadow-sm" />
+          <div className="relative flex items-center justify-center h-10 w-10 rounded-2xl overflow-hidden border border-amber-400/40 shadow-md group-hover:scale-105 transition-transform bg-slate-900">
+            <img src="/app-logo.png" alt="DHOTI AALE" className="w-full h-full object-cover" />
             <div className="absolute -top-1 -right-1 flex h-3 w-3">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
