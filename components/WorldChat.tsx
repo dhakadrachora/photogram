@@ -18,12 +18,14 @@ import {
   Sparkles,
   RefreshCw,
   Bot,
+  ArrowLeft,
 } from 'lucide-react';
 
 interface WorldChatProps {
   currentUser: User | null;
   onOpenAuth: () => void;
   onStartBattleInvite: (opponentName: string) => void;
+  onBack?: () => void;
 }
 
 const MESSAGE_EXPIRATION_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -91,6 +93,7 @@ export function WorldChat({
   currentUser,
   onOpenAuth,
   onStartBattleInvite,
+  onBack,
 }: WorldChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
@@ -728,26 +731,38 @@ export function WorldChat({
    */
 
   return (
-    <div className="relative h-full w-full flex flex-1 flex-col p-1.5 sm:p-6 max-w-6xl mx-auto overflow-hidden">
+    <div className="relative h-full w-full flex flex-1 flex-col p-1 sm:p-5 max-w-6xl mx-auto overflow-hidden bg-slate-950">
       {/* HEADER */}
-      <div className="flex items-center justify-between pb-2 sm:pb-4 border-b border-slate-800 gap-2 shrink-0">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-            <h1 className="text-base sm:text-2xl font-black text-white tracking-tight truncate">
-              गाँव चौपाल (World Chat)
-            </h1>
-
-            <div
-              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400"
-              title="Real active users"
+      <div className="flex items-center justify-between pb-2 sm:pb-3 border-b border-slate-800 gap-2 shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="p-1.5 -ml-0.5 text-stone-300 hover:text-white rounded-xl bg-slate-900 border border-slate-800 active:scale-95 transition-all shrink-0"
+              title="Back to Home"
             >
-              <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse ring-2 ring-emerald-400/25" />
+              <ArrowLeft className="h-4 w-4 text-[#C25E29]" />
+            </button>
+          )}
 
-              <span className="text-[11px] sm:text-xs font-bold tracking-wide">
-                {onlineCountText}
-              </span>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+              <h1 className="text-sm sm:text-2xl font-black text-white tracking-tight truncate">
+                गाँव चौपाल (World Chat)
+              </h1>
+
+              <div
+                className="inline-flex items-center gap-1.5 px-2 py-0.5 sm:px-3 sm:py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400"
+                title="Real active users"
+              >
+                <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse ring-2 ring-emerald-400/25" />
+
+                <span className="text-[10px] sm:text-xs font-bold tracking-wide">
+                  {onlineCountText}
+                </span>
+              </div>
             </div>
-          </div>
 
           <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 hidden sm:flex items-center gap-1.5">
             <span>
@@ -761,6 +776,7 @@ export function WorldChat({
             </span>
           </p>
         </div>
+      </div>
 
         <div className="flex items-center gap-2 shrink-0">
           {currentUser ? (
@@ -1003,127 +1019,134 @@ export function WorldChat({
             )}
           </div>
 
-          {/* INPUT */}
-          {currentUser ? (
-            <div className="shrink-0 p-2 sm:p-3.5 bg-slate-900 border-t border-slate-800 pb-[max(0.75rem,env(safe-area-inset-bottom))] relative z-20">
-              {showStickers && (
-                <div className="mb-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
-                  {quickStickers.map((sticker) => (
-                    <button
-                      key={sticker}
-                      onClick={() =>
-                        void handleSendMessage(
-                          '',
-                          sticker
-                        )
-                      }
-                      disabled={isSending}
-                      className="shrink-0 rounded-xl bg-slate-800 hover:bg-amber-500/20 border border-slate-700 hover:border-amber-500/40 px-2.5 py-1 text-xs font-bold text-amber-300 transition-colors disabled:opacity-50"
-                    >
-                      {sticker}
-                    </button>
-                  ))}
+          {/* CHAT INPUT BAR - ALWAYS VISIBLE & ACCESSIBLE ON MOBILE */}
+          <div className="shrink-0 p-2 sm:p-3 bg-slate-900 border-t border-slate-800 pb-[max(0.6rem,env(safe-area-inset-bottom))] relative z-20">
+            {/* If not logged in, show prompt banner */}
+            {!currentUser && (
+              <div
+                onClick={onOpenAuth}
+                className="mb-2 flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold cursor-pointer hover:bg-amber-500/25 active:scale-[0.99] transition-all"
+              >
+                <div className="flex items-center gap-1.5">
+                  <Lock className="h-3.5 w-3.5 text-amber-400" />
+                  <span>चौपाल में संदेश भेजने के लिए 1-क्लिक लॉगिन करें</span>
                 </div>
-              )}
-
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setShowStickers(!showStickers)
-                  }
-                  className={`shrink-0 rounded-2xl p-2.5 sm:p-3 border transition-colors ${
-                    showStickers
-                      ? 'bg-amber-500 text-slate-950 border-amber-400'
-                      : 'bg-slate-800 text-slate-300 border-slate-700 hover:text-white'
-                  }`}
-                  title="Desi Stickers"
-                >
-                  <Smile className="h-5 w-5" />
-                </button>
-
-                <div className="relative flex-1 min-w-0">
-                  <input
-                    id="world-chat-input"
-                    type="text"
-                    maxLength={1000}
-                    placeholder="संदेश लिखें / Type message..."
-                    value={inputMessage}
-                    disabled={isSending}
-                    onChange={(e) =>
-                      setInputMessage(e.target.value)
-                    }
-                    onFocus={() => {
-                      setTimeout(() => {
-                        scrollToBottom('smooth');
-                        const inputEl = document.getElementById('world-chat-input');
-                        inputEl?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                      }, 200);
-                    }}
-                    onKeyDown={(e) => {
-                      if (
-                        e.key === 'Enter' &&
-                        !e.shiftKey &&
-                        !isSending
-                      ) {
-                        e.preventDefault();
-
-                        void handleSendMessage(
-                          inputMessage
-                        );
-                      }
-                    }}
-                    className="w-full rounded-2xl bg-slate-800 border border-slate-700 px-3.5 py-2.5 sm:py-3 text-base sm:text-sm text-white placeholder-slate-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/40 disabled:opacity-60"
-                  />
-                </div>
-
-                <button
-                  id="world-chat-send-btn"
-                  onClick={() =>
-                    void handleSendMessage(
-                      inputMessage
-                    )
-                  }
-                  disabled={
-                    isSending ||
-                    !inputMessage.trim()
-                  }
-                  className="shrink-0 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 p-2.5 sm:p-3 text-slate-950 font-bold shadow-md transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Send Message"
-                >
-                  <Send className="h-5 w-5" />
-                </button>
+                <span className="text-[10px] bg-amber-500 text-slate-950 px-2 py-0.5 rounded-lg font-black">Login</span>
               </div>
-            </div>
-          ) : (
-            <div
-              className="shrink-0 p-3 sm:p-5 bg-slate-900/98 border-t border-amber-500/30 flex flex-col sm:flex-row items-center justify-between gap-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] relative z-20"
-            >
-              <div className="flex items-center gap-2.5 text-left">
-                <div className="flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl sm:rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                  <Lock className="h-4 w-4 sm:h-5 sm:w-5" />
-                </div>
+            )}
 
-                <div>
-                  <h4 className="text-xs sm:text-base font-black text-white">
-                    चौपाल में संदेश भेजने के लिए लॉगिन करें
-                  </h4>
+            {/* Quick Stickers */}
+            {currentUser && showStickers && (
+              <div className="mb-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+                {quickStickers.map((sticker) => (
+                  <button
+                    key={sticker}
+                    onClick={() =>
+                      void handleSendMessage(
+                        '',
+                        sticker
+                      )
+                    }
+                    disabled={isSending}
+                    className="shrink-0 rounded-xl bg-slate-800 hover:bg-amber-500/20 border border-slate-700 hover:border-amber-500/40 px-2.5 py-1 text-xs font-bold text-amber-300 transition-colors disabled:opacity-50"
+                  >
+                    {sticker}
+                  </button>
+                ))}
+              </div>
+            )}
 
-                  <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5">
-                    बातचीत में हिस्सा लेने के लिए एक क्लिक में लॉगिन करें।
-                  </p>
-                </div>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!currentUser) {
+                    onOpenAuth();
+                  } else {
+                    setShowStickers(!showStickers);
+                  }
+                }}
+                className={`shrink-0 rounded-2xl p-2.5 sm:p-3 border transition-colors ${
+                  showStickers && currentUser
+                    ? 'bg-amber-500 text-slate-950 border-amber-400'
+                    : 'bg-slate-800 text-slate-300 border-slate-700 hover:text-white'
+                }`}
+                title="Desi Stickers"
+              >
+                <Smile className="h-5 w-5" />
+              </button>
+
+              <div className="relative flex-1 min-w-0">
+                <input
+                  id="world-chat-input"
+                  type="text"
+                  maxLength={1000}
+                  placeholder={
+                    currentUser
+                      ? "संदेश लिखें / Type message..."
+                      : "संदेश लिखने के लिए यहाँ क्लिक करें (Login)..."
+                  }
+                  value={inputMessage}
+                  disabled={isSending}
+                  onClick={() => {
+                    if (!currentUser) onOpenAuth();
+                  }}
+                  onChange={(e) => {
+                    if (!currentUser) {
+                      onOpenAuth();
+                      return;
+                    }
+                    setInputMessage(e.target.value);
+                  }}
+                  onFocus={() => {
+                    if (!currentUser) {
+                      onOpenAuth();
+                      return;
+                    }
+                    setTimeout(() => {
+                      scrollToBottom('smooth');
+                      const inputEl = document.getElementById('world-chat-input');
+                      inputEl?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                    }, 200);
+                  }}
+                  onKeyDown={(e) => {
+                    if (!currentUser) {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        onOpenAuth();
+                      }
+                      return;
+                    }
+                    if (
+                      e.key === 'Enter' &&
+                      !e.shiftKey &&
+                      !isSending
+                    ) {
+                      e.preventDefault();
+                      void handleSendMessage(inputMessage);
+                    }
+                  }}
+                  className="w-full rounded-2xl bg-slate-800 border border-slate-700 px-3.5 py-2.5 sm:py-3 text-base sm:text-sm text-white placeholder-slate-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/40 disabled:opacity-60 cursor-text shadow-inner"
+                />
               </div>
 
               <button
-                onClick={onOpenAuth}
-                className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl sm:rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 px-4 py-2 sm:px-5 sm:py-2.5 text-xs sm:text-sm font-black shadow-xl transition-transform active:scale-95 shrink-0"
+                id="world-chat-send-btn"
+                onClick={() => {
+                  if (!currentUser) {
+                    onOpenAuth();
+                    return;
+                  }
+                  void handleSendMessage(inputMessage);
+                }}
+                disabled={isSending || (currentUser ? !inputMessage.trim() : false)}
+                className="shrink-0 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 p-2.5 sm:p-3 text-slate-950 font-bold shadow-md transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                title={currentUser ? "Send Message" : "Login to Send"}
               >
-                <LogIn className="h-4 w-4" />
-                <span>लॉगिन करें / Login to Chat</span>
+                <Send className="h-5 w-5" />
               </button>
             </div>
-          )}
+          </div>
         </div>
 
         {/* SIDEBAR */}

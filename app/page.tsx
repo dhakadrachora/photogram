@@ -1100,7 +1100,7 @@ export default function Home() {
           TOP SUB NAV
           ====================================================== */}
 
-      {activeTab !== 'home' && (
+      {activeTab !== 'home' && activeTab !== 'worldchat' && (
         <div className="sticky top-0 z-30 flex w-full items-center justify-between border-b border-stone-800 bg-stone-900 px-4 py-2.5 text-white shadow-sm">
 
           <button
@@ -1119,9 +1119,7 @@ export default function Home() {
 
           <span className="text-xs font-bold uppercase tracking-wider text-amber-400">
 
-            {activeTab === 'worldchat'
-              ? 'गाँव चौपाल'
-              : activeTab === 'battle'
+            {activeTab === 'battle'
               ? 'मुकाबला (Battle)'
               : activeTab === 'assistant'
               ? 'AI Assistant 🔒'
@@ -1129,7 +1127,7 @@ export default function Home() {
               ? 'Profile'
               : activeTab === 'support'
               ? 'सहायता व सपोर्ट (Support 24/7)'
-              : 'Admin Panel 👑'}
+              : 'Rewards & Offers'}
 
           </span>
 
@@ -1283,15 +1281,18 @@ export default function Home() {
             ==================================================== */}
 
         {activeTab === 'worldchat' && (
-          <WorldChat
-            currentUser={currentUser}
-            onOpenAuth={() =>
-              setIsAuthModalOpen(true)
-            }
-            onStartBattleInvite={
-              handleStartBattleInvite
-            }
-          />
+          <div className="fixed inset-0 z-40 h-[100dvh] w-full bg-slate-950 flex flex-col overflow-hidden">
+            <WorldChat
+              currentUser={currentUser}
+              onBack={() => setActiveTab('home')}
+              onOpenAuth={() =>
+                setIsAuthModalOpen(true)
+              }
+              onStartBattleInvite={
+                handleStartBattleInvite
+              }
+            />
+          </div>
         )}
 
         {/* ====================================================
