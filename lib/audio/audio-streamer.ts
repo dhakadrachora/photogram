@@ -165,10 +165,11 @@ export class AudioStreamer {
 
       let audioBuffer: AudioBuffer;
 
-      if (isWav) {
+      try {
+        // Automatically decodes MP3, WAV, AAC into AudioBuffer
         audioBuffer = await ctx.decodeAudioData(bytes.buffer.slice(0));
-      } else {
-        // Raw PCM16 Mono 24kHz
+      } catch {
+        // Fallback to Raw PCM16 Mono 24kHz if not encoded
         const int16Array = new Int16Array(bytes.buffer);
         const floatArray = new Float32Array(int16Array.length);
         for (let i = 0; i < int16Array.length; i++) {

@@ -10,42 +10,45 @@ export interface LiveSessionCallbacks {
   onError: (error: string) => void;
 }
 
-// Helper to strictly select or shape a deep Male voice for Hindi / Indian conversational context
+// Helper to strictly select a confirmed Male voice for Hindi / Indian conversational context
 export function selectMaleVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
   if (!voices || voices.length === 0) return null;
+
+  const isFemaleName = (name: string) =>
+    /female|woman|stri|kalpana|swara|neerja|heera|zira|samantha|karen|victoria|hazel|priya|aditi|ananya|geeta|radha|leena|shruti|lekha|google हिन्दी|google hindi|sangeeta/i.test(
+      name
+    );
 
   // 1. Explicitly preferred male Hindi / Indian voices
   const maleHindiVoice = voices.find((v) => {
     const name = v.name.toLowerCase();
     const lang = v.lang.toLowerCase();
     const isHindiOrIndian = lang.includes('hi') || lang.includes('in') || name.includes('hindi');
-    const isMale = /male|man|purush|hemant|ravi|madhav|david|guy|george|mark|microsoft ravi|hie|hid|ena/i.test(name);
-    const isFemale = /female|woman|stri|kalpana|swara|neerja|heera|zira|samantha|karen|victoria|hazel|priya|aditi|ananya|geeta|radha|leena|shruti/i.test(name);
-    return isHindiOrIndian && isMale && !isFemale;
+    const isMale = /male|man|purush|hemant|ravi|madhav|david|guy|george|mark|microsoft ravi|hic|hid|ena|rishi/i.test(
+      name
+    );
+    return isHindiOrIndian && isMale && !isFemaleName(name);
   });
   if (maleHindiVoice) return maleHindiVoice;
 
-  // 2. Any Indian voice that is NOT explicitly female
+  // 2. Any Indian voice that is STRICTLY NOT female
   const nonFemaleIndianVoice = voices.find((v) => {
     const name = v.name.toLowerCase();
     const lang = v.lang.toLowerCase();
     const isHindiOrIndian = lang.includes('hi') || lang.includes('in') || name.includes('hindi');
-    const isFemale = /female|woman|stri|kalpana|swara|neerja|heera|zira|samantha|karen|victoria|hazel|priya|aditi|ananya|geeta|radha|leena|shruti/i.test(name);
-    return isHindiOrIndian && !isFemale;
+    return isHindiOrIndian && !isFemaleName(name);
   });
   if (nonFemaleIndianVoice) return nonFemaleIndianVoice;
 
   // 3. Confirmed international male voice
   const anyMaleVoice = voices.find((v) => {
     const name = v.name.toLowerCase();
-    const isMale = /male|man|purush|hemant|ravi|madhav|david|guy|george|mark/i.test(name);
-    const isFemale = /female|woman|stri|kalpana|swara|neerja|heera|zira|samantha|karen|victoria|hazel|priya|aditi|ananya|geeta|radha|leena|shruti/i.test(name);
-    return isMale && !isFemale;
+    const isMale = /male|man|purush|hemant|ravi|madhav|david|guy|george|mark|daniel|oliver/i.test(name);
+    return isMale && !isFemaleName(name);
   });
   if (anyMaleVoice) return anyMaleVoice;
 
-  // 4. Fallback to first available Hindi voice
-  return voices.find((v) => v.lang.toLowerCase().includes('hi')) || null;
+  return null;
 }
 
 export class LiveSession {
@@ -94,7 +97,7 @@ export class LiveSession {
     this.callbacks.onStateChange(newState);
   }
 
-  public async connect(greetingText?: string): Promise<void> {
+  public async connect(greetingText?: string, base64Audio?: string | null): Promise<void> {
     if (this.state !== 'disconnected') return;
 
     this.setState('connecting');
@@ -107,7 +110,7 @@ export class LiveSession {
       const greeting =
         greetingText ||
         'राम राम भाईसाहब! हाँ भाई, मैंने कॉल उठा ली है। हुक्म करो भाईसाहब, क्या सेवा करें आपकी?';
-      this.sendVoiceMessage(greeting);
+      await this.sendVoiceMessage(greeting, base64Audio);
     } catch (err) {
       console.error('Failed to connect live session:', err);
       this.setState('disconnected');
@@ -269,11 +272,7 @@ export class LiveSession {
 
       // If voice mode, play audio response
       if (isVoice) {
-        if (data.audio) {
-          await this.streamer.playChunk(data.audio, 24000);
-        } else {
-          await this.speakFallback(replyText);
-        }
+        await this.playMaleSpeech(replyText, data.audio);
       }
     } catch (err: any) {
       console.warn('Query handling notice:', err?.message || err);
@@ -282,7 +281,7 @@ export class LiveSession {
         : 'राम राम भाईसाहब! थोड़ा सा नेटवर्क धीमा है, पर मैं यहीं हूँ। एक बार फिर पूछिए!';
       this.callbacks.onTranscript(userPrompt, fallbackReply);
       if (isVoice) {
-        await this.speakFallback(fallbackReply);
+        await this.playMaleSpeech(fallbackReply);
       }
     } finally {
       if (isVoice && this.state !== 'disconnected') {
@@ -291,10 +290,43 @@ export class LiveSession {
     }
   }
 
-  public async sendVoiceMessage(customText: string) {
+  public async playMaleSpeech(text: string, base64Audio?: string | null): Promise<void> {
+    // 1. If server sent neural audio (hi-IN-MadhurNeural), play it immediately!
+    if (base64Audio) {
+      try {
+        await this.streamer.playChunk(base64Audio);
+        return;
+      } catch (err) {
+        console.warn('Direct neural audio play notice:', err);
+      }
+    }
+
+    // 2. Fetch genuine neural male audio from /api/tts
+    try {
+      const response = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.audio) {
+          await this.streamer.playChunk(data.audio);
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('Server Male TTS notice:', err);
+    }
+
+    // 3. Fallback to browser SpeechSynthesis with STRICT male-only selection
+    await this.speakFallback(text);
+  }
+
+  public async sendVoiceMessage(customText: string, base64Audio?: string | null) {
     this.setState('speaking');
     this.callbacks.onTranscript('', customText);
-    await this.speakFallback(customText);
+    await this.playMaleSpeech(customText, base64Audio);
     if (this.state !== 'disconnected') {
       this.setState('listening');
     }

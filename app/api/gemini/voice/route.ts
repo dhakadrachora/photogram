@@ -1,6 +1,7 @@
 import { GoogleGenAI, Type, FunctionDeclaration } from '@google/genai';
 import { NextRequest, NextResponse } from 'next/server';
 import { contentStore } from '@/lib/content-store';
+import { generateMaleHindiSpeechBase64 } from '@/lib/audio/male-tts';
 
 export const dynamic = 'force-dynamic';
 
@@ -411,6 +412,7 @@ function generateIntelligentWebsiteAnswer(rawPrompt: string): { text: string; to
 
 export async function POST(req: NextRequest) {
   let userPrompt = '';
+  let isVoiceRequest = false;
   try {
     const body = await req.json().catch(() => ({}));
     const { prompt, history, mode = 'text', userEmail, isVoice } = body;
@@ -418,7 +420,7 @@ export async function POST(req: NextRequest) {
 
     const requestMode = req.headers.get('x-request-mode') || mode;
     const headerEmail = req.headers.get('x-user-email') || userEmail;
-    const isVoiceRequest = requestMode === 'voice' || isVoice === true;
+    isVoiceRequest = requestMode === 'voice' || isVoice === true;
 
     // Guests are fully allowed to talk to DHOTI AALE AI voice assistant
     const allowGuest = contentStore.settings.allowGuestAi !== false;
@@ -443,9 +445,13 @@ export async function POST(req: NextRequest) {
     if (!apiKey) {
       // Local Intelligent Website Knowledge Engine (Masculine brotherly voice, 100% website knowledge)
       const intelligentAnswer = generateIntelligentWebsiteAnswer(prompt);
+      const audioBase64 = isVoiceRequest
+        ? await generateMaleHindiSpeechBase64(intelligentAnswer.text)
+        : null;
+
       return NextResponse.json({
         text: intelligentAnswer.text,
-        audio: null,
+        audio: audioBase64,
         toolCalls: intelligentAnswer.toolCalls || [],
       });
     }
@@ -541,11 +547,14 @@ RESPONSE FORMAT:
 
     const replyText = response.text || 'राम राम भाईसाहब! हुक्म करो, आज गाँव ढोटी में क्या जानना चाहते हो?';
     const functionCalls = response.functionCalls || [];
+    const audioBase64 = isVoiceRequest
+      ? await generateMaleHindiSpeechBase64(replyText)
+      : null;
 
     return NextResponse.json(
       {
         text: replyText,
-        audio: null,
+        audio: audioBase64,
         toolCalls: functionCalls.map((fc) => ({
           id: fc.id || Math.random().toString(),
           name: fc.name,
@@ -561,10 +570,14 @@ RESPONSE FORMAT:
   } catch (error: any) {
     console.warn('Voice Assistant API notice, switching to intelligent local knowledge engine:', error?.message || error);
     const intelligentAnswer = generateIntelligentWebsiteAnswer(userPrompt);
+    const audioBase64 = isVoiceRequest
+      ? await generateMaleHindiSpeechBase64(intelligentAnswer.text)
+      : null;
+
     return NextResponse.json(
       {
         text: intelligentAnswer.text,
-        audio: null,
+        audio: audioBase64,
         toolCalls: intelligentAnswer.toolCalls || [],
       },
       {

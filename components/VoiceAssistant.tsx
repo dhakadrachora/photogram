@@ -243,16 +243,46 @@ export function VoiceAssistant({
       return;
     }
 
-    // 1. Enter Calling / Ringing state
+    // 1. Immediately request microphone access on direct click gesture
+    try {
+      if (typeof navigator !== 'undefined' && navigator.mediaDevices) {
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
+    } catch (permErr: any) {
+      console.warn('Microphone permission check on call click:', permErr?.message || permErr);
+      showError('कृपया माइक्रोफ़ोन (Microphone) की परमिशन Allow करें।');
+      return;
+    }
+
+    // 2. Enter Calling / Ringing state
     setCallStatus('calling');
     setUserTranscript('');
     setIsMuted(false);
     session.setMuted(false);
 
-    // 2. Play realistic outgoing ringtone ("Tring... Tring...")
+    // 3. Play realistic outgoing ringtone ("Tring... Tring...")
     SoundEffects.startOutgoingRingtone();
 
-    // 3. AI picks up call after realistic 2-second ringing delay
+    // 4. Pre-fetch genuine neural male audio for the greeting while ringing
+    const greetingMessage = topicIntro
+      ? `राम राम भाईसाहब! हाँ भाई, मैंने कॉल उठा ली है। आप ${topicIntro} के बारे में पूछ रहे थे ना? हुक्म करो भाईसाहब, पूरी जानकारी मेरे पास है!`
+      : 'राम राम भाईसाहब! हाँ भाई, मैंने कॉल उठा ली है। हुक्म करो भाईसाहब, क्या हाल-चाल है और आज क्या सेवा करें आपकी?';
+
+    setAssistantTranscript(greetingMessage);
+
+    let preloadedMaleAudio: string | null = null;
+    fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: greetingMessage }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.audio) preloadedMaleAudio = data.audio;
+      })
+      .catch((err) => console.warn('Preload male TTS notice:', err));
+
+    // 5. AI picks up call after realistic 2-second ringing delay
     if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
 
     ringTimeoutRef.current = setTimeout(async () => {
@@ -263,18 +293,12 @@ export function VoiceAssistant({
         setCallDuration(0);
 
         session.setUserEmail(currentUser?.email || 'guest@dhotiaale.online');
-
-        const greetingMessage = topicIntro
-          ? `राम राम भाईसाहब! हाँ भाई, मैंने कॉल उठा ली है। आप ${topicIntro} के बारे में पूछ रहे थे ना? हुक्म करो भाईसाहब, पूरी जानकारी मेरे पास है!`
-          : 'राम राम भाईसाहब! हाँ भाई, मैंने कॉल उठा ली है। हुक्म करो भाईसाहब, क्या हाल-चाल है और आज क्या सेवा करें आपकी?';
-
-        setAssistantTranscript(greetingMessage);
-        await session.connect(greetingMessage);
+        await session.connect(greetingMessage, preloadedMaleAudio);
       } catch (error: any) {
         console.error('[VoiceCall] pickup failed:', error);
         SoundEffects.stopOutgoingRingtone();
         setCallStatus('ended');
-        showError('माइक्रोफोन परमिशन दें और दोबारा कॉल लगाएं।');
+        showError('कॉल कनेक्ट होने में समस्या आई। कृपया दोबारा प्रयास करें।');
       }
     }, 2200);
   };
