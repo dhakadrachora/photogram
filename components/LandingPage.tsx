@@ -613,6 +613,43 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
             </div>
           </div>
         </section>
+
+        {/* =========================================================
+            PROFESSIONAL FOOTER (GOOGLE ADSENSE & COMPLIANCE VERIFIED)
+            ========================================================= */}
+        <footer className="mt-12 pt-8 pb-6 border-t border-stone-200/80 text-stone-600 space-y-5">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-2.5">
+              <img src="/app-logo.png" alt="DHOTI AALE" className="w-8 h-8 rounded-xl object-cover border border-amber-400/40" />
+              <div>
+                <span className="font-black text-stone-900 text-sm tracking-tight block">DHOTI AALE (ढोटी आले)</span>
+                <span className="text-[10px] text-stone-500">Rajasthan&apos;s #1 Digital Village Platform</span>
+              </div>
+            </div>
+
+            {/* Compliance Policy Links */}
+            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs font-semibold text-stone-600">
+              <a href="/about" className="hover:text-amber-800 transition-colors">About Us</a>
+              <span className="text-stone-300">•</span>
+              <a href="/privacy-policy" className="hover:text-amber-800 transition-colors">Privacy Policy</a>
+              <span className="text-stone-300">•</span>
+              <a href="/terms" className="hover:text-amber-800 transition-colors">Terms &amp; Conditions</a>
+              <span className="text-stone-300">•</span>
+              <a href="/contact" className="hover:text-amber-800 transition-colors">Contact Us</a>
+              <span className="text-stone-300">•</span>
+              <a href="/support" className="hover:text-amber-800 transition-colors">24/7 Support Desk</a>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-4 border-t border-stone-200/50 text-[11px] text-stone-400">
+            <div>
+              © {new Date().getFullYear()} DHOTI AALE. Designed &amp; Built for Village Community.
+            </div>
+            <div>
+              Founder: <strong>Rohit Dhakad</strong> | Dhoti, Rajasthan (IN-325001)
+            </div>
+          </div>
+        </footer>
       </main>
       {/* END: VillageCommunityFeaturesGrid */}
 
