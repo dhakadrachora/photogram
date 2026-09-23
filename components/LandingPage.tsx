@@ -469,6 +469,150 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
           </div>
           <ChevronRight className="h-4 w-4 text-amber-400 group-hover:translate-x-1 transition-transform" />
         </div>
+
+        {/* =========================================================
+            SEMANTIC SEO & KNOWLEDGE BASE SECTION (CRAWLABLE CONTENT)
+            ========================================================= */}
+        <section aria-label="DHOTI AALE डिजिटल गाँव जानकारी एवं विशेषताएँ" className="mt-8 pt-6 border-t border-stone-200/80 space-y-6">
+          <div className="text-center space-y-1">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300">
+              <Crown className="h-3.5 w-3.5 text-amber-700" />
+              <span>राजस्थान का #1 डिजिटल गाँव मंच</span>
+            </div>
+            <h2 className="text-lg sm:text-xl font-black text-stone-900 tracking-tight">
+              DHOTI AALE (ढोटी आले) - डिजिटल पहचान, मुकाबला और चौपाल
+            </h2>
+            <p className="text-xs text-stone-600 max-w-xl mx-auto leading-relaxed">
+              ढोटी गाँव (राजस्थान) का आधुनिक वेब पोर्टल जहाँ ग्रामीण संस्कृति, युवा प्रतिभा और आर्टिफिशियल इंटेलिजेंस (AI) एक साथ जुड़ते हैं।
+            </p>
+          </div>
+
+          {/* 4 Feature Deep-Dives for SEO Crawlers & Visitors */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
+            {/* Feature 1: Photo Battle */}
+            <div 
+              onClick={() => {
+                SoundEffects.playTap();
+                onNavigateTab('battle');
+              }}
+              className="p-4 rounded-2xl bg-white border border-stone-200 shadow-sm hover:border-[#C25E29] hover:shadow-md transition-all cursor-pointer group"
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-xl bg-orange-100 text-[#C25E29] flex items-center justify-center font-bold">
+                  ⚔️
+                </div>
+                <h3 className="text-sm font-bold text-stone-900 group-hover:text-[#C25E29] transition-colors">
+                  लाइव फोटो बैटल एरीना (Photo Battles)
+                </h3>
+              </div>
+              <p className="text-xs text-stone-600 leading-relaxed">
+                अपनी सबसे शानदार फोटो अपलोड करें, साथी निवासियों को 1v1 मुकाबले में चुनौती दें और लाइव वोटों के ज़रिए गाँव के चैंपियन बनें। विजेताओं को आकर्षक रिवॉर्ड्स और पहचान दी जाती है।
+              </p>
+            </div>
+
+            {/* Feature 2: DHOTI AI */}
+            <div 
+              onClick={() => {
+                SoundEffects.playTap();
+                onNavigateTab('assistant');
+              }}
+              className="p-4 rounded-2xl bg-white border border-stone-200 shadow-sm hover:border-amber-500 hover:shadow-md transition-all cursor-pointer group"
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+                  🤖
+                </div>
+                <h3 className="text-sm font-bold text-stone-900 group-hover:text-amber-700 transition-colors">
+                  DHOTI AALE AI वॉइस असिस्टेंट
+                </h3>
+              </div>
+              <p className="text-xs text-stone-600 leading-relaxed">
+                गाँव का अपना बुद्धिमान डिजिटल साथी जो हिंदी, अंग्रेजी और राजस्थानी में आपकी बात समझता है। गाँव की जानकारी, मुकाबले की स्थिति और सरकारी योजनाओं की सहायता एक आवाज़ में प्राप्त करें।
+              </p>
+            </div>
+
+            {/* Feature 3: World Chat Choupal */}
+            <div 
+              onClick={() => {
+                SoundEffects.playTap();
+                onNavigateTab('worldchat');
+              }}
+              className="p-4 rounded-2xl bg-white border border-stone-200 shadow-sm hover:border-sky-500 hover:shadow-md transition-all cursor-pointer group"
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center font-bold">
+                  💬
+                </div>
+                <h3 className="text-sm font-bold text-stone-900 group-hover:text-sky-700 transition-colors">
+                  24/7 गाँव चौपाल (World Chat)
+                </h3>
+              </div>
+              <p className="text-xs text-stone-600 leading-relaxed">
+                देश-विदेश में बसे ढोटी निवासियों के साथ 24 घंटे लाइव गपशप, त्यौहारों की बधाइयाँ और देसी स्टिकर्स का आनंद लें। सुरक्षित और मॉडरेटेड चौपाल मंच।
+              </p>
+            </div>
+
+            {/* Feature 4: Resident Directory & Blue Tick */}
+            <div 
+              onClick={() => {
+                SoundEffects.playTap();
+                onNavigateTab('profile');
+              }}
+              className="p-4 rounded-2xl bg-white border border-stone-200 shadow-sm hover:border-purple-500 hover:shadow-md transition-all cursor-pointer group"
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
+                  👑
+                </div>
+                <h3 className="text-sm font-bold text-stone-900 group-hover:text-purple-700 transition-colors">
+                  निवासी डायरेक्टरी व ब्लू टिक (Verified Residents)
+                </h3>
+              </div>
+              <p className="text-xs text-stone-600 leading-relaxed">
+                गाँव के प्रतिष्ठित नागरिकों, युवाओं और उद्यमियों की आधिकारिक प्रोफ़ाइल। एडमिन द्वारा प्रमाणित ब्लू टिक (Blue Tick) सम्मान और गाँव में पहचान।
+              </p>
+            </div>
+          </div>
+
+          {/* Quick FAQ Section for Google Snippets */}
+          <div className="rounded-2xl bg-stone-100/80 border border-stone-200 p-4 space-y-3 text-left">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-stone-600 flex items-center gap-1.5">
+              <span>❓ अक्सर पूछे जाने वाले सवाल (FAQs)</span>
+            </h3>
+
+            <div className="space-y-2 text-xs">
+              <details className="group rounded-xl bg-white border border-stone-200 p-3 [&_summary::-webkit-details-marker]:hidden cursor-pointer">
+                <summary className="flex items-center justify-between font-bold text-stone-800">
+                  <span>DHOTI AALE पोर्टल क्या है?</span>
+                  <span className="transition group-open:rotate-180">▾</span>
+                </summary>
+                <p className="mt-2 text-stone-600 leading-relaxed">
+                  DHOTI AALE (www.dhotiaale.online) राजस्थान के ढोटी गाँव का आधिकारिक डिजिटल समुदाय है, जिसमें फोटो बैटल प्रतियोगिताएं, AI असिस्टेंट, लाइव चौपाल और गाँव की खबरें उपलब्ध हैं।
+                </p>
+              </details>
+
+              <details className="group rounded-xl bg-white border border-stone-200 p-3 [&_summary::-webkit-details-marker]:hidden cursor-pointer">
+                <summary className="flex items-center justify-between font-bold text-stone-800">
+                  <span>फोटो बैटल (Photo Battle) में कैसे जीतें?</span>
+                  <span className="transition group-open:rotate-180">▾</span>
+                </summary>
+                <p className="mt-2 text-stone-600 leading-relaxed">
+                  अपनी प्रोफ़ाइल से Battle Arena में फोटो सबमिट करें। गाँव के निवासी और मित्र लाइव वोट करते हैं। सबसे ज्यादा वोट प्राप्त करने वाले प्रतिभागी को इंस्टाग्राम रिवॉर्ड और विजेता प्रमाणपत्र मिलता है।
+                </p>
+              </details>
+
+              <details className="group rounded-xl bg-white border border-stone-200 p-3 [&_summary::-webkit-details-marker]:hidden cursor-pointer">
+                <summary className="flex items-center justify-between font-bold text-stone-800">
+                  <span>क्या यह ऐप मोबाइल में बिना डाउनलोड किए चल सकती है?</span>
+                  <span className="transition group-open:rotate-180">▾</span>
+                </summary>
+                <p className="mt-2 text-stone-600 leading-relaxed">
+                  हाँ, DHOTI AALE एक Progressive Web App (PWA) है। आप इसे किसी भी ब्राउज़र में चला सकते हैं या 'Install App' पर क्लिक करके बिना प्ले स्टोर के सीधे फोन में सेव कर सकते हैं।
+                </p>
+              </details>
+            </div>
+          </div>
+        </section>
       </main>
       {/* END: VillageCommunityFeaturesGrid */}
 

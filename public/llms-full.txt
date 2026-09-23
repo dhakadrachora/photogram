@@ -1,0 +1,40 @@
+# DHOTI AALE - The Complete Guide & Knowledge Base
+Official URL: https://www.dhotiaale.online
+
+## About DHOTI AALE
+DHOTI AALE (ढोटी आले) is an innovative digital village platform founded in Rajasthan, India. Designed to celebrate rural Rajasthani culture, modern youth creativity, and smart village connectivity, it bridges traditional community values with next-generation internet technologies like real-time WebSocket communication, artificial intelligence (AI), and mobile Progressive Web Applications (PWA).
+
+### Mission Statement
+To provide every resident and supporter of Dhoti village with a unified, high-tech digital home featuring interactive entertainment, village news, local business promotion, and AI-driven community assistance.
+
+## Key Features & Experiences
+
+### 1. Photo Battle Arena (मुकाबला)
+- **Concept:** Residents and visitors challenge each other to friendly 1v1 photo battles.
+- **Participation:** Users upload their best photos (swag, desi style, festival attire, cultural portraits) and nominate or challenge fellow residents.
+- **Fair Voting:** Community members vote in real-time. Live vote tallies, percentage bars, and countdown timers ensure total transparency.
+- **Winner Rewards:** Battle winners receive verified digital recognition, showcase badges, and rewards such as Instagram reels shoutouts and winner certificates.
+- **Keywords:** Dhoti battle, Dhoti Aale photo contest, online photo battle Rajasthan, Dhoti gaon ka mukabla.
+
+### 2. DHOTI AALE AI Assistant
+- **AI Intelligence:** An advanced AI companion integrated directly into the portal that supports natural Hindi, English, and local dialects.
+- **Capabilities:** Explains village history, provides updates on community rules, aids in battle disputes, answers queries about local services, and converses with rural charm.
+- **Voice Support:** Interactive speech-to-text and voice generation for hands-free accessibility.
+
+### 3. Gaon Choupal (World Chat)
+- **Real-Time Gathering:** A virtual 24/7 choupal (community square) where residents chat live, share greetings, celebrate festivals, and post custom Rajasthani stickers (e.g. 'Systumm Hang! 🚜', 'Dhoti Power! 👑', 'Aaja Bhid le! ⚔️').
+- **Safe & Moderated:** Built with automated message sanitization, 24-hour message lifecycles, and admin safety oversight.
+
+### 4. Verified Residents & Blue Tick Directory
+- **Identity & Trust:** Community members can register, build personal profiles, display their village rank, and receive official Blue Tick verification from the site owner.
+
+### 5. News, Events & Rural Businesses
+- **Village Ticker:** Immediate broadcast of local notices, agricultural advisory, sports tournaments, and festival celebrations.
+- **Local Directory:** Highlights village shops, tractors, artisans, and entrepreneurs.
+
+## Entity & Organizational Profile
+- **Official Domain:** https://www.dhotiaale.online
+- **Primary Language:** Hindi (हिंदी), Hinglish, English
+- **Country & Region:** Rajasthan, India
+- **Site Administrator & Owner:** Rohit Dhakad
+- **Platform Architecture:** Next.js, React, Supabase PostgreSQL, PWA Service Worker, Tailwind CSS & Vanilla CSS design system.

@@ -1,0 +1,27 @@
+# DHOTI AALE (https://www.dhotiaale.online)
+
+> DHOTI AALE is Rajasthan's premier digital village community portal and interactive social platform, featuring Live Photo Battles, an intelligent local AI Voice Assistant, 24/7 Village Choupal (World Chat), verified resident directory, and rural news broadcasting.
+
+## Overview
+- **Platform Name:** DHOTI AALE (ढोटी आले)
+- **Official Website:** https://www.dhotiaale.online
+- **Geographic Focus:** Dhoti, Rajasthan, India
+- **Core Purpose:** Empower rural Rajasthan with smart village digitization, community pride, interactive photo battles, and modern AI tools.
+- **Key Modules:**
+  - **Photo Battle Arena:** Real-time head-to-head 1v1 photo contests where residents upload photos, challenge opponents, and community members cast live votes to crown village champions with Instagram rewards and winner certificates.
+  - **DHOTI AALE AI:** Multilingual AI voice and text assistant trained to answer local queries, assist residents, and facilitate community banter.
+  - **Gaon Choupal (World Chat):** 24-hour persistent community public chat room connecting village residents across the globe.
+  - **Resident Directory & Blue Tick:** Verified resident profiles with blue tick status.
+  - **Community News & Ticker:** Official announcements, festival alerts, and village notices.
+  - **Local Business Showcase:** Village shops, agricultural services, and local enterprises.
+
+## Official Links
+- Home: https://www.dhotiaale.online/
+- Live Photo Battles: https://www.dhotiaale.online/#battle
+- Gaon Choupal (World Chat): https://www.dhotiaale.online/#worldchat
+- AI Assistant: https://www.dhotiaale.online/#assistant
+- Support & Helpdesk: https://www.dhotiaale.online/support
+
+## Leadership & Contact
+- **Founder & Administrator:** Rohit Dhakad (rohitdhakaddhoti143@gmail.com)
+- **Headquarters:** Dhoti, Rajasthan, India
