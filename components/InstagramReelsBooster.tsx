@@ -29,18 +29,25 @@ interface OrderItem {
   id: string;
   orderId: string;
   link: string;
-  username: string;
+  shortcode?: string;
+  displayLabel?: string;
   quantity: number;
   status: string;
   timestamp: number;
 }
 
+interface LeaderboardItem {
+  rank: number;
+  handle: string;
+  boostedViews: string;
+  badges: string;
+}
+
 export function InstagramReelsBooster() {
   const [activeTab, setActiveTab] = useState<'boost' | 'leaderboard' | 'track'>('boost');
 
-  // Input states
+  // Input state - Only Reel Link
   const [reelLink, setReelLink] = useState('');
-  const [username, setUsername] = useState('');
   const [inputError, setInputError] = useState<string | null>(null);
 
   // Watch ad modal & countdown
@@ -54,14 +61,14 @@ export function InstagramReelsBooster() {
   const [successData, setSuccessData] = useState<{
     orderId: string;
     quantity: number;
-    username: string;
+    displayLabel?: string;
   } | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // Leaderboard & Live feed
-  const [totalDelivered, setTotalDelivered] = useState(14800);
+  // 100% Real Live Leaderboard & Deliveries
+  const [totalDelivered, setTotalDelivered] = useState(0);
   const [recentDeliveries, setRecentDeliveries] = useState<OrderItem[]>([]);
-  const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardItem[]>([]);
   const [isLoadingFeed, setIsLoadingFeed] = useState(false);
 
   // Track order
@@ -69,14 +76,14 @@ export function InstagramReelsBooster() {
   const [trackResult, setTrackResult] = useState<any | null>(null);
   const [isTracking, setIsTracking] = useState(false);
 
-  // Fetch initial leaderboard & feed
+  // Fetch real live records
   const fetchFeed = async () => {
     setIsLoadingFeed(true);
     try {
       const res = await fetch('/api/reels/boost');
       const data = await res.json();
       if (data.success) {
-        setTotalDelivered(data.totalDelivered || 14800);
+        setTotalDelivered(data.totalDelivered || 0);
         setRecentDeliveries(data.recentDeliveries || []);
         setLeaderboard(data.leaderboard || []);
       }
@@ -89,7 +96,7 @@ export function InstagramReelsBooster() {
 
   useEffect(() => {
     fetchFeed();
-    const interval = setInterval(fetchFeed, 30000); // 30s auto-refresh
+    const interval = setInterval(fetchFeed, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -105,7 +112,7 @@ export function InstagramReelsBooster() {
     }
 
     if (!link.includes('instagram.com/')) {
-      setInputError('अमान्य लिंक! कृपया मान्य Instagram Reel लिंक दर्ज करें (उदा: https://www.instagram.com/reel/...)');
+      setInputError('अमान्य लिंक! केवल सही Instagram Reel लिंक ही मान्य है (उदा: https://www.instagram.com/reel/...)');
       return;
     }
 
@@ -113,7 +120,7 @@ export function InstagramReelsBooster() {
       SoundEffects.playTap();
     } catch {}
 
-    // 1. Open Adsterra Smartlink in a new window/tab to guarantee paid ad impression
+    // 1. Open Adsterra Smartlink in a new window/tab to guarantee paid ad earnings
     try {
       window.open(SMARTLINK_URL, '_blank', 'noopener,noreferrer');
     } catch (e) {
@@ -155,7 +162,6 @@ export function InstagramReelsBooster() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           link: reelLink.trim(),
-          username: username.trim() || undefined,
         }),
       });
 
@@ -167,7 +173,7 @@ export function InstagramReelsBooster() {
         setSuccessData({
           orderId: data.orderId,
           quantity: data.quantity || 100,
-          username: data.username,
+          displayLabel: data.displayLabel,
         });
         setReelLink('');
         fetchFeed();
@@ -176,7 +182,7 @@ export function InstagramReelsBooster() {
         } catch {}
       } else {
         setIsAdModalOpen(false);
-        setInputError(data.error || 'ऑर्डर भेजने में समस्या आई। कृपया 3 घंटे बाद प्रयास करें।');
+        setInputError(data.error || 'ऑर्डर भेजने में समस्या आई। कृपया पुनः प्रयास करें।');
       }
     } catch (err: any) {
       setIsClaiming(false);
@@ -229,14 +235,14 @@ export function InstagramReelsBooster() {
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-base sm:text-lg font-black tracking-tight text-white flex items-center gap-1.5">
-                <span>Instagram Reels Free Views Booster</span>
+                <span>Free 100 Instagram Reels Views Booster</span>
                 <span className="text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-pink-500 text-slate-950 shadow-sm">
                   100% FREE
                 </span>
               </h2>
             </div>
             <p className="text-xs text-slate-400 font-medium mt-0.5">
-              अपनी रील पर हर 3 घंटे में पाएँ <strong className="text-pink-400">100 फ्री व्यूज</strong>। सिर्फ 15 सेकंड का ऐड देखें!
+              अपनी अलग-अलग Reels पर पाएँ <strong className="text-pink-400">अनलिमिटेड 100 फ्री व्यूज</strong>। सिर्फ 15 सेकंड का ऐड देखें!
             </p>
           </div>
         </div>
@@ -244,7 +250,7 @@ export function InstagramReelsBooster() {
         {/* Counter Badge */}
         <div className="px-3.5 py-1.5 rounded-2xl bg-slate-800/90 border border-slate-700/80 flex items-center gap-2 text-xs font-bold text-emerald-400 shrink-0 shadow-inner">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-          <span>{totalDelivered.toLocaleString('hi-IN')}+ Views Delivered</span>
+          <span>{totalDelivered.toLocaleString('hi-IN')} Live Views Delivered</span>
         </div>
       </div>
 
@@ -319,57 +325,52 @@ export function InstagramReelsBooster() {
               </div>
 
               {/* 3-Hour Cooldown Note */}
-              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 flex items-center justify-center gap-2 max-w-md mx-auto">
+              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 flex items-center justify-center gap-2 max-w-lg mx-auto">
                 <Clock className="h-4 w-4 shrink-0 text-amber-400" />
-                <span>इस रील के लिए अगला 100 व्यूज का क्लेम <strong>3 घंटे बाद</strong> खुलेगा।</span>
+                <span>इस रील पर अगला क्लेम <strong>3 घंटे बाद</strong> कर सकते हैं। आप दूसरी किसी भी रील पर <strong>अभी तुरंत</strong> 100 व्यूज बढ़ा सकते हैं!</span>
               </div>
 
-              <button
-                onClick={() => setSuccessData(null)}
-                className="px-5 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-white transition-all shadow-md"
-              >
-                + किसी दूसरी रील पर व्यूज बढ़ाएँ
-              </button>
+              <div>
+                <button
+                  onClick={() => setSuccessData(null)}
+                  className="px-6 py-2.5 rounded-xl text-xs font-bold bg-pink-600 hover:bg-pink-500 text-white transition-all shadow-md active:scale-95 cursor-pointer"
+                >
+                  + दूसरी रील पर तुरंत 100 व्यूज बढ़ाएँ
+                </button>
+              </div>
             </div>
           ) : (
-            /* Input Form */
+            /* Input Form - ONLY Reel Link */
             <form onSubmit={handleStartWatchAd} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center gap-1.5">
-                    <Instagram className="h-3.5 w-3.5 text-pink-400" />
-                    <span>Instagram Reel Link *</span>
-                  </label>
-                  <input
-                    type="url"
-                    required
-                    value={reelLink}
-                    onChange={(e) => {
-                      setReelLink(e.target.value);
-                      setInputError(null);
-                    }}
-                    placeholder="https://www.instagram.com/reel/C7xyz123/..."
-                    className="w-full px-4 py-3 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500/40 shadow-inner"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center gap-1.5">
-                    <span>Username (वैकल्पिक)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="@your_instagram"
-                    className="w-full px-4 py-3 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500/40 shadow-inner"
-                  />
-                </div>
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-300 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Instagram className="h-4 w-4 text-pink-400" />
+                    <span>Instagram Reel Link (सिर्फ रील का लिंक पेस्ट करें) *</span>
+                  </span>
+                  <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                    ⚡ अनलिमिटेड रील्स समर्थित
+                  </span>
+                </label>
+                <input
+                  type="url"
+                  required
+                  value={reelLink}
+                  onChange={(e) => {
+                    setReelLink(e.target.value);
+                    setInputError(null);
+                  }}
+                  placeholder="https://www.instagram.com/reel/C8XYZ123/..."
+                  className="w-full px-4 py-3.5 rounded-2xl bg-slate-950 border border-slate-800 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500/40 shadow-inner font-mono transition-all"
+                />
+                <p className="text-[11px] text-slate-400 pt-1">
+                  💡 <strong>Unlimited Boost:</strong> आप जितनी चाहें उतनी अलग-अलग Reels पर अनलिमिटेड बार 100-100 व्यूज बढ़ा सकते हैं! केवल एक ही रील लिंक पर दोबारा 3 घंटे बाद व्यूज मिलेंगे।
+                </p>
               </div>
 
               {/* Error Box */}
               {inputError && (
-                <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-xs text-rose-300 flex items-start gap-2 animate-in fade-in">
+                <div className="p-3.5 rounded-xl bg-rose-500/15 border border-rose-500/40 text-xs text-rose-300 flex items-start gap-2.5 animate-in fade-in">
                   <AlertCircle className="h-4 w-4 shrink-0 text-rose-400 mt-0.5" />
                   <div>{inputError}</div>
                 </div>
@@ -377,17 +378,17 @@ export function InstagramReelsBooster() {
 
               {/* Rules Note */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] text-slate-400 pt-1">
-                <div className="flex items-center gap-1.5 bg-slate-950/60 p-2 rounded-xl border border-slate-800/80">
+                <div className="flex items-center gap-1.5 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
                   <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
                   <span>पब्लिक रील (Public Account) होना चाहिए</span>
                 </div>
-                <div className="flex items-center gap-1.5 bg-slate-950/60 p-2 rounded-xl border border-slate-800/80">
+                <div className="flex items-center gap-1.5 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
                   <Clock className="h-3.5 w-3.5 text-amber-400 shrink-0" />
-                  <span>एक रील पर हर 3 घंटे में 100 व्यूज</span>
+                  <span>सेम रील पर 3 घंटे का अंतराल (Gap)</span>
                 </div>
-                <div className="flex items-center gap-1.5 bg-slate-950/60 p-2 rounded-xl border border-slate-800/80">
+                <div className="flex items-center gap-1.5 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
                   <ShieldCheck className="h-3.5 w-3.5 text-blue-400 shrink-0" />
-                  <span>100% सुरक्षित और असली SMM व्यूज</span>
+                  <span>100% असली SMM सर्वर डिलीवरी</span>
                 </div>
               </div>
 
@@ -395,7 +396,7 @@ export function InstagramReelsBooster() {
               <div className="pt-2 flex items-center justify-end">
                 <button
                   type="submit"
-                  className="w-full sm:w-auto px-6 py-3.5 rounded-2xl text-xs sm:text-sm font-black bg-gradient-to-r from-amber-500 via-pink-500 to-purple-600 hover:from-amber-400 hover:via-pink-400 hover:to-purple-500 text-white shadow-xl shadow-pink-500/25 flex items-center justify-center gap-2 transition-transform active:scale-95 cursor-pointer"
+                  className="w-full sm:w-auto px-7 py-3.5 rounded-2xl text-xs sm:text-sm font-black bg-gradient-to-r from-amber-500 via-pink-500 to-purple-600 hover:from-amber-400 hover:via-pink-400 hover:to-purple-500 text-white shadow-xl shadow-pink-500/25 flex items-center justify-center gap-2 transition-transform active:scale-95 cursor-pointer"
                 >
                   <Play className="h-4 w-4 fill-white" />
                   <span>Watch 15s Ad & Boost 100 Views FREE</span>
@@ -406,7 +407,7 @@ export function InstagramReelsBooster() {
         </div>
       )}
 
-      {/* TAB 2: LIVE LEADERBOARD */}
+      {/* TAB 2: LIVE LEADERBOARD (100% REAL LIVE RECORDS) */}
       {activeTab === 'leaderboard' && (
         <div className="mt-5 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -414,38 +415,48 @@ export function InstagramReelsBooster() {
             <div className="space-y-2">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
                 <Award className="h-4 w-4 text-amber-400" />
-                <span>आज के टॉप बूस्टर (Top Boosters)</span>
+                <span>आज के टॉप बूस्टर (Live Leaderboard)</span>
               </h3>
               <div className="space-y-1.5">
-                {leaderboard.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="p-3 rounded-xl bg-slate-950/80 border border-slate-800/90 flex items-center justify-between gap-3 text-xs"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <span
-                        className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${
-                          idx === 0
-                            ? 'bg-amber-400 text-slate-950'
-                            : idx === 1
-                            ? 'bg-slate-300 text-slate-950'
-                            : idx === 2
-                            ? 'bg-amber-700 text-white'
-                            : 'bg-slate-800 text-slate-400'
-                        }`}
-                      >
-                        {item.rank}
-                      </span>
-                      <span className="font-bold text-white">{item.handle}</span>
+                {leaderboard.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-slate-400 bg-slate-950/60 rounded-2xl border border-slate-800/90 space-y-2">
+                    <div className="w-10 h-10 mx-auto rounded-full bg-amber-500/10 flex items-center justify-center text-amber-400">
+                      <Award className="h-5 w-5" />
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-pink-400 font-bold">{item.boostedViews}</span>
-                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
-                        {item.badges}
-                      </span>
-                    </div>
+                    <p className="font-bold text-slate-300">🌟 अभी तक कोई आर्डर नहीं लगा है!</p>
+                    <p className="text-[11px] text-slate-500 max-w-xs mx-auto">अपनी रील का लिंक डालें और पहला 100 व्यूज का असली लाइव रिकॉर्ड दर्ज करें।</p>
                   </div>
-                ))}
+                ) : (
+                  leaderboard.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="p-3 rounded-xl bg-slate-950/80 border border-slate-800/90 flex items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span
+                          className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${
+                            idx === 0
+                              ? 'bg-amber-400 text-slate-950'
+                              : idx === 1
+                              ? 'bg-slate-300 text-slate-950'
+                              : idx === 2
+                              ? 'bg-amber-700 text-white'
+                              : 'bg-slate-800 text-slate-400'
+                          }`}
+                        >
+                          {item.rank}
+                        </span>
+                        <span className="font-bold text-white font-mono">{item.handle}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-pink-400 font-bold">{item.boostedViews}</span>
+                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                          {item.badges}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 
@@ -454,7 +465,7 @@ export function InstagramReelsBooster() {
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
                   <TrendingUp className="h-4 w-4 text-emerald-400" />
-                  <span>लाइव डिलीवरी फीड (Live Orders)</span>
+                  <span>लाइव डिलीवरी फीड (Live Orders Feed)</span>
                 </h3>
                 <button onClick={fetchFeed} className="text-[11px] text-pink-400 hover:underline flex items-center gap-1">
                   <RefreshCw className={`h-3 w-3 ${isLoadingFeed ? 'animate-spin' : ''}`} />
@@ -462,10 +473,14 @@ export function InstagramReelsBooster() {
                 </button>
               </div>
 
-              <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
+              <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
                 {recentDeliveries.length === 0 ? (
-                  <div className="p-6 text-center text-xs text-slate-500 bg-slate-950/60 rounded-xl border border-slate-800">
-                    No orders delivered yet today. Be the first one!
+                  <div className="p-8 text-center text-xs text-slate-400 bg-slate-950/60 rounded-2xl border border-slate-800/90 space-y-2">
+                    <div className="w-10 h-10 mx-auto rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+                      <TrendingUp className="h-5 w-5" />
+                    </div>
+                    <p className="font-bold text-slate-300">✨ लाइव फीड खाली है</p>
+                    <p className="text-[11px] text-slate-500 max-w-xs mx-auto">जैसे ही कोई यूजर रील बूस्ट करेगा, असली लाइव रिकॉर्ड यहाँ तुरंत अपडेट होगा।</p>
                   </div>
                 ) : (
                   recentDeliveries.map((ord) => (
@@ -475,7 +490,9 @@ export function InstagramReelsBooster() {
                     >
                       <div className="flex items-center gap-2 truncate">
                         <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                        <span className="font-semibold text-slate-300 truncate">@{ord.username}</span>
+                        <span className="font-semibold text-slate-300 font-mono truncate">
+                          {ord.displayLabel || (ord.shortcode ? `Reel #${ord.shortcode.slice(0, 10)}` : `Reel #${ord.orderId}`)}
+                        </span>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <span className="font-bold text-emerald-400 text-[11px]">+{ord.quantity} Views</span>
@@ -501,7 +518,7 @@ export function InstagramReelsBooster() {
               required
               value={trackOrderId}
               onChange={(e) => setTrackOrderId(e.target.value)}
-              placeholder="Enter your Order ID (उदा: 784230)..."
+              placeholder="अपना Order ID दर्ज करें (उदा: 784230)..."
               className="flex-1 px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 outline-none focus:border-pink-500"
             />
             <button

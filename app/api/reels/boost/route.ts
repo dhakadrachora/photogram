@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import fs from 'fs';
+import path from 'path';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,45 +14,49 @@ interface BoosterOrder {
   id: string;
   orderId: string;
   link: string;
-  username: string;
+  shortcode: string;
+  displayLabel: string;
   quantity: number;
   status: string;
   timestamp: number;
 }
 
-// In-memory persistent state across server lifecycle
-const reelCooldownMap = new Map<string, number>();
-const boosterOrders: BoosterOrder[] = [
-  {
-    id: 'ord_sample_1',
-    orderId: '784129',
-    link: 'https://www.instagram.com/reel/sample1/',
-    username: 'rohit_dhakad_official',
-    quantity: 100,
-    status: 'Completed',
-    timestamp: Date.now() - 45 * 60 * 1000,
-  },
-  {
-    id: 'ord_sample_2',
-    orderId: '784192',
-    link: 'https://www.instagram.com/reel/sample2/',
-    username: 'rajasthani_swag_dhoti',
-    quantity: 100,
-    status: 'Completed',
-    timestamp: Date.now() - 25 * 60 * 1000,
-  },
-  {
-    id: 'ord_sample_3',
-    orderId: '784230',
-    link: 'https://www.instagram.com/reel/sample3/',
-    username: 'dhoti_clan_king',
-    quantity: 100,
-    status: 'Processing',
-    timestamp: Date.now() - 5 * 60 * 1000,
-  },
-];
+const ORDERS_FILE = path.join(process.cwd(), '.reels_orders.json');
 
-let baseDeliveredViews = 12400;
+function loadOrders(): BoosterOrder[] {
+  try {
+    if (fs.existsSync(ORDERS_FILE)) {
+      const content = fs.readFileSync(ORDERS_FILE, 'utf-8');
+      const parsed = JSON.parse(content);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (err) {
+    console.warn('Orders file read error:', err);
+  }
+  return [];
+}
+
+function persistOrders(orders: BoosterOrder[]) {
+  try {
+    fs.writeFileSync(ORDERS_FILE, JSON.stringify(orders.slice(-500), null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('Orders file write error:', err);
+  }
+}
+
+// In-memory cache synced with disk
+const boosterOrders: BoosterOrder[] = loadOrders();
+const reelCooldownMap = new Map<string, number>();
+
+// Rebuild cooldown map from persisted orders
+for (const order of boosterOrders) {
+  if (order.link && order.timestamp) {
+    const prev = reelCooldownMap.get(order.link) || 0;
+    if (order.timestamp > prev) {
+      reelCooldownMap.set(order.link, order.timestamp);
+    }
+  }
+}
 
 function cleanInstagramUrl(rawUrl: string): string {
   try {
@@ -61,16 +67,13 @@ function cleanInstagramUrl(rawUrl: string): string {
   }
 }
 
-function extractUsernameOrHandle(url: string, providedUser?: string): string {
-  if (providedUser && providedUser.trim()) {
-    return providedUser.trim().replace(/^@/, '');
-  }
+function extractShortcode(cleanUrl: string): string {
   try {
-    const parts = url.split('/').filter(Boolean);
-    const shortcode = parts[parts.length - 1] || 'user';
-    return `user_${shortcode.slice(0, 6)}`;
+    const segments = cleanUrl.split('/').filter(Boolean);
+    const code = segments[segments.length - 1] || 'reel';
+    return code;
   } catch {
-    return 'dhoti_resident';
+    return 'reel';
   }
 }
 
@@ -79,7 +82,7 @@ export async function GET(req: NextRequest) {
   const action = searchParams.get('action');
   const orderId = searchParams.get('orderId');
 
-  // Order status lookup
+  // 1. Live Order status lookup via CheapSMMHub API
   if (action === 'status' && orderId) {
     try {
       const formData = new URLSearchParams();
@@ -105,7 +108,7 @@ export async function GET(req: NextRequest) {
         });
       }
     } catch (e) {
-      console.warn('SMM status check fallback:', e);
+      console.warn('SMM status check error:', e);
     }
 
     const localOrder = boosterOrders.find((o) => o.orderId === orderId);
@@ -116,7 +119,7 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // Check cooldown for a specific link
+  // 2. Check cooldown for a specific link
   const checkLink = searchParams.get('checkLink');
   if (checkLink) {
     const cleanUrl = cleanInstagramUrl(checkLink);
@@ -132,21 +135,42 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // Live Leaderboard & Recent Deliveries
-  const recentList = [...boosterOrders].reverse().slice(0, 15);
-  const totalDelivered = baseDeliveredViews + boosterOrders.length * 100;
+  // 3. 100% Real Live Leaderboard & Recent Deliveries
+  const recentList = [...boosterOrders].reverse().slice(0, 20);
+  const totalDelivered = boosterOrders.length * 100;
+
+  // Build real dynamic leaderboard from actual submissions
+  const frequencyMap = new Map<string, { count: number; shortcode: string }>();
+  for (const o of boosterOrders) {
+    const key = o.shortcode || 'reel';
+    const existing = frequencyMap.get(key) || { count: 0, shortcode: key };
+    existing.count += 1;
+    frequencyMap.set(key, existing);
+  }
+
+  const sortedBoosters = Array.from(frequencyMap.values())
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10)
+    .map((item, index) => {
+      const views = item.count * 100;
+      let badge = 'Active 🎯';
+      if (index === 0) badge = 'Top Booster 👑';
+      else if (index === 1) badge = 'Superstar 🔥';
+      else if (index === 2) badge = 'Elite ⚡';
+
+      return {
+        rank: index + 1,
+        handle: `Reel #${item.shortcode.slice(0, 10)}`,
+        boostedViews: `${views.toLocaleString('hi-IN')} Views`,
+        badges: badge,
+      };
+    });
 
   return NextResponse.json({
     success: true,
     totalDelivered,
     recentDeliveries: recentList,
-    leaderboard: [
-      { rank: 1, handle: '@dhoti_champion_rohit', boostedViews: '3,400 Views', badges: 'VIP 👑' },
-      { rank: 2, handle: '@swag_rajasthan_dhoti', boostedViews: '2,800 Views', badges: 'Top Booster 🔥' },
-      { rank: 3, handle: '@marwadi_reels_star', boostedViews: '2,100 Views', badges: 'Elite ✨' },
-      { rank: 4, handle: '@desi_dhoti_culture', boostedViews: '1,600 Views', badges: 'Rising ⚡' },
-      { rank: 5, handle: '@choupal_veer_325001', boostedViews: '1,200 Views', badges: 'Active 🎯' },
-    ],
+    leaderboard: sortedBoosters,
   });
 }
 
@@ -154,7 +178,6 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
     const rawLink = body.link;
-    const providedUser = body.username;
 
     if (!rawLink || typeof rawLink !== 'string') {
       return NextResponse.json(
@@ -174,7 +197,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: 'अमान्य लिंक! कृपया सही Instagram Reel लिंक पेस्ट करें (उदा: https://www.instagram.com/reel/...)',
+          error: 'अमान्य लिंक! केवल Instagram Reel लिंक मान्य है (उदा: https://www.instagram.com/reel/...)',
         },
         { status: 400 }
       );
@@ -182,7 +205,7 @@ export async function POST(req: NextRequest) {
 
     const cleanUrl = cleanInstagramUrl(rawLink);
 
-    // Enforce 3-Hour Cooldown
+    // Enforce 3-Hour Cooldown ONLY on this exact reel link
     const lastClaimed = reelCooldownMap.get(cleanUrl) || 0;
     const elapsed = Date.now() - lastClaimed;
 
@@ -195,7 +218,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: `यह रील पहले ही सबमिट की जा चुकी है! आप इस लिंक पर ${remainingFormatted} बाद दोबारा 100 फ्री व्यूज ले सकते हैं। (या अभी किसी दूसरी रील का लिंक डालें)`,
+          error: `यह रील पहले ही बूस्ट हो चुकी है! आप इस लिंक पर ${remainingFormatted} बाद दोबारा 100 व्यूज ले सकते हैं। (दूसरी किसी भी रील का लिंक डालकर आप अभी तुरंत अनलिमिटेड व्यूज बढ़ा सकते हैं!)`,
           remainingMs,
           remainingFormatted,
         },
@@ -230,7 +253,6 @@ export async function POST(req: NextRequest) {
         smmStatus = 'In Progress';
       } else if (smmResponse && smmResponse.error) {
         console.warn('[CheapSMMHub Error]:', smmResponse.error);
-        // If SMM error happens, fallback gracefully so user gets order ID and admin can inspect
         smmStatus = 'Queued';
       }
     } catch (apiError) {
@@ -238,31 +260,35 @@ export async function POST(req: NextRequest) {
       smmStatus = 'Queued';
     }
 
-    // Update cooldown map
+    // Update cooldown map for this specific reel URL
     reelCooldownMap.set(cleanUrl, Date.now());
 
-    // Record order in history
-    const username = extractUsernameOrHandle(cleanUrl, providedUser);
+    // Record 100% REAL LIVE order in history and persist
+    const shortcode = extractShortcode(cleanUrl);
+    const displayLabel = `Reel #${shortcode.slice(0, 10)}`;
+
     const newOrder: BoosterOrder = {
       id: `dhoti_${Date.now()}`,
       orderId: smmOrderId,
       link: cleanUrl,
-      username,
+      shortcode,
+      displayLabel,
       quantity: 100,
       status: smmStatus,
       timestamp: Date.now(),
     };
 
     boosterOrders.push(newOrder);
-    if (boosterOrders.length > 100) boosterOrders.shift();
+    if (boosterOrders.length > 500) boosterOrders.shift();
+    persistOrders(boosterOrders);
 
     return NextResponse.json({
       success: true,
       orderId: smmOrderId,
       quantity: 100,
-      username,
+      displayLabel,
       status: smmStatus,
-      message: 'बधाई हो! आपके रील पर 100 फ्री व्यूज का आर्डर सफलतापूर्वक भेज दिया गया है।',
+      message: 'बधाई हो! आपकी Instagram Reel पर 100 फ्री व्यूज का आर्डर सफलतापूर्वक भेज दिया गया है।',
       cooldownExpiresAt: Date.now() + COOLDOWN_MS,
     });
   } catch (error: any) {
