@@ -90,7 +90,7 @@ export default function TermsPage() {
               <span>4. Intellectual Property Rights</span>
             </h2>
             <p>
-              The design, logos, trademarks, and source code of DHOTI AALE are the property of the site founder (Rohit Dhakad). Users retain ownership of their uploaded photographs but grant DHOTI AALE a non-exclusive license to display them for the purpose of community battles and user profiles.
+              The design, logos, trademarks, and source code of DHOTI AALE are the property of DHOTI AALE. Users retain ownership of their uploaded photographs but grant DHOTI AALE a non-exclusive license to display them for the purpose of community battles and user profiles.
             </p>
           </section>
 
@@ -114,7 +114,7 @@ export default function TermsPage() {
             </p>
             <div className="p-4 rounded-xl bg-stone-100 border border-stone-200 text-xs font-mono space-y-1 text-stone-700">
               <div><strong>Platform:</strong> DHOTI AALE (https://www.dhotiaale.online)</div>
-              <div><strong>Administrator:</strong> Rohit Dhakad</div>
+              <div><strong>Administrator:</strong> DHOTI AALE Team</div>
               <div><strong>Email:</strong> rohitdhakaddhoti143@gmail.com</div>
               <div><strong>Location:</strong> Dhoti, Rajasthan, India</div>
             </div>

@@ -682,7 +682,7 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
               © {new Date().getFullYear()} DHOTI AALE. Designed &amp; Built for Village Community.
             </div>
             <div>
-              Founder: <strong>Rohit Dhakad</strong> | Dhoti, Rajasthan (IN-325001)
+              <strong>DHOTI AALE Team</strong> | Dhoti, Rajasthan (IN-325001)
             </div>
           </div>
         </footer>

@@ -21,29 +21,50 @@ export async function generateMaleHindiSpeechBase64(text: string): Promise<strin
     const stream = tts.toStream(cleanText);
 
     return await new Promise<string | null>((resolve) => {
+      let isSettled = false;
       const chunks: Buffer[] = [];
+
+      const cleanup = () => {
+        try {
+          tts.close();
+        } catch {}
+      };
+
       const timeout = setTimeout(() => {
-        resolve(null);
-      }, 6000);
+        if (!isSettled) {
+          isSettled = true;
+          cleanup();
+          console.warn('Male TTS generation timed out after 7s');
+          resolve(null);
+        }
+      }, 7000);
 
       stream.audioStream.on('data', (chunk: Buffer) => {
         chunks.push(chunk);
       });
 
       stream.audioStream.on('end', () => {
-        clearTimeout(timeout);
-        if (chunks.length === 0) {
-          resolve(null);
-          return;
+        if (!isSettled) {
+          isSettled = true;
+          clearTimeout(timeout);
+          cleanup();
+          if (chunks.length === 0) {
+            resolve(null);
+            return;
+          }
+          const buffer = Buffer.concat(chunks);
+          resolve(buffer.toString('base64'));
         }
-        const buffer = Buffer.concat(chunks);
-        resolve(buffer.toString('base64'));
       });
 
       stream.audioStream.on('error', (err) => {
-        clearTimeout(timeout);
-        console.warn('Male TTS generation notice:', err?.message || err);
-        resolve(null);
+        if (!isSettled) {
+          isSettled = true;
+          clearTimeout(timeout);
+          cleanup();
+          console.warn('Male TTS stream notice:', err?.message || err);
+          resolve(null);
+        }
       });
     });
   } catch (err) {
@@ -51,3 +72,4 @@ export async function generateMaleHindiSpeechBase64(text: string): Promise<strin
     return null;
   }
 }
+

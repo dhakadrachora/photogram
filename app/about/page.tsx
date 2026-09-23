@@ -100,21 +100,21 @@ export default function AboutPage() {
           {/* Founder Profile */}
           <section className="space-y-3 pt-2">
             <h2 className="text-base font-bold text-stone-900">
-              2. नेतृत्व एवं संस्थापक (Founder & Leadership)
+              2. नेतृत्व एवं संस्थापक (Leadership & Team)
             </h2>
             <div className="p-5 rounded-2xl bg-white border border-stone-200 shadow-sm flex flex-col sm:flex-row items-center sm:items-start gap-4 text-center sm:text-left">
               <div className="w-16 h-16 rounded-full bg-amber-500 text-slate-950 font-black text-xl flex items-center justify-center shadow-md shrink-0">
-                RD
+                DA
               </div>
               <div className="space-y-1 flex-1">
                 <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
-                  <h3 className="text-base font-black text-stone-900">Rohit Dhakad</h3>
+                  <h3 className="text-base font-black text-stone-900">DHOTI AALE Team</h3>
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
-                    Founder & Administrator 👑
+                    Administrator & Community 👑
                   </span>
                 </div>
                 <p className="text-xs text-stone-600 leading-relaxed">
-                  ढोटी गाँव के डिजिटल सशक्तिकरण के स्वप्नदृष्टा। रोहित धाकड़ का लक्ष्य राजस्थान के हर गाँव को हाई-टेक, पारदर्शी और आपस में जुड़ा हुआ बनाना है।
+                  ढोटी गाँव के डिजिटल सशक्तिकरण के स्वप्नदृष्टा। हमारा लक्ष्य राजस्थान के हर गाँव को हाई-टेक, पारदर्शी और आपस में जुड़ा हुआ बनाना है।
                 </p>
                 <div className="pt-2 flex items-center justify-center sm:justify-start gap-4 text-xs text-stone-500">
                   <span className="flex items-center gap-1">

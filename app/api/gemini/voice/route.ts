@@ -139,7 +139,7 @@ function getLiveWebsiteContext(): string {
       (u) => now - (u.lastActive || 0) < 60000
     );
     const onlineCount = Math.max(1, activePresenceUsers.length);
-    const onlineUserNames = activePresenceUsers.map((u) => u.userName).join(', ') || 'Rohit Dhakad, Vikram Choudhary';
+    const onlineUserNames = activePresenceUsers.map((u) => u.userName).join(', ') || 'DHOTI AALE Admin, Vikram Choudhary';
 
     const recentChat = contentStore.chatMessages.slice(-6).map((m) => {
       const sender = m.isAi ? 'DHOTI AALE AI (Verified Blue Tick)' : m.userName;
@@ -154,8 +154,8 @@ function getLiveWebsiteContext(): string {
 【वेबसाइट की पहचान व व्यवस्थापक (Site & Admin Identity)】:
 - वेबसाइट का नाम: "${settings.siteTitle}"
 - टैगलाइन: "${settings.siteTagline}"
-- साइट ओनर व सुपर एडमिन: Rohit Dhakad (ईमेल: rohitdhakaddhoti143@gmail.com) 👑
-- ब्लू वेरिफाइड बैज नियम: सिर्फ एडमिन रोहित धाकड़ ही किसी यूज़र को ब्लू टिक दे या हटा सकते हैं। वर्ल्ड चैट में "DHOTI AALE AI" को डिफ़ॉल्ट रूप से हमेशा ब्लू टिक प्राप्त है।
+- साइट ओनर व सुपर एडमिन: DHOTI AALE Admin Team 👑
+- ब्लू वेरिफाइड बैज नियम: सिर्फ एडमिन टीम ही किसी यूज़र को ब्लू टिक दे या हटा सकती है। वर्ल्ड चैट में "DHOTI AALE AI" को डिफ़ॉल्ट रूप से हमेशा ब्लू टिक प्राप्त है।
 - टॉप घोषणा बैनर: "${settings.announcementBanner}" (सक्रिय: ${settings.isAnnouncementActive ? 'हाँ' : 'नहीं'})
 
 【100 फ्री इंस्टाग्राम रील्स व्यूज बूस्टर (Instagram Reels Booster - Rewards Page)】:
@@ -306,23 +306,20 @@ function generateIntelligentWebsiteAnswer(rawPrompt: string): { text: string; to
     };
   }
 
-  // 5. Site Owner / Admin / Rohit Dhakad / Blue Tick
+  // 5. Site Owner / Admin / Blue Tick
   if (
     q.includes('owner') ||
     q.includes('admin') ||
-    q.includes('rohit') ||
-    q.includes('dhakad') ||
     q.includes('kiska') ||
     q.includes('kiski') ||
     q.includes('malik') ||
     q.includes('मालिक') ||
     q.includes('एडमिन') ||
-    q.includes('रोहित') ||
     q.includes('ब्लू टिक') ||
     q.includes('blue tick')
   ) {
     return {
-      text: 'राम राम भाईसाहब! हमारी इस DHOTI AALE वेबसाइट के सुपर एडमिन और ओनर रोहित धाकड़ (Rohit Dhakad, rohitdhakaddhoti143@gmail.com) हैं 👑। वही गाँव के इस पूरे डिजिटल मंच के कर्ता-धर्ता हैं! ब्लू टिक भी सिर्फ रोहित भाई की स्वीकृति से मिलता है, और विश्व चौपाल में मुझे (DHOTI AALE AI) हमेशा वेरिफाइड ब्लू टिक हासिल है!',
+      text: 'राम राम भाईसाहब! हमारी इस DHOTI AALE वेबसाइट के सुपर एडमिन DHOTI AALE Admin Team हैं 👑। वही गाँव के इस पूरे डिजिटल मंच के कर्ता-धर्ता हैं! ब्लू टिक भी सिर्फ एडमिन टीम की स्वीकृति से मिलता है, और विश्व चौपाल में मुझे (DHOTI AALE AI) हमेशा वेरिफाइड ब्लू टिक हासिल है!',
     };
   }
 
@@ -406,7 +403,7 @@ function generateIntelligentWebsiteAnswer(rawPrompt: string): { text: string; to
 
   // Default Comprehensive Answer
   return {
-    text: 'राम राम भाईसाहब! मैं हूँ DHOTI AALE — आपका देसी AI भाई। मुझे इस वेबसाइट की हर एक चीज़ पता है — रिवॉर्ड्स पेज पर 100 फ्री इंस्टाग्राम रील्स व्यूज कैसे पाएं, अखाड़े में कौन आगे है, चौपाल का हाल, धोती सिक्के और हमारे सुपर एडमिन रोहित धाकड़ जी के बारे में। हुक्म करो भाईसाहब, क्या सेवा करें आपकी?',
+    text: 'राम राम भाईसाहब! मैं हूँ DHOTI AALE — आपका देसी AI भाई। मुझे इस वेबसाइट की हर एक चीज़ पता है — रिवॉर्ड्स पेज पर 100 फ्री इंस्टाग्राम रील्स व्यूज कैसे पाएं, अखाड़े में कौन आगे है, चौपाल का हाल, धोती सिक्के और हमारे सुपर एडमिन टीम के बारे में। हुक्म करो भाईसाहब, क्या सेवा करें आपकी?',
   };
 }
 
@@ -499,9 +496,9 @@ HOW TO ANSWER USERS ABOUT THE WEBSITE:
    - Quote EXACT live vote numbers and percentages from the live battles above.
    - Name the leading candidate and predict the winner with percentage probability.
 4. "वेबसाइट किसकी है / एडमिन कौन है?"
-   - State proudly: रोहित धाकड़ (Rohit Dhakad, rohitdhakaddhoti143@gmail.com) इस वेबसाइट के ओनर व सुपर एडमिन हैं 👑.
+   - State proudly: DHOTI AALE Admin Team इस वेबसाइट के ओनर व सुपर एडमिन हैं 👑.
 5. "ब्लू टिक किसको मिलता है?"
-   - Explain that only admin Rohit Dhakad can give the verified blue badge, and DHOTI AALE AI in World Chat has it by default.
+   - Explain that only the DHOTI AALE Admin Team can give the verified blue badge, and DHOTI AALE AI in World Chat has it by default.
 6. "सिक्के (Dhoti Coins) कैसे मिलते हैं?"
    - New account gets 50 coins, winning/voting in battles gives +100 coins, daily quiz gives +20, chat gives +5.
 7. "लाइव चैट में कौन है / कितने लोग ऑनलाइन हैं?"

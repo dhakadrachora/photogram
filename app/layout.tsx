@@ -38,7 +38,6 @@ export const metadata: Metadata = {
     'dhoti aale ai',
     'dhoti choupal',
     'dhoti news',
-    'rohit dhakad dhoti',
     'dhoti ki pehchan',
     'rajasthan digital village',
     'dhoti resident blue tick',
@@ -47,8 +46,8 @@ export const metadata: Metadata = {
     'dhoti aale app',
     'dhoti clan',
   ],
-  authors: [{ name: 'Rohit Dhakad', url: SITE_URL }],
-  creator: 'Rohit Dhakad',
+  authors: [{ name: 'DHOTI AALE Team', url: SITE_URL }],
+  creator: 'DHOTI AALE Team',
   publisher: 'DHOTI AALE',
   category: 'Community & Entertainment',
 
@@ -175,8 +174,8 @@ const jsonLdGraph = {
       },
       image: `${SITE_URL}/app-logo.png`,
       founder: {
-        '@type': 'Person',
-        name: 'Rohit Dhakad',
+        '@type': 'Organization',
+        name: 'DHOTI AALE Team',
         jobTitle: 'Site Owner & Administrator',
       },
       address: {
@@ -270,7 +269,7 @@ export default function RootLayout({
         {/* AI & Search Engine Directives */}
         <meta name="rating" content="General" />
         <meta name="revisit-after" content="1 days" />
-        <meta name="author" content="Rohit Dhakad" />
+        <meta name="author" content="DHOTI AALE Team" />
 
         {/* Google AdSense Verification & Auto Ads Script */}
         <meta name="google-adsense-account" content="ca-pub-2229349785904510" />

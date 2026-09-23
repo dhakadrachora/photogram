@@ -394,8 +394,8 @@ export function VoiceAssistant({
       topic: 'अखाड़े के लाइव मुकाबले और जीतने की संभावना',
     },
     {
-      label: '👑 सुपर एडमिन रोहित धाकड़',
-      topic: 'सुपर एडमिन रोहित धाकड़ जी',
+      label: '👑 DHOTI AALE एडमिन',
+      topic: 'DHOTI AALE एडमिन टीम',
     },
     {
       label: '📢 गाँव ढोटी की ताज़ा खबर',

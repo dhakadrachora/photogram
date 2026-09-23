@@ -142,7 +142,7 @@ export default function PrivacyPolicyPage() {
             </p>
             <div className="p-4 rounded-xl bg-stone-100 border border-stone-200 text-xs font-mono space-y-1 text-stone-700">
               <div><strong>Platform:</strong> DHOTI AALE (https://www.dhotiaale.online)</div>
-              <div><strong>Site Owner & Administrator:</strong> Rohit Dhakad</div>
+              <div><strong>Site Owner & Administrator:</strong> DHOTI AALE Team</div>
               <div><strong>Official Email:</strong> rohitdhakaddhoti143@gmail.com</div>
               <div><strong>Location:</strong> Dhoti, Rajasthan, India</div>
             </div>

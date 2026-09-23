@@ -36,5 +36,5 @@ To provide every resident and supporter of Dhoti village with a unified, high-te
 - **Official Domain:** https://www.dhotiaale.online
 - **Primary Language:** Hindi (हिंदी), Hinglish, English
 - **Country & Region:** Rajasthan, India
-- **Site Administrator & Owner:** Rohit Dhakad
+- **Site Administrator & Owner:** DHOTI AALE Team
 - **Platform Architecture:** Next.js, React, Supabase PostgreSQL, PWA Service Worker, Tailwind CSS & Vanilla CSS design system.

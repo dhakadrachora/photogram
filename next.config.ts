@@ -73,9 +73,15 @@ const nextConfig: NextConfig = {
 
   // output: 'standalone',
 
+  serverExternalPackages: ['msedge-tts', 'ws', 'bufferutil', 'utf-8-validate'],
+
   transpilePackages: ['motion'],
 
-  webpack: (config, { dev }) => {
+  webpack: (config, { dev, isServer }) => {
+    if (isServer) {
+      config.externals = [...(config.externals || []), 'msedge-tts', 'ws', 'bufferutil', 'utf-8-validate'];
+    }
+
     if (dev && process.env.DISABLE_HMR === 'true') {
       config.watchOptions = {
         ignored: /.*/,
