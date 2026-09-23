@@ -209,4 +209,99 @@ export const SoundEffects = {
     osc.start(now);
     osc.stop(now + 0.2);
   },
+
+  // Outgoing Phone Call Ringtone ("Tring... Tring...")
+  startOutgoingRingtone: () => {
+    SoundEffects.stopOutgoingRingtone();
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    const playPulse = () => {
+      const c = getAudioContext();
+      if (!c || c.state === 'closed') return;
+      const now = c.currentTime;
+
+      const osc1 = c.createOscillator();
+      const osc2 = c.createOscillator();
+      const gain = c.createGain();
+
+      osc1.type = 'sine';
+      osc2.type = 'sine';
+      osc1.frequency.setValueAtTime(400, now);
+      osc2.frequency.setValueAtTime(450, now);
+
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.09, now + 0.05);
+      gain.gain.setValueAtTime(0.09, now + 1.1);
+      gain.gain.linearRampToValueAtTime(0, now + 1.2);
+
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(c.destination);
+
+      osc1.start(now);
+      osc2.start(now);
+      osc1.stop(now + 1.25);
+      osc2.stop(now + 1.25);
+    };
+
+    playPulse();
+    (SoundEffects as any)._ringInterval = setInterval(() => {
+      playPulse();
+    }, 2800);
+  },
+
+  stopOutgoingRingtone: () => {
+    if ((SoundEffects as any)._ringInterval) {
+      clearInterval((SoundEffects as any)._ringInterval);
+      (SoundEffects as any)._ringInterval = null;
+    }
+  },
+
+  // Call Connected Chime
+  playCallConnected: () => {
+    SoundEffects.stopOutgoingRingtone();
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    const freqs = [587.33, 880]; // D5 -> A5 pleasant connection chime
+    freqs.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now + idx * 0.1);
+
+      gain.gain.setValueAtTime(0.12, now + idx * 0.1);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.1 + 0.25);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + idx * 0.1);
+      osc.stop(now + idx * 0.1 + 0.26);
+    });
+  },
+
+  // Call Ended Busy Tone ("Tu... Tu... Tu...")
+  playCallEnded: () => {
+    SoundEffects.stopOutgoingRingtone();
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    [0, 0.2, 0.4].forEach((offset) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(425, now + offset);
+
+      gain.gain.setValueAtTime(0.1, now + offset);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.12);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + offset);
+      osc.stop(now + offset + 0.13);
+    });
+  },
 };

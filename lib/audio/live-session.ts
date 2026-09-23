@@ -58,6 +58,8 @@ export class LiveSession {
   private currentPromptHistory: { role: 'user' | 'assistant'; text: string }[] = [];
   private userEmail: string | null = null;
 
+  private isMuted = false;
+
   constructor(callbacks: LiveSessionCallbacks, initialEmail?: string | null) {
     this.callbacks = callbacks;
     this.userEmail = initialEmail || null;
@@ -75,6 +77,14 @@ export class LiveSession {
     this.userEmail = email;
   }
 
+  public setMuted(muted: boolean) {
+    this.isMuted = muted;
+  }
+
+  public getIsMuted(): boolean {
+    return this.isMuted;
+  }
+
   public getState(): VoiceState {
     return this.state;
   }
@@ -84,7 +94,7 @@ export class LiveSession {
     this.callbacks.onStateChange(newState);
   }
 
-  public async connect(): Promise<void> {
+  public async connect(greetingText?: string): Promise<void> {
     if (this.state !== 'disconnected') return;
 
     this.setState('connecting');
@@ -93,9 +103,11 @@ export class LiveSession {
       this.initSpeechRecognition();
       this.setState('listening');
 
-      // Initial friendly witty voice greeting with mandatory RAM RAM BHAISAB
-      SoundEffects.playBell();
-      this.sendVoiceMessage('राम राम भाईसाहब! मैं हूँ DHOTI AALE। कहो भाईसाहब, आज गाँव ढोटी में क्या नया अपडेट है या अखाड़े में कौन बाज़ी मारेगा — क्या जानना चाहते हो?');
+      // Initial friendly call pickup voice greeting
+      const greeting =
+        greetingText ||
+        'राम राम भाईसाहब! हाँ भाई, मैंने कॉल उठा ली है। हुक्म करो भाईसाहब, क्या सेवा करें आपकी?';
+      this.sendVoiceMessage(greeting);
     } catch (err) {
       console.error('Failed to connect live session:', err);
       this.setState('disconnected');
@@ -107,6 +119,9 @@ export class LiveSession {
     this.isListeningContinuous = false;
     this.stopSpeechRecognition();
     this.streamer.cleanup();
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
     this.setState('disconnected');
   }
 
@@ -145,7 +160,7 @@ export class LiveSession {
           }
         }
 
-        if (finalTranscript.trim()) {
+        if (finalTranscript.trim() && this.state !== 'speaking' && !this.isMuted) {
           this.processUserInput(finalTranscript.trim(), true);
         }
       };
