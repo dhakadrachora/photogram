@@ -12,6 +12,7 @@ import {
   Trophy,
   Users,
 } from 'lucide-react';
+import { InstagramReelsBooster } from './InstagramReelsBooster';
 
 interface WinnerOffer {
   id: string;
@@ -203,8 +204,18 @@ export function WinnerOffersPage({
           </div>
         </section>
 
+        {/* INSTANT FREE 100 INSTAGRAM REELS VIEWS BOOSTER */}
+        <section className="mt-8 mb-4">
+          <div className="mb-3 px-1">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">
+              ⚡ Instant Daily Free Views
+            </span>
+          </div>
+          <InstagramReelsBooster />
+        </section>
+
         {/* REWARD RULES */}
-        <section className="mt-8">
+        <section className="mt-12">
           <div className="mb-4">
             <p className="text-xs font-extrabold uppercase tracking-widest text-amber-600">
               Reward Rules

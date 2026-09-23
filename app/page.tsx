@@ -13,6 +13,8 @@ import { WorldChat } from '@/components/WorldChat';
 import { BattleArena } from '@/components/BattleArena';
 import { ProfileView } from '@/components/ProfileView';
 import { SupportView } from '@/components/SupportView';
+import { WinnerOffersPage } from '@/components/WinnerOffersPage';
+import { InstagramReelsBooster } from '@/components/InstagramReelsBooster';
 
 import { VoiceAssistant } from '@/components/VoiceAssistant';
 import GoogleAuthModal from '@/components/GoogleAuthModal';
@@ -279,6 +281,16 @@ function WinnerRewardsSection() {
             winners ko Instagram Reels Views FREE milenge.
           </p>
 
+        </div>
+
+        {/* INSTANT FREE 100 INSTAGRAM REELS VIEWS BOOSTER */}
+        <div className="mt-8 mb-10">
+          <div className="mb-3 px-1 text-center">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">
+              ⚡ Instant Daily Free Views
+            </span>
+          </div>
+          <InstagramReelsBooster />
         </div>
 
         {/* REWARD RULES */}
@@ -1336,6 +1348,14 @@ export default function Home() {
           />
         )}
 
+        {/* ====================================================
+            REWARDS & FREE INSTAGRAM VIEWS
+            ==================================================== */}
+
+        {activeTab === 'rewards' && (
+          <WinnerOffersPage onBack={() => setActiveTab('home')} />
+        )}
+
       </main>
 
       {/* ======================================================
@@ -1427,32 +1447,12 @@ export default function Home() {
             {/* REWARDS */}
             <button
               type="button"
-              onClick={() => {
-                if (
-                  activeTab !== 'home'
-                ) {
-                  setActiveTab('home');
-
-                  window.setTimeout(() => {
-                    document
-                      .getElementById(
-                        'winner-rewards'
-                      )
-                      ?.scrollIntoView({
-                        behavior: 'smooth',
-                      });
-                  }, 120);
-                } else {
-                  document
-                    .getElementById(
-                      'winner-rewards'
-                    )
-                    ?.scrollIntoView({
-                      behavior: 'smooth',
-                    });
-                }
-              }}
-              className="flex flex-col items-center gap-1 text-stone-400 transition-colors hover:text-stone-700"
+              onClick={() => setActiveTab('rewards')}
+              className={`flex flex-col items-center gap-1 transition-colors ${
+                activeTab === 'rewards'
+                  ? 'font-medium text-[#2D7D46]'
+                  : 'text-stone-400 hover:text-stone-700'
+              }`}
             >
               <Gift className="h-5 w-5" />
 

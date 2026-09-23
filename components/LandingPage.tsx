@@ -24,12 +24,12 @@ import {
   Building,
   UserCheck,
   Headphones,
+  Gift,
 } from 'lucide-react';
 import { User, AppTab, NewsItem, CommunityUpdate, PresenceUser } from '@/types';
 import { SoundEffects } from '@/lib/audio/sound-effects';
 import { isSiteAdmin } from '@/lib/admin-auth';
 import { PWAInstallButton } from './PWAInstallButton';
-import { InstagramReelsBooster } from './InstagramReelsBooster';
 
 interface LandingPageProps {
   currentUser: User | null;
@@ -246,8 +246,40 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
 
       {/* BEGIN: VillageCommunityFeaturesGrid */}
       <main id="features-section" className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-6 flex-1 -mt-3 z-10" data-purpose="features-navigation">
-        {/* Viral Free Instagram Reels Views Booster */}
-        <InstagramReelsBooster />
+        {/* Sleek Rewards & Free Views Teaser Banner */}
+        <div
+          id="rewards-teaser-banner"
+          onClick={() => {
+            SoundEffects.playTap();
+            onNavigateTab('rewards');
+          }}
+          className="mb-4 group relative overflow-hidden rounded-2xl bg-gradient-to-r from-amber-500 via-rose-500 to-purple-600 p-[1.5px] shadow-sm hover:shadow-md cursor-pointer transition-all duration-200 active:scale-[0.99]"
+        >
+          <div className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-rose-500 text-white shadow-sm">
+                <Gift className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs sm:text-sm font-black text-stone-900">
+                    🎁 100 Free Instagram Reels Views
+                  </span>
+                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-bold text-emerald-700">
+                    मुफ़्त
+                  </span>
+                </div>
+                <p className="text-[11px] text-stone-500">
+                  हर 3 घंटे में रील्स लिंक डालें और फ्री व्यूज बूस्ट पाएं
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 text-xs font-bold text-rose-600 shrink-0 group-hover:translate-x-1 transition-transform">
+              <span className="hidden sm:inline">Claim Karein</span>
+              <ChevronRight className="h-4 w-4" />
+            </div>
+          </div>
+        </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 sm:gap-4 md:gap-5">
           {/* CARD 1: News / ताज़ा समाचार */}

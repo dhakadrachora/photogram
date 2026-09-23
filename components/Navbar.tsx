@@ -14,6 +14,7 @@ import {
   Menu,
   X,
   AlertCircle,
+  Gift,
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -159,6 +160,26 @@ export function Navbar({
             <Bot className="h-4 w-4 text-amber-400" />
             <span>DHOTI AALE (AI)</span>
             {activeTab === 'assistant' && (
+              <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-amber-400 rounded-full shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
+            )}
+          </button>
+
+          {/* Rewards */}
+          <button
+            id="nav-rewards-tab"
+            onClick={() => handleTabClick('rewards')}
+            className={`relative flex items-center gap-2 px-3.5 py-2 text-xs sm:text-sm font-semibold transition-all ${
+              activeTab === 'rewards'
+                ? 'text-amber-400'
+                : 'text-slate-300 hover:text-white'
+            }`}
+          >
+            <Gift className="h-4 w-4 text-amber-400" />
+            <span>Rewards</span>
+            <span className="px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold border border-emerald-500/30">
+              Free Views
+            </span>
+            {activeTab === 'rewards' && (
               <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-amber-400 rounded-full shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
             )}
           </button>
@@ -316,6 +337,16 @@ export function Navbar({
           >
             <Bot className="h-4 w-4 text-amber-400" />
             <span>DHOTI AALE (AI वॉइस)</span>
+          </button>
+          <button
+            onClick={() => handleTabClick('rewards')}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold ${
+              activeTab === 'rewards' ? 'bg-amber-500/20 text-amber-400' : 'text-slate-300'
+            }`}
+          >
+            <Gift className="h-4 w-4 text-amber-400" />
+            <span>इनाम व फ्री व्यूज (Rewards)</span>
+            <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold">100 Views</span>
           </button>
           <button
             onClick={() => handleTabClick('profile')}

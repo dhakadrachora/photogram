@@ -89,7 +89,8 @@ export type AppTab =
   | 'battle'
   | 'assistant'
   | 'profile'
-  | 'support';
+  | 'support'
+  | 'rewards';
 
 export interface ToolCall {
   id: string;
