@@ -273,16 +273,12 @@ export default function RootLayout({
         <meta name="author" content="Rohit Dhakad" />
 
         {/* Google AdSense Verification & Auto Ads Script */}
-        {process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID && (
-          <>
-            <meta name="google-adsense-account" content={process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID} />
-            <script
-              async
-              src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID}`}
-              crossOrigin="anonymous"
-            />
-          </>
-        )}
+        <meta name="google-adsense-account" content="ca-pub-2229349785904510" />
+        <script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2229349785904510"
+          crossOrigin="anonymous"
+        />
 
         {/* Schema.org Structured Data */}
         <script

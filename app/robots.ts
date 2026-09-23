@@ -38,6 +38,7 @@ export default function robots(): MetadataRoute.Robots {
           '/manifest.webmanifest',
           '/llms.txt',
           '/llms-full.txt',
+          '/ads.txt',
         ],
         disallow: [
           '/admin',
