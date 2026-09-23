@@ -29,6 +29,7 @@ import { User, AppTab, NewsItem, CommunityUpdate, PresenceUser } from '@/types';
 import { SoundEffects } from '@/lib/audio/sound-effects';
 import { isSiteAdmin } from '@/lib/admin-auth';
 import { PWAInstallButton } from './PWAInstallButton';
+import { InstagramReelsBooster } from './InstagramReelsBooster';
 
 interface LandingPageProps {
   currentUser: User | null;
@@ -245,6 +246,9 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
 
       {/* BEGIN: VillageCommunityFeaturesGrid */}
       <main id="features-section" className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-6 flex-1 -mt-3 z-10" data-purpose="features-navigation">
+        {/* Viral Free Instagram Reels Views Booster */}
+        <InstagramReelsBooster />
+
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 sm:gap-4 md:gap-5">
           {/* CARD 1: News / ताज़ा समाचार */}
           <article
