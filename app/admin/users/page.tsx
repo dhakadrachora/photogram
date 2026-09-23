@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { UserCog, Search, Shield, Trash2, Coins, Phone, Mail, Calendar, Sparkles, Check } from 'lucide-react';
+import { UserCog, Search, Shield, Trash2, Phone, Mail, Calendar, Sparkles, Check, Send, Bell, CheckSquare, Square } from 'lucide-react';
 import { adminFetch } from '@/lib/admin/api';
 import { AdminTable, Column } from '@/components/admin/AdminTable';
 import { AdminPagination } from '@/components/admin/AdminPagination';
 import { ConfirmDialog } from '@/components/admin/ConfirmDialog';
 import { useToast } from '@/components/admin/Toast';
 import { VerifiedTick } from '@/components/VerifiedTick';
+import { BroadcastModal } from '@/components/admin/BroadcastModal';
 
 interface UserRecord {
   id: string;
@@ -20,7 +21,6 @@ interface UserRecord {
   role?: string;
   is_admin?: boolean;
   isOwner?: boolean;
-  coins?: number;
   wins?: number;
   battles?: number;
   created_at?: string;
@@ -34,6 +34,14 @@ export default function AdminUsersPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
+
+  // Selection state
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+
+  // Broadcast modal state
+  const [broadcastOpen, setBroadcastOpen] = useState(false);
+  const [broadcastTarget, setBroadcastTarget] = useState<'all' | 'selected'>('all');
+  const [broadcastType, setBroadcastType] = useState<'email' | 'notification' | 'both'>('both');
 
   // Delete dialog
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -64,6 +72,34 @@ export default function AdminUsersPage() {
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
+
+  // Selection helpers
+  const handleToggleSelectAll = () => {
+    if (users.length === 0) return;
+    const allVisibleSelected = users.every((u) => selectedUserIds.includes(u.id));
+    if (allVisibleSelected) {
+      setSelectedUserIds([]);
+    } else {
+      const allIds = Array.from(new Set([...selectedUserIds, ...users.map((u) => u.id)]));
+      setSelectedUserIds(allIds);
+    }
+  };
+
+  const handleToggleSelectUser = (id: string) => {
+    setSelectedUserIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleOpenBroadcast = (target: 'all' | 'selected', type: 'email' | 'notification' | 'both' = 'both') => {
+    if (target === 'selected' && selectedUserIds.length === 0) {
+      toastError('Please select at least one resident first');
+      return;
+    }
+    setBroadcastTarget(target);
+    setBroadcastType(type);
+    setBroadcastOpen(true);
+  };
 
   const handleToggleVerified = async (user: UserRecord) => {
     if (user.isOwner) {
@@ -142,13 +178,51 @@ export default function AdminUsersPage() {
 
     if (res.success) {
       success('User profile removed');
+      setSelectedUserIds((prev) => prev.filter((id) => id !== deletingId));
       fetchUsers();
     } else {
       toastError(res.error || 'Failed to delete user');
     }
   };
 
+  const allVisibleSelected = users.length > 0 && users.every((u) => selectedUserIds.includes(u.id));
+
   const columns: Column<UserRecord>[] = [
+    {
+      key: 'select',
+      header: (
+        <button
+          type="button"
+          onClick={handleToggleSelectAll}
+          className="p-1 text-slate-400 hover:text-amber-400 transition-colors focus:outline-none"
+          title={allVisibleSelected ? 'Deselect all visible' : 'Select all visible'}
+        >
+          {allVisibleSelected ? (
+            <CheckSquare className="h-4 w-4 text-amber-400" />
+          ) : (
+            <Square className="h-4 w-4 text-slate-500" />
+          )}
+        </button>
+      ),
+      className: 'w-10 text-center',
+      render: (u) => {
+        const isSelected = selectedUserIds.includes(u.id);
+        return (
+          <button
+            type="button"
+            onClick={() => handleToggleSelectUser(u.id)}
+            className="p-1 text-slate-400 hover:text-amber-400 transition-colors focus:outline-none"
+            title={isSelected ? 'Deselect resident' : 'Select resident'}
+          >
+            {isSelected ? (
+              <CheckSquare className="h-4 w-4 text-amber-400" />
+            ) : (
+              <Square className="h-4 w-4 text-slate-600 hover:text-slate-400" />
+            )}
+          </button>
+        );
+      },
+    },
     {
       key: 'user',
       header: 'Resident Profile',
@@ -201,16 +275,6 @@ export default function AdminUsersPage() {
         <span className="text-slate-300 font-mono text-xs">
           {u.phone ? `+91 ${u.phone.replace(/^\+?91/, '')}` : '—'}
         </span>
-      ),
-    },
-    {
-      key: 'coins',
-      header: 'Dhoti Coins',
-      render: (u) => (
-        <div className="flex items-center gap-1 text-amber-400 font-bold text-xs">
-          <Coins className="h-3.5 w-3.5" />
-          <span>{u.coins ?? 50}</span>
-        </div>
       ),
     },
     {
@@ -317,13 +381,60 @@ export default function AdminUsersPage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h2 className="text-lg font-black text-white tracking-tight">Resident User Directory & Blue Tick Control</h2>
-        <p className="text-xs text-slate-400">
-          यहाँ सभी रजिस्टर्ड व लॉग-इन यूज़र्स का डेटा मौजूद है। साइट ओनर किसी भी रेजिडेंट को यहाँ से ब्लू टिक (Verified Badge) लगा या हटा सकता है।
-        </p>
+      {/* Page Title & Main Broadcast Trigger */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-black text-white tracking-tight">Resident User Directory & Blue Tick Control</h2>
+          <p className="text-xs text-slate-400">
+            यहाँ सभी रजिस्टर्ड व लॉग-इन यूज़र्स का डेटा मौजूद है। आप सभी को या चुने हुए यूज़र्स को ईमेल व नोटिफिकेशन भेज सकते हैं।
+          </p>
+        </div>
+
+        <button
+          onClick={() => handleOpenBroadcast('all', 'both')}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 shadow-md shadow-amber-500/20 transition-all active:scale-95 shrink-0"
+        >
+          <Send className="h-4 w-4" />
+          <span>📢 Broadcast to All Residents</span>
+        </button>
       </div>
 
+      {/* Selected Action Bar */}
+      {selectedUserIds.length > 0 && (
+        <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex flex-wrap items-center justify-between gap-3 animate-in fade-in">
+          <div className="flex items-center gap-2 text-xs font-bold text-amber-300">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+            <span>{selectedUserIds.length} resident(s) selected</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleOpenBroadcast('selected', 'email')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-500 hover:bg-blue-400 text-white transition-all shadow-sm"
+            >
+              <Mail className="h-3.5 w-3.5" />
+              <span>Email Selected ({selectedUserIds.length})</span>
+            </button>
+
+            <button
+              onClick={() => handleOpenBroadcast('selected', 'notification')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 transition-all shadow-sm"
+            >
+              <Bell className="h-3.5 w-3.5" />
+              <span>Notify Selected ({selectedUserIds.length})</span>
+            </button>
+
+            <button
+              onClick={() => setSelectedUserIds([])}
+              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Search Input */}
       <div className="flex items-center gap-2 p-2 bg-slate-900 border border-slate-800 rounded-xl">
         <Search className="h-4 w-4 text-slate-400 ml-2" />
         <input
@@ -338,6 +449,7 @@ export default function AdminUsersPage() {
         />
       </div>
 
+      {/* Table */}
       <AdminTable
         columns={columns}
         data={users}
@@ -346,6 +458,7 @@ export default function AdminUsersPage() {
         emptyDescription="No users matched your search query."
       />
 
+      {/* Pagination */}
       <AdminPagination
         currentPage={page}
         totalPages={totalPages}
@@ -354,6 +467,18 @@ export default function AdminUsersPage() {
         onPageChange={(p) => setPage(p)}
       />
 
+      {/* Broadcast Modal */}
+      <BroadcastModal
+        isOpen={broadcastOpen}
+        onClose={() => setBroadcastOpen(false)}
+        target={broadcastTarget}
+        selectedUserIds={selectedUserIds}
+        selectedCount={selectedUserIds.length}
+        initialType={broadcastType}
+        onSuccess={() => setSelectedUserIds([])}
+      />
+
+      {/* Confirm Delete Dialog */}
       <ConfirmDialog
         isOpen={Boolean(deletingId)}
         title="Delete User Account"

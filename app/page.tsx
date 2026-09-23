@@ -1149,7 +1149,9 @@ export default function Home() {
 
       <main
         className={`flex w-full flex-1 flex-col ${
-          activeTab === 'worldchat' ? 'pb-0' : 'pb-16'
+          activeTab === 'worldchat'
+            ? 'h-[calc(100dvh-6.5rem)] overflow-hidden pb-0'
+            : 'pb-16'
         }`}
       >
 

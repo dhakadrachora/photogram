@@ -728,7 +728,7 @@ export function WorldChat({
    */
 
   return (
-    <div className="relative h-[calc(100dvh-50px)] sm:h-auto sm:min-h-[calc(100vh-4rem)] w-full flex flex-col p-1.5 sm:p-6 max-w-6xl mx-auto overflow-hidden sm:overflow-visible">
+    <div className="relative h-full w-full flex flex-1 flex-col p-1.5 sm:p-6 max-w-6xl mx-auto overflow-hidden">
       {/* HEADER */}
       <div className="flex items-center justify-between pb-2 sm:pb-4 border-b border-slate-800 gap-2 shrink-0">
         <div className="min-w-0">
@@ -812,7 +812,7 @@ export function WorldChat({
       )}
 
       {/* MAIN */}
-      <div className="mt-1.5 sm:mt-4 flex-1 grid grid-cols-1 lg:grid-cols-4 gap-2.5 sm:gap-4 min-h-0 lg:min-h-[520px] overflow-hidden">
+      <div className="mt-1 sm:mt-3 flex-1 grid grid-cols-1 lg:grid-cols-4 gap-2 sm:gap-4 min-h-0 overflow-hidden">
         {/* CHAT */}
         <div className="lg:col-span-3 min-h-0 flex-1 flex flex-col rounded-2xl sm:rounded-3xl bg-slate-950/90 border border-slate-800 overflow-hidden shadow-2xl relative">
           {/* IMPORTANT: FIXED/FLEXIBLE SCROLL AREA */}
@@ -1005,7 +1005,7 @@ export function WorldChat({
 
           {/* INPUT */}
           {currentUser ? (
-            <div className="shrink-0 p-2 sm:p-3.5 bg-slate-900 border-t border-slate-800 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+            <div className="shrink-0 p-2 sm:p-3.5 bg-slate-900 border-t border-slate-800 pb-[max(0.75rem,env(safe-area-inset-bottom))] relative z-20">
               {showStickers && (
                 <div className="mb-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
                   {quickStickers.map((sticker) => (
@@ -1056,7 +1056,9 @@ export function WorldChat({
                     onFocus={() => {
                       setTimeout(() => {
                         scrollToBottom('smooth');
-                      }, 250);
+                        const inputEl = document.getElementById('world-chat-input');
+                        inputEl?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                      }, 200);
                     }}
                     onKeyDown={(e) => {
                       if (
@@ -1095,7 +1097,7 @@ export function WorldChat({
             </div>
           ) : (
             <div
-              className="shrink-0 p-3 sm:p-5 bg-slate-900/98 border-t border-amber-500/30 flex flex-col sm:flex-row items-center justify-between gap-2.5 pb-[max(0.6rem,env(safe-area-inset-bottom))]"
+              className="shrink-0 p-3 sm:p-5 bg-slate-900/98 border-t border-amber-500/30 flex flex-col sm:flex-row items-center justify-between gap-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] relative z-20"
             >
               <div className="flex items-center gap-2.5 text-left">
                 <div className="flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl sm:rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30">

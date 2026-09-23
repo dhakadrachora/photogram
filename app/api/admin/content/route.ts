@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminRequest } from '@/lib/admin/auth';
 import { createServerClient } from '@/lib/supabase';
+import { invalidateContentCache } from '@/lib/cache/content-cache';
 
 export const dynamic = 'force-dynamic';
 
@@ -269,6 +270,8 @@ export async function POST(req: NextRequest) {
     const { data, error } = await sb.from(table).insert(row).select().maybeSingle();
     if (error) throw error;
 
+    invalidateContentCache();
+
     return NextResponse.json({
       success: true,
       message: `${type} item created successfully`,
@@ -330,6 +333,8 @@ export async function PUT(req: NextRequest) {
 
     if (error) throw error;
 
+    invalidateContentCache();
+
     return NextResponse.json({
       success: true,
       message: 'Item updated successfully',
@@ -368,6 +373,8 @@ export async function DELETE(req: NextRequest) {
   try {
     const { error } = await sb.from(table).delete().eq('id', id);
     if (error) throw error;
+
+    invalidateContentCache();
 
     return NextResponse.json({
       success: true,

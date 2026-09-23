@@ -139,11 +139,26 @@ async function authenticate(req: NextRequest) {
 |--------------------------------------------------------------------------
 | Anyone can read currently active users.
 */
+let cachedPresenceUsers: PresenceUser[] = [];
+let lastPresenceFetch = 0;
+const PRESENCE_CACHE_TTL_MS = 6000;
+
 export async function GET() {
   try {
-    const client = createPublicClient();
+    if (Date.now() - lastPresenceFetch < PRESENCE_CACHE_TTL_MS && cachedPresenceUsers.length > 0) {
+      return response({
+        success: true,
+        count: cachedPresenceUsers.length,
+        users: cachedPresenceUsers,
+        timeoutMs: INACTIVITY_TIMEOUT_MS,
+      });
+    }
 
+    const client = createPublicClient();
     const users = await getActiveUsers(client);
+
+    cachedPresenceUsers = users;
+    lastPresenceFetch = Date.now();
 
     return response({
       success: true,
@@ -259,6 +274,8 @@ export async function POST(req: NextRequest) {
     }
 
     const users = await getActiveUsers(client);
+    cachedPresenceUsers = users;
+    lastPresenceFetch = Date.now();
 
     return response({
       success: true,
@@ -312,6 +329,8 @@ export async function DELETE(req: NextRequest) {
         500
       );
     }
+
+    lastPresenceFetch = 0;
 
     return response({
       success: true,

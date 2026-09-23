@@ -89,6 +89,11 @@ export function usePWA() {
   const refreshingRef = useRef(false);
 
   /*
+   * Track initial deployment timestamp to detect live updates.
+   */
+  const initialBuildTimeRef = useRef<string | null>(null);
+
+  /*
    * Activate a waiting service worker immediately.
    */
   const activateWaitingWorker = useCallback(
@@ -115,17 +120,40 @@ export function usePWA() {
    * Check whether a new deployment is available.
    *
    * The service worker itself uses updateViaCache: 'none',
-   * so the browser must check the latest /sw.js.
+   * so the browser must check the latest /sw.js and /api/version.
    */
   const checkForUpdates = useCallback(async (): Promise<boolean> => {
-    if (
-      typeof window === 'undefined' ||
-      !('serviceWorker' in navigator)
-    ) {
+    if (typeof window === 'undefined') {
       return false;
     }
 
     try {
+      // 1. Check version endpoint
+      try {
+        const verRes = await fetch('/api/version', { cache: 'no-store' });
+        if (verRes.ok) {
+          const verData = await verRes.json();
+          if (!initialBuildTimeRef.current) {
+            initialBuildTimeRef.current = verData.buildTime;
+          } else if (initialBuildTimeRef.current !== verData.buildTime) {
+            console.log('[DHOTI AALE] New deployment detected:', verData.buildTime);
+            setUpdateAvailable(true);
+            if (registrationRef.current) {
+              await registrationRef.current.update();
+              activateWaitingWorker(registrationRef.current);
+            }
+            return true;
+          }
+        }
+      } catch {
+        // Ignore network errors in offline mode
+      }
+
+      // 2. Check service worker registration
+      if (!('serviceWorker' in navigator)) {
+        return false;
+      }
+
       const registration =
         registrationRef.current ||
         (await navigator.serviceWorker.getRegistration('/'));
@@ -201,6 +229,30 @@ export function usePWA() {
       setIsInstalled(true);
       setCanInstall(false);
       setDeferredPrompt(null);
+
+      // Trigger local welcome notification
+      if (typeof window !== 'undefined' && 'Notification' in window) {
+        const sendWelcomeNotice = () => {
+          try {
+            new Notification('Dhoti Aale App Installed! 🎉', {
+              body: 'स्वागत है! Dhoti Aale ऐप आपके फोन में सफलतापूर्वक इंस्टॉल हो चुका है। अब आप हर नया अपडेट और गाँव की खबरें सीधे पा सकते हैं।',
+              icon: '/icons/icon-192x192.png',
+            });
+          } catch (e) {
+            console.log('[DHOTI AALE] Notification error:', e);
+          }
+        };
+
+        if (Notification.permission === 'granted') {
+          sendWelcomeNotice();
+        } else if (Notification.permission !== 'denied') {
+          Notification.requestPermission().then((permission) => {
+            if (permission === 'granted') {
+              sendWelcomeNotice();
+            }
+          });
+        }
+      }
     };
 
     /*
