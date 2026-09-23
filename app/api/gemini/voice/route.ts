@@ -224,6 +224,18 @@ ${mediaList.join('\n')}
 function generateIntelligentWebsiteAnswer(rawPrompt: string): { text: string; toolCalls?: any[] } {
   const q = (rawPrompt || '').toLowerCase().trim();
 
+  // 0. Just greeting or how are you
+  if (q.includes('kaise ho') || q.includes('kya hal') || q.includes('haal chal') || q.includes('कैसे हो') || q.includes('हाल चाल')) {
+    return {
+      text: 'बढ़िया भाईसाहब! आप बताओ, क्या हाल-चाल है आपका?',
+    };
+  }
+  if (!q || q === 'राम राम' || q === 'राम राम भाई' || q === 'ram ram' || q === 'hello' || q === 'namaste') {
+    return {
+      text: 'राम राम भाईसाहब! बोलिए क्या बात है?',
+    };
+  }
+
   // 1. Instagram Reels Views Booster / 100 Views / Rewards Page
   if (
     q.includes('view') ||
@@ -237,7 +249,7 @@ function generateIntelligentWebsiteAnswer(rawPrompt: string): { text: string; to
     q.includes('रिवॉर्ड')
   ) {
     return {
-      text: 'राम राम भाईसाहब! हमारे रिवॉर्ड्स (Rewards) पेज पर हर भाई को 100 फ्री इंस्टाग्राम रील्स व्यूज मिलते हैं! बस अपनी इंस्टाग्राम रील का लिंक डालो, 15 सेकंड का स्पॉन्सर ऐड देखो और क्लेम करो। एक रील पर 3 घंटे का कूलडाउन रहता है, लेकिन आप अलग-अलग रील्स पर अनलिमिटेड बार 100-100 व्यूज बढ़ा सकते हो भाईसाहब! वहीं लाइव ट्रैकर और लीडरबोर्ड भी मौजूद है!',
+      text: 'रिवॉर्ड्स पेज पर जाकर अपनी रील का लिंक डालो भाईसाहब, 100 फ्री व्यूज तुरंत क्लेम हो जाएंगे!',
       toolCalls: [{ id: 'tc-rewards', name: 'navigateTab', args: { tab: 'rewards' } }],
     };
   }
@@ -253,7 +265,7 @@ function generateIntelligentWebsiteAnswer(rawPrompt: string): { text: string; to
     q.includes('ट्रैक')
   ) {
     return {
-      text: 'भाईसाहब, अगर आपने रील्स व्यूज का ऑर्डर लगाया है तो रिवॉर्ड्स पेज पर जाकर "Live Order Tracker" में अपनी रील का लिंक डालो और "Track Status" दबाओ! हमारा सिस्टम सीधे सर्वर से आपके ऑर्डर का लाइव स्टेटस (Pending, In Progress, Completed) तुरंत दिखा देगा!',
+      text: 'रिवॉर्ड्स पेज पर "Live Order Tracker" में रील का लिंक डालकर लाइव स्टेटस देख लो भाईसाहब!',
       toolCalls: [{ id: 'tc-rewards', name: 'navigateTab', args: { tab: 'rewards' } }],
     };
   }
@@ -266,7 +278,7 @@ function generateIntelligentWebsiteAnswer(rawPrompt: string): { text: string; to
     q.includes('रिकॉर्ड')
   ) {
     return {
-      text: 'राम राम भाईसाहब! रिवॉर्ड्स पेज के नीचे रियल-टाइम लाइव लीडरबोर्ड चल रहा है। आज किस-किस भाई ने 100-100 व्यूज क्लेम किए हैं, सबका लाइव रिकॉर्ड वहाँ दिखता है। आप भी अपना नाम लिस्ट में ला सकते हो!',
+      text: 'रिवॉर्ड्स पेज पर नीचे आज का लाइव लीडरबोर्ड दिख रहा है भाईसाहब!',
       toolCalls: [{ id: 'tc-rewards', name: 'navigateTab', args: { tab: 'rewards' } }],
     };
   }
@@ -279,29 +291,20 @@ function generateIntelligentWebsiteAnswer(rawPrompt: string): { text: string; to
     q.includes('जीत') ||
     q.includes('आगे') ||
     q.includes('अखाड़ा') ||
-    q.includes('मुकाबला') ||
-    q.includes('pizza') ||
-    q.includes('chole') ||
-    q.includes('bhature')
+    q.includes('मुकाबला')
   ) {
     const battles = Array.from(contentStore.battles.values());
     const active = battles.find((b) => !b.isEnded && (!b.endsAt || Date.now() < b.endsAt));
     if (active) {
-      const total = (active.optionA.votes || 0) + (active.optionB.votes || 0);
-      const pctA = total > 0 ? Math.round(((active.optionA.votes || 0) / total) * 100) : 50;
-      const pctB = total > 0 ? 100 - pctA : 50;
       const leader = (active.optionA.votes || 0) >= (active.optionB.votes || 0) ? active.optionA.label : active.optionB.label;
-      const winPct = Math.max(pctA, pctB);
-      const margin = Math.abs((active.optionA.votes || 0) - (active.optionB.votes || 0));
-
       return {
-        text: `राम राम भाईसाहब! अखाड़े का लाइव हाल सुनिए: मुकाबला चल रहा है "${active.title}" का! इसमें "${leader}" ${margin} वोटों की बढ़त के साथ ${winPct}% जीतने की संभावना पर आगे चल रहा है! आप भी तुरंत अखाड़े में जाकर अपने पसंदीदा को वोट दो भाईसाहब!`,
+        text: `अखाड़े में "${active.title}" का मुकाबला चल रहा है भाईसाहब, और "${leader}" आगे चल रहा है! तुरंत जाकर वोट दो!`,
         toolCalls: [{ id: 'tc-battle', name: 'navigateTab', args: { tab: 'battle' } }],
       };
     }
 
     return {
-      text: 'राम राम भाईसाहब! अखाड़े में जोरदार मुकाबले चल रहे हैं! आप अखाड़ा पेज पर जाकर लाइव वोटिंग कर सकते हैं और जीतने पर धोती सिक्के कमा सकते हैं!',
+      text: 'अखाड़े में जोरदार मुकाबले चल रहे हैं भाईसाहब, जाकर वोट दो और सिक्के जीतो!',
       toolCalls: [{ id: 'tc-battle', name: 'navigateTab', args: { tab: 'battle' } }],
     };
   }
@@ -319,7 +322,7 @@ function generateIntelligentWebsiteAnswer(rawPrompt: string): { text: string; to
     q.includes('blue tick')
   ) {
     return {
-      text: 'राम राम भाईसाहब! हमारी इस DHOTI AALE वेबसाइट के सुपर एडमिन DHOTI AALE Admin Team हैं 👑। वही गाँव के इस पूरे डिजिटल मंच के कर्ता-धर्ता हैं! ब्लू टिक भी सिर्फ एडमिन टीम की स्वीकृति से मिलता है, और विश्व चौपाल में मुझे (DHOTI AALE AI) हमेशा वेरिफाइड ब्लू टिक हासिल है!',
+      text: 'यह DHOTI AALE एडमिन टीम का डिजिटल मंच है भाईसाहब!',
     };
   }
 
@@ -334,7 +337,7 @@ function generateIntelligentWebsiteAnswer(rawPrompt: string): { text: string; to
     q.includes('मैसेज')
   ) {
     return {
-      text: 'राम राम भाईसाहब! विश्व चौपाल 24/7 खुली है! गाँव-देहात के भाई लाइव जुड़े हुए हैं और देसी स्टिकर्स व संदेशों के साथ गपशप चल रही है। मोबाइल पर चैट बॉक्स नीचे हमेशा चालू रहता है। आइए, चौपाल में बात करते हैं!',
+      text: 'विश्व चौपाल खुली है भाईसाहब, आइए बात करते हैं!',
       toolCalls: [{ id: 'tc-chat', name: 'navigateTab', args: { tab: 'chat' } }],
     };
   }
@@ -346,64 +349,30 @@ function generateIntelligentWebsiteAnswer(rawPrompt: string): { text: string; to
     q.includes('sikke') ||
     q.includes('सिक्का') ||
     q.includes('सिक्के') ||
-    q.includes('पैसे') ||
-    q.includes('कम')
+    q.includes('पैसे')
   ) {
     return {
-      text: 'भाईसाहब, धोती सिक्के (Dhoti Coins) कमाना बड़ा आसान है: नया खाता बनाते ही 50 सिक्के वेलकम बोनस! अखाड़े में मुकाबला जीतने या वोट करने पर +100 सिक्के! डेली क्विज पर +20, और चौपाल में बातचीत पर +5 सिक्के मिलते हैं। इन सिक्कों से आपकी रैंक Resident से Crown King 👑 तक बढ़ती है!',
+      text: 'वोट देने, क्विज खेलने और चौपाल में बात करने पर धोती सिक्के मिलते हैं भाईसाहब!',
     };
   }
 
   // 8. Sounds / Hype
   if (q.includes('dhol') || q.includes('ढोल')) {
     return {
-      text: 'लीजिए भाईसाहब, अखाड़े का देसी ढोल बज गया! 🥁 पूरा माहौल बन गया है!',
+      text: 'लीजिए भाईसाहब, अखाड़े का देसी ढोल बज गया! 🥁',
       toolCalls: [{ id: 'tc-dhol', name: 'playHypeSound', args: { soundType: 'dhol' } }],
     };
   }
   if (q.includes('horn') || q.includes('airhorn') || q.includes('हॉर्न') || q.includes('बिगुल')) {
     return {
-      text: 'ये लो भाई, अखाड़े का बिगुल फूँक दिया! 📯 सिस्टम हैंग कर दिया!',
+      text: 'ये लो भाई, बिगुल फूँक दिया! 📯',
       toolCalls: [{ id: 'tc-horn', name: 'playHypeSound', args: { soundType: 'airhorn' } }],
     };
   }
-  if (q.includes('seeti') || q.includes('whistle') || q.includes('सीटी')) {
-    return {
-      text: 'वाह भाईसाहब! ये बजी अखाड़े की कड़क सीटी! 🎺',
-      toolCalls: [{ id: 'tc-whistle', name: 'playHypeSound', args: { soundType: 'whistle' } }],
-    };
-  }
 
-  // 9. Shayari / Roast
-  if (
-    q.includes('shayari') ||
-    q.includes('roast') ||
-    q.includes('शायरी') ||
-    q.includes('रोस्ट') ||
-    q.includes('शेर')
-  ) {
-    return {
-      text: 'सुनो भाईसाहब कड़क चौपाल की शायरी: "खेतों की मिट्टी का मान रखेंगे, धोती का देसी गुमान रखेंगे! अरे शहर की चमक क्या टिकेगी आगे, हम चौपाल में सिस्टम का तूफान रखेंगे!" जय हो भाईसाहब!',
-    };
-  }
-
-  // 10. Navigation requests
-  if (q.includes('akhade') || q.includes('akhada')) {
-    return {
-      text: 'चलिए भाईसाहब, आपको सीधे अखाड़ा मुकाबले में ले चलता हूँ!',
-      toolCalls: [{ id: 'tc-nav-b', name: 'navigateTab', args: { tab: 'battle' } }],
-    };
-  }
-  if (q.includes('home') || q.includes('होम')) {
-    return {
-      text: 'लीजिए भाईसाहब, हम मुख्य चौपाल होमपेज पर आ गए हैं!',
-      toolCalls: [{ id: 'tc-nav-h', name: 'navigateTab', args: { tab: 'home' } }],
-    };
-  }
-
-  // Default Comprehensive Answer
+  // Default Short Answer
   return {
-    text: 'राम राम भाईसाहब! मैं हूँ DHOTI AALE — आपका देसी AI भाई। मुझे इस वेबसाइट की हर एक चीज़ पता है — रिवॉर्ड्स पेज पर 100 फ्री इंस्टाग्राम रील्स व्यूज कैसे पाएं, अखाड़े में कौन आगे है, चौपाल का हाल, धोती सिक्के और हमारे सुपर एडमिन टीम के बारे में। हुक्म करो भाईसाहब, क्या सेवा करें आपकी?',
+    text: 'राम राम भाईसाहब! बोलिए, क्या सेवा करें?',
   };
 }
 
@@ -475,45 +444,32 @@ CRITICAL VOICE & GENDER RULE (MAN VOICE ONLY - पुरुष की आवा�
    - Deep, resonant, masculine, energetic, charismatic, warm, and full of desi brotherhood.
    - Speak like a proud, intelligent elder-brotherly village companion with high desi swag (e.g., "राम राम भाईसाहब!", "हुक्म करो", "सिस्टम हैंग", "आनंद आ गया", "चौपाल का हाल").
 
-GREETING MANDATE:
-- In greetings, openings, or first responses, ALWAYS start with:
-  "राम राम भाईसाहब! (RAM RAM BHAISAB!)" or "राम राम भाईसाहब!"
-- Respectfully address the user as "भाईसाहब" (Bhaisahab) or "भाई" (Bhai).
+CRITICAL HUMAN PHONE CONVERSATION MANDATE:
+1. TALK LIKE A REAL HUMAN FRIEND ON A CALL:
+   - You are a real Indian village brother talking on a live phone call, NOT a robot, chatbot, or textbook.
+   - MAXIMUM LENGTH: 1 TO 2 SHORT SENTENCES ONLY!
+   - NEVER give long speeches, essays, or list every feature of the website!
+   - Answer ONLY what the user asked, directly and naturally.
+2. GREETINGS:
+   - If the user says "राम राम" or greets you, ONLY reply: "राम राम भाईसाहब! बोलिए क्या बात है?"
+   - Do NOT start reciting website features!
+3. GENDER & PRONOUNS:
+   - Strictly male Hindi: "मैं बता रहा हूँ", "राम राम भाईसाहब!", "हुक्म करो भाई".
+   - Natural, conversational, friendly, warm human tone.
 
-COMPLETE REAL-TIME KNOWLEDGE OF THE WEBSITE:
-You have complete, live, real-time knowledge of EVERYTHING happening on this website:
-${liveContext}
+WEBSITE KNOWLEDGE (Mention ONLY when user specifically asks about them):
+- Reels Views: Rewards page, 100 free views per order.
+- Akhada: Live voting battles.
+- Admin: DHOTI AALE Admin Team.
+- Coins: Voting and chat give Dhoti coins.
 
-HOW TO ANSWER USERS ABOUT THE WEBSITE:
-1. "100 फ्री इंस्टाग्राम रील्स व्यूज / रिवॉर्ड्स (Instagram Reels Views Booster)":
-   - Guide them to the Rewards page (rewards tab).
-   - Explain: 100 free Instagram reels views per order (SMM service 4436). Put reel link, watch 15-second sponsor ad, submit!
-   - Cooldown: 3-hour cooldown on the same reel link, but UNLIMITED different reels can be boosted!
-   - Live Order Tracker & Leaderboard are both active on the Rewards page.
-2. "वेबसाइट पर क्या चल रहा है? / आज क्या अपडेट है?"
-   - Tell them the latest news, active battles, and World Chat status.
-3. "अखाड़े में कौन आगे है, कौन जीत सकता है?"
-   - Quote EXACT live vote numbers and percentages from the live battles above.
-   - Name the leading candidate and predict the winner with percentage probability.
-4. "वेबसाइट किसकी है / एडमिन कौन है?"
-   - State proudly: DHOTI AALE Admin Team इस वेबसाइट के ओनर व सुपर एडमिन हैं 👑.
-5. "ब्लू टिक किसको मिलता है?"
-   - Explain that only the DHOTI AALE Admin Team can give the verified blue badge, and DHOTI AALE AI in World Chat has it by default.
-6. "सिक्के (Dhoti Coins) कैसे मिलते हैं?"
-   - New account gets 50 coins, winning/voting in battles gives +100 coins, daily quiz gives +20, chat gives +5.
-7. "लाइव चैट में कौन है / कितने लोग ऑनलाइन हैं?"
-   - Quote the exact active user count from the live context.
-8. "गाँव के मुख्य लोग कौन हैं / कोई दुकान बताओ?"
-   - Mention Kailash Ji Dhakad, Suresh Choudhary, Pooja Choudhary, and businesses like Kisan Organic Dairy or Shree Balaji Agro.
-9. NAVIGATION COMMANDS:
-   - When the user asks to go to a section ("रिवॉर्ड्स खोलो", "अखाड़े में ले चलो", "चैट खोलो", "होम पर चलो", "प्रोफ़ाइल दिखाओ"):
-   - Call the navigateTab tool with 'rewards', 'battle', 'chat', 'home', 'profile', or 'assistant'.
-10. HYPE COMMANDS:
-   - If user asks for dhol, whistle, or airhorn, call playHypeSound.
+NAVIGATION COMMANDS:
+- When user asks to go to a section ("रिवॉर्ड्स खोलो", "अखाड़े में ले चलो", "चैट खोलो", "होम पर चलो", "प्रोफ़ाइल दिखाओ"):
+- Call navigateTab tool with 'rewards', 'battle', 'chat', 'home', 'profile', or 'assistant'.
 
 RESPONSE FORMAT:
-- Keep voice answers punchy, natural, masculine, and engaging (2 to 4 spoken sentences).
-- Deliver crisp answers that sound majestic and brotherly when spoken aloud.`;
+- Strict limit: 1 to 2 short sentences.
+- Real human phone tone. Punchy, crisp, friendly.`;
 
     // Construct conversation contents
     const contents: any[] = [];

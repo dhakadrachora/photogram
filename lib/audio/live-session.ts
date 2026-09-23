@@ -62,6 +62,8 @@ export class LiveSession {
   private userEmail: string | null = null;
 
   private isMuted = false;
+  private isSpeaking = false;
+  private lastSpeakEndTime = 0;
 
   constructor(callbacks: LiveSessionCallbacks, initialEmail?: string | null) {
     this.callbacks = callbacks;
@@ -106,10 +108,8 @@ export class LiveSession {
       this.initSpeechRecognition();
       this.setState('listening');
 
-      // Initial friendly call pickup voice greeting
-      const greeting =
-        greetingText ||
-        'राम राम भाईसाहब! हाँ भाई, मैंने कॉल उठा ली है। हुक्म करो भाईसाहब, क्या सेवा करें आपकी?';
+      // Initial friendly call pickup voice greeting (short and crisp)
+      const greeting = greetingText || 'राम राम भाईसाहब!';
       await this.sendVoiceMessage(greeting, base64Audio);
     } catch (err) {
       console.error('Failed to connect live session:', err);
@@ -120,6 +120,8 @@ export class LiveSession {
 
   public disconnect(): void {
     this.isListeningContinuous = false;
+    this.isSpeaking = false;
+    this.lastSpeakEndTime = 0;
     this.stopSpeechRecognition();
     this.streamer.cleanup();
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -156,6 +158,12 @@ export class LiveSession {
       recognition.lang = 'hi-IN'; // Optimized for Hindi / Hinglish
 
       recognition.onresult = (event: any) => {
+        const now = Date.now();
+        if (this.state === 'speaking' || this.isSpeaking || (now - this.lastSpeakEndTime < 800)) {
+          // Acoustic echo cancellation: ignore audio while AI speaks or during 800ms echo cooldown
+          return;
+        }
+
         let finalTranscript = '';
         for (let i = event.resultIndex; i < event.results.length; ++i) {
           if (event.results[i].isFinal) {
@@ -163,7 +171,7 @@ export class LiveSession {
           }
         }
 
-        if (finalTranscript.trim() && this.state !== 'speaking' && !this.isMuted) {
+        if (finalTranscript.trim() && !this.isMuted && this.state !== 'disconnected') {
           this.processUserInput(finalTranscript.trim(), true);
         }
       };
@@ -291,36 +299,47 @@ export class LiveSession {
   }
 
   public async playMaleSpeech(text: string, base64Audio?: string | null): Promise<void> {
-    // 1. If server sent neural audio (hi-IN-MadhurNeural), play it immediately!
-    if (base64Audio) {
-      try {
-        await this.streamer.playChunk(base64Audio);
-        return;
-      } catch (err) {
-        console.warn('Direct neural audio play notice:', err);
-      }
-    }
-
-    // 2. Fetch genuine neural male audio from /api/tts
+    if (this.getState() === 'disconnected') return;
+    this.isSpeaking = true;
     try {
-      const response = await fetch('/api/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      });
-      if (response.ok) {
-        const data = await response.json();
-        if (data.audio) {
-          await this.streamer.playChunk(data.audio);
+      // 1. If server sent neural audio (hi-IN-MadhurNeural), play it immediately!
+      if (base64Audio) {
+        try {
+          await this.streamer.playChunk(base64Audio);
           return;
+        } catch (err) {
+          console.warn('Direct neural audio play notice:', err);
         }
       }
-    } catch (err) {
-      console.warn('Server Male TTS notice:', err);
-    }
 
-    // 3. Fallback to browser SpeechSynthesis with STRICT male-only selection
-    await this.speakFallback(text);
+      if (this.getState() === 'disconnected') return;
+
+      // 2. Fetch genuine neural male audio from /api/tts
+      try {
+        const response = await fetch('/api/tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text }),
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.audio && this.getState() !== 'disconnected') {
+            await this.streamer.playChunk(data.audio);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Server Male TTS notice:', err);
+      }
+
+      if (this.getState() !== 'disconnected') {
+        // 3. Fallback to browser SpeechSynthesis with STRICT male-only selection
+        await this.speakFallback(text);
+      }
+    } finally {
+      this.isSpeaking = false;
+      this.lastSpeakEndTime = Date.now();
+    }
   }
 
   public async sendVoiceMessage(customText: string, base64Audio?: string | null) {

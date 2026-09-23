@@ -47,7 +47,7 @@ export function VoiceAssistant({
   const [userTranscript, setUserTranscript] = useState<string>('');
 
   const [assistantTranscript, setAssistantTranscript] = useState<string>(
-    'राम राम भाईसाहब! (RAM RAM BHAISAB!) मैं हूँ DHOTI AALE — आपका अपना देसी AI साथी। कॉल लगाएं और मुझसे लाइव बात करें!'
+    'राम राम भाईसाहब!'
   );
 
   const [recentTool, setRecentTool] = useState<ToolCall | null>(null);
@@ -61,7 +61,7 @@ export function VoiceAssistant({
   >([
     {
       sender: 'assistant',
-      text: 'राम राम भाईसाहब! (RAM RAM BHAISAB!) मैं हूँ DHOTI AALE। गाँव ढोटी की हर ताज़ा खबर, 100 फ्री इंस्टाग्राम रील्स व्यूज और अखाड़े में कौन आगे है — सब कुछ है मेरे पास। हुक्म करो भाईसाहब!',
+      text: 'राम राम भाईसाहब!',
       time: 'Just now',
     },
   ]);
@@ -264,9 +264,7 @@ export function VoiceAssistant({
     SoundEffects.startOutgoingRingtone();
 
     // 4. Pre-fetch genuine neural male audio for the greeting while ringing
-    const greetingMessage = topicIntro
-      ? `राम राम भाईसाहब! हाँ भाई, मैंने कॉल उठा ली है। आप ${topicIntro} के बारे में पूछ रहे थे ना? हुक्म करो भाईसाहब, पूरी जानकारी मेरे पास है!`
-      : 'राम राम भाईसाहब! हाँ भाई, मैंने कॉल उठा ली है। हुक्म करो भाईसाहब, क्या हाल-चाल है और आज क्या सेवा करें आपकी?';
+    const greetingMessage = 'राम राम भाईसाहब!';
 
     setAssistantTranscript(greetingMessage);
 

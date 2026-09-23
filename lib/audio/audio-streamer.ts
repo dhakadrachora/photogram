@@ -194,14 +194,32 @@ export class AudioStreamer {
         this.nextStartTime = now + 0.05; // tiny buffer against jitter
       }
 
-      source.start(this.nextStartTime);
+      const scheduledStart = this.nextStartTime;
+      source.start(scheduledStart);
       this.nextStartTime += audioBuffer.duration;
 
       this.activeSources.push(source);
-      source.onended = () => {
-        const idx = this.activeSources.indexOf(source);
-        if (idx !== -1) this.activeSources.splice(idx, 1);
-      };
+
+      return new Promise<void>((resolve) => {
+        let isDone = false;
+        const finish = () => {
+          if (!isDone) {
+            isDone = true;
+            resolve();
+          }
+        };
+
+        source.onended = () => {
+          const idx = this.activeSources.indexOf(source);
+          if (idx !== -1) this.activeSources.splice(idx, 1);
+          finish();
+        };
+
+        (source as any)._cancelPlayback = finish;
+        // Safety timeout in case onended doesn't fire
+        const remainingDelayMs = Math.max(100, ((scheduledStart - now) + audioBuffer.duration + 0.25) * 1000);
+        setTimeout(finish, remainingDelayMs);
+      });
     } catch (err) {
       console.warn('Error playing audio chunk:', err);
     }
@@ -213,6 +231,9 @@ export class AudioStreamer {
   public interrupt(): void {
     for (const source of this.activeSources) {
       try {
+        if ((source as any)._cancelPlayback) {
+          (source as any)._cancelPlayback();
+        }
         source.stop();
         source.disconnect();
       } catch {
