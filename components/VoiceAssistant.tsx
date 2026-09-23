@@ -100,13 +100,13 @@ export function VoiceAssistant({
 
   const playGreetingAudio = () => {
     const greetingText =
-      'राम राम भाईसाहब! (RAM RAM BHAISAB!) मैं हूँ DHOTI AALE — आपका अपना देसी AI साथी। ढोटी गाँव की हर ताज़ा खबर, चौपाल का हाल और अखाड़े में कौन आगे है — सब कुछ है मेरे पास! कहो भाईसाहब क्या सेवा करें आपकी?';
+      'राम राम भाईसाहब! (RAM RAM BHAISAB!) मैं हूँ DHOTI AALE — आपका अपना देसी AI साथी। रिवॉर्ड्स पेज पर 100 फ्री इंस्टाग्राम रील्स व्यूज, अखाड़े में कौन आगे है और किसकी जीत की संभावना है — पूरी वेबसाइट की जानकारी मेरे पास है! कहो भाईसाहब क्या सेवा करें आपकी?';
 
     setAssistantTranscript(greetingText);
 
     const session = liveSessionRef.current;
 
-    if (session && currentUser) {
+    if (session) {
       try {
         session.sendVoiceMessage(greetingText);
         return;
@@ -251,6 +251,7 @@ export function VoiceAssistant({
                 'home',
                 'worldchat',
                 'battle',
+                'rewards',
                 'assistant',
                 'profile',
               ].includes(targetTab)
@@ -308,24 +309,9 @@ export function VoiceAssistant({
     }
 
     session.setUserEmail(
-      currentUser?.email || null
+      currentUser?.email || 'guest@dhotiaale.online'
     );
-
-    /*
-     * If user logs out while voice is active,
-     * disconnect the authenticated voice session.
-     */
-    if (!currentUser && voiceState !== 'disconnected') {
-      try {
-        session.disconnect();
-      } catch {
-        // Ignore disconnect errors.
-      }
-
-      setVoiceState('disconnected');
-      setAudioLevel(0);
-    }
-  }, [currentUser, voiceState]);
+  }, [currentUser]);
 
   /*
    * ---------------------------------------------------------
@@ -345,28 +331,15 @@ export function VoiceAssistant({
       return;
     }
 
-    /*
-     * Voice is LOGIN ONLY.
-     * Never use a fake guest email.
-     */
-    if (!currentUser) {
-      showError(
-        'Voice Assistant इस्तेमाल करने के लिए पहले Sign In करें।'
-      );
-
-      onOpenAuth();
-      return;
-    }
+    const effectiveEmail = currentUser?.email || 'guest@dhotiaale.online';
 
     /*
      * Connect
      */
     if (voiceState === 'disconnected') {
       try {
-        session.setUserEmail(currentUser.email);
-
+        session.setUserEmail(effectiveEmail);
         await session.connect();
-
         setErrorMessage(null);
       } catch (error: unknown) {
         console.error(
@@ -490,9 +463,9 @@ export function VoiceAssistant({
 
   const quickPrompts = [
     {
-      label: '📢 आज क्या अपडेट है?',
+      label: '🎁 100 फ्री रील्स व्यूज कैसे पाएं?',
       prompt:
-        'राम राम भाईसाहब! आज गाँव ढोटी में क्या-क्या नया अपडेट और ताज़ा खबर है?',
+        'रिवॉर्ड्स पेज पर 100 फ्री इंस्टाग्राम रील्स व्यूज कैसे मिलते हैं और इसके क्या नियम हैं?',
     },
     {
       label: '⚔️ अखाड़े में कौन आगे है और कौन जीतेगा?',
@@ -500,14 +473,14 @@ export function VoiceAssistant({
         'अखाड़े में कौन-कौन बैटल में है, अभी वोटों में आगे कौन चल रहा है और किसकी जीतने की संभावना है?',
     },
     {
-      label: '🍕 Chole Bhature vs Pizza में कौन जीतेगा?',
+      label: '👑 वेबसाइट का मालिक व एडमिन कौन है?',
       prompt:
-        'Chole Bhature vs Pizza मुकाबले में अभी कौन आगे है और वोटों के हिसाब से किसकी जीत की संभावना है?',
+        'इस वेबसाइट के ओनर और एडमिन कौन हैं?',
     },
     {
-      label: '🚜 Village Flow vs City Trap?',
+      label: '📢 आज क्या नया अपडेट है?',
       prompt:
-        'Village Desi Flow vs City Trap रैप बैटल में कौन आगे चल रहा है और कौन बाज़ी मारेगा?',
+        'राम राम भाईसाहब! आज गाँव ढोटी में क्या-क्या नया अपडेट और ताज़ा खबर है?',
     },
     {
       label: '🪙 धोती सिक्के (Coins) कैसे कमाएं?',
@@ -520,9 +493,9 @@ export function VoiceAssistant({
         'अखाड़े में जश्न का ढोल बजाओ और बिगुल फूँको!',
     },
     {
-      label: '🔥 कड़क देसी रोस्ट या शायरी!',
+      label: '🔥 कड़क देसी शायरी!',
       prompt:
-        'भाईसाहब मुझे एक जोरदार चौपाल की देसी शायरी या हल्का रोस्ट सुनाओ!',
+        'भाईसाहब मुझे एक जोरदार चौपाल की देसी शायरी सुनाओ!',
     },
   ];
 
@@ -538,27 +511,16 @@ export function VoiceAssistant({
           <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 border border-emerald-500/30 text-emerald-300 text-[11px] font-bold shadow-sm">
             <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
             <span>
-              टेक्स्ट चैट: 100% फ्री व पब्लिक (No Login)
+              100% फ्री व पब्लिक (No Login Required)
             </span>
           </div>
 
           {/* Voice status */}
-          <div className="inline-flex items-center gap-1.5 rounded-full bg-slate-900/90 px-3 py-1 border border-slate-700 text-slate-300 text-[11px] font-bold shadow-sm">
-            {currentUser ? (
-              <>
-                <ShieldCheck className="h-3.5 w-3.5 text-amber-400" />
-                <span className="text-amber-300">
-                  वॉइस मोड: अनलॉक्ड 🎙️
-                </span>
-              </>
-            ) : (
-              <>
-                <Lock className="h-3.5 w-3.5 text-slate-400" />
-                <span>
-                  टू-वे वॉइस मोड: लॉगिन आवश्यक
-                </span>
-              </>
-            )}
+          <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-3 py-1 border border-amber-500/30 text-amber-300 text-[11px] font-bold shadow-sm">
+            <ShieldCheck className="h-3.5 w-3.5 text-amber-400" />
+            <span className="text-amber-300">
+              देसी AI मर्द की आवाज़ (Active for All) 🎙️
+            </span>
           </div>
         </div>
 
@@ -628,16 +590,8 @@ export function VoiceAssistant({
                 ? 'bg-blue-600 text-white ring-8 ring-blue-500/30 animate-pulse'
                 : 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 hover:from-amber-950/40 hover:to-slate-800 text-amber-400 hover:text-amber-300 border-2 border-amber-500/50 hover:border-amber-400 hover:shadow-amber-500/20'
             }`}
-            title={
-              currentUser
-                ? 'DHOTI AALE से देसी आवाज़ में बात करें'
-                : 'Voice के लिए पहले Sign In करें'
-            }
-            aria-label={
-              currentUser
-                ? 'Start voice assistant'
-                : 'Sign in for voice assistant'
-            }
+            title="DHOTI AALE से देसी मर्द की आवाज़ में बात करें"
+            aria-label="Start DHOTI AALE voice assistant"
           >
             {voiceState === 'listening' ? (
               <Mic className="h-10 w-10 sm:h-12 sm:w-12 animate-bounce" />
@@ -677,22 +631,20 @@ export function VoiceAssistant({
                 ? 'DHOTI AALE बोल रहा है'
                 : voiceState === 'connecting'
                 ? 'कनेक्ट हो रहा है...'
-                : currentUser
-                ? 'बोलने के लिए माइक दबाएं'
-                : 'Voice के लिए Sign In करें'}
+                : 'बोलने के लिए माइक दबाएं'}
             </span>
           </div>
 
-          {/* Login */}
+          {/* Optional Sign In for coins/profile */}
           {!currentUser &&
             voiceState === 'disconnected' && (
               <button
                 onClick={onOpenAuth}
-                className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 hover:bg-amber-500/20 px-3.5 py-1 text-xs font-bold text-amber-300 border border-amber-500/30 transition-all hover:scale-105"
+                className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-slate-900/80 hover:bg-amber-500/20 px-3.5 py-1 text-xs font-bold text-amber-300/80 hover:text-amber-300 border border-slate-700 hover:border-amber-500/40 transition-all hover:scale-105"
               >
                 <LogIn className="h-3.5 w-3.5" />
                 <span>
-                  Sign In करके Voice इस्तेमाल करें
+                  सिक्के व प्रोफ़ाइल सेव करने के लिए Sign In करें
                 </span>
               </button>
             )}

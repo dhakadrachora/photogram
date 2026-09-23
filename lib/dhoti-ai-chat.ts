@@ -148,7 +148,7 @@ Current message from "${incomingMsg.userName}":
 Provide a short, friendly, natural Hinglish response as DHOTI AALE AI:`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: 'gemini-2.5-flash',
         contents: prompt,
         config: {
           systemInstruction: systemPrompt,
