@@ -25,11 +25,14 @@ import {
   UserCheck,
   Headphones,
   Gift,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { User, AppTab, NewsItem, CommunityUpdate, PresenceUser } from '@/types';
 import { SoundEffects } from '@/lib/audio/sound-effects';
 import { isSiteAdmin } from '@/lib/admin-auth';
 import { PWAInstallButton } from './PWAInstallButton';
+import { NewsReaderModal } from './NewsReaderModal';
 
 interface LandingPageProps {
   currentUser: User | null;
@@ -45,9 +48,50 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
 
   // Dynamic news / announcements
   const [newsList, setNewsList] = useState<NewsItem[]>([]);
+  const [selectedNewsForReader, setSelectedNewsForReader] = useState<NewsItem | null>(null);
+  const [copiedNewsId, setCopiedNewsId] = useState<string | null>(null);
   const [updatesList, setUpdatesList] = useState<CommunityUpdate[]>([]);
   const [onlineUsers, setOnlineUsers] = useState<PresenceUser[]>([]);
   const onlineCount = onlineUsers.length;
+
+  const handleShareNewsWhatsApp = (item: NewsItem, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (typeof window === 'undefined') return;
+    const shareUrl = `${window.location.origin}/news?id=${encodeURIComponent(item.id)}`;
+    const cleanExcerpt = (item.excerpt || item.content || '')
+      .replace(/[#*`_]/g, '')
+      .slice(0, 140)
+      .trim();
+    const text = `📰 *${item.title}*\n\n${cleanExcerpt}...\n\n👉 पूरी खबर यहाँ पढ़ें:\n${shareUrl}\n\n_DHOTI AALE - राजस्थान का डिजिटल ग्राम मंच_`;
+    const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+    window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleCopyNewsLink = async (item: NewsItem, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (typeof window === 'undefined') return;
+    const shareUrl = `${window.location.origin}/news?id=${encodeURIComponent(item.id)}`;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(shareUrl);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = shareUrl;
+        ta.style.position = 'fixed';
+        ta.style.left = '-999999px';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+      }
+      setCopiedNewsId(item.id);
+      setTimeout(() => setCopiedNewsId(null), 2200);
+    } catch {
+      setCopiedNewsId(item.id);
+      setTimeout(() => setCopiedNewsId(null), 2200);
+    }
+  };
 
   useEffect(() => {
     let isSubscribed = true;
@@ -301,11 +345,13 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-medium">ताज़ा</span>
               </div>
               <p className="text-[11px] text-stone-500 mt-1 leading-tight line-clamp-2">
-                ढोटी पंचायत विकास कार्य एवं मुख्य समाचार...
+                {newsList.length > 0 ? newsList[0].title : 'ढोटी पंचायत विकास कार्य एवं मुख्य समाचार...'}
               </p>
             </div>
             <div className="mt-3 pt-2 border-t border-stone-100 flex items-center justify-between text-[11px] text-stone-600">
-              <span className="text-[10px] text-stone-400">आज के मुख्य बिंदु</span>
+              <span className="text-[10px] text-stone-400">
+                {newsList.length > 0 ? `${newsList.length} खबरें • पढ़ें` : 'आज के मुख्य बिंदु'}
+              </span>
               <ChevronRight className="h-3 w-3 text-stone-400" />
             </div>
           </article>
@@ -665,6 +711,8 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
 
             {/* Compliance Policy Links */}
             <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs font-semibold text-stone-600">
+              <a href="/news" className="text-[#8D2817] font-bold hover:underline">गाँव समाचार (News)</a>
+              <span className="text-stone-300">•</span>
               <a href="/about" className="hover:text-amber-800 transition-colors">About Us</a>
               <span className="text-stone-300">•</span>
               <a href="/privacy-policy" className="hover:text-amber-800 transition-colors">Privacy Policy</a>
@@ -691,77 +739,156 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
 
       {/* ================= MODAL: NEWS (ताज़ा समाचार) ================= */}
       {activeModal === 'news' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="relative w-full max-w-md max-h-[85vh] overflow-y-auto rounded-3xl bg-white border border-stone-200 p-5 shadow-2xl text-stone-800">
-            <div className="flex items-center justify-between pb-3 border-b border-stone-100">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-orange-100 text-[#8D2817] flex items-center justify-center">
-                  <Newspaper className="h-4 w-4" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="relative w-full max-w-2xl max-h-[88vh] flex flex-col rounded-3xl bg-white border border-stone-200 p-4 sm:p-6 shadow-2xl text-stone-800">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-stone-100 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-orange-100 text-[#8D2817] flex items-center justify-center border border-orange-200">
+                  <Newspaper className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-stone-900">ढोटी समाचार (News)</h3>
-                  <p className="text-[10px] text-stone-500">Panchayat & Village Headlines</p>
+                  <h3 className="text-base font-bold text-stone-900">ढोटी समाचार (Village News)</h3>
+                  <p className="text-[10px] text-stone-500">Panchayat &amp; Village Headlines</p>
                 </div>
               </div>
-              <button
-                onClick={() => setActiveModal(null)}
-                className="p-1.5 rounded-full hover:bg-stone-100 text-stone-400 hover:text-stone-700"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <a
+                  href="/news"
+                  className="hidden sm:inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-[#8D2817] text-xs font-bold transition-colors"
+                >
+                  <span>सभी समाचार देखें ↗</span>
+                </a>
+                <button
+                  onClick={() => setActiveModal(null)}
+                  className="p-1.5 rounded-full hover:bg-stone-100 text-stone-400 hover:text-stone-700"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
 
-            <div className="mt-4 space-y-3">
+            {/* Scrollable News Items */}
+            <div className="mt-4 flex-1 overflow-y-auto space-y-3.5 pr-1">
               {newsList.length > 0 ? (
                 newsList.map((item) => (
-                  <div key={item.id} className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200/80">
-                    <div className="flex items-center justify-between text-[11px] text-stone-500 mb-1">
-                      <span className="font-semibold text-[#8D2817]">{item.category}</span>
-                      <span>{item.createdAt ? new Date(item.createdAt).toLocaleDateString('hi-IN') : 'ताज़ा'}</span>
+                  <div
+                    key={item.id}
+                    onClick={() => setSelectedNewsForReader(item)}
+                    className="p-3.5 sm:p-4 rounded-2xl bg-stone-50 hover:bg-stone-100/90 border border-stone-200/90 hover:border-amber-400/80 cursor-pointer transition-all group space-y-2.5"
+                  >
+                    {/* Featured Image */}
+                    {item.imageUrl && (
+                      <div className="relative w-full aspect-[16/9] max-h-52 rounded-xl overflow-hidden bg-stone-200 shadow-xs">
+                        <img
+                          src={item.imageUrl}
+                          alt={item.title}
+                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between text-[11px] text-stone-500">
+                      <span className="font-bold text-[#8D2817] px-2 py-0.5 rounded bg-orange-100/80">
+                        {item.category}
+                      </span>
+                      <span>
+                        {item.createdAt ? new Date(item.createdAt).toLocaleDateString('hi-IN') : 'ताज़ा'}
+                      </span>
                     </div>
-                    <h4 className="text-sm font-bold text-stone-900">{item.title}</h4>
-                    <p className="text-xs text-stone-600 mt-1 leading-relaxed">{item.content || item.excerpt}</p>
-                    <div className="mt-2 text-[10px] text-stone-400">स्रोत: {item.author || 'ग्राम पंचायत ढोटी'}</div>
+
+                    <h4 className="text-sm sm:text-base font-bold text-stone-900 group-hover:text-[#8D2817] transition-colors leading-snug">
+                      {item.title}
+                    </h4>
+
+                    <p className="text-xs text-stone-600 line-clamp-2 leading-relaxed">
+                      {item.excerpt || item.content?.slice(0, 130)}
+                    </p>
+
+                    {/* Action Bar */}
+                    <div
+                      className="pt-2.5 border-t border-stone-200/60 flex items-center justify-between gap-2"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <span className="text-[10px] text-stone-400 truncate max-w-[120px]">
+                        स्रोत: {item.author || 'DHOTI AALE'}
+                      </span>
+
+                      <div className="flex items-center gap-1.5">
+                        {/* WhatsApp Share */}
+                        <button
+                          onClick={(e) => handleShareNewsWhatsApp(item, e)}
+                          title="WhatsApp पर शेयर करें"
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#25D366] hover:bg-[#20ba59] active:scale-95 text-white text-[11px] font-bold shadow-xs transition-colors cursor-pointer"
+                        >
+                          <svg className="h-3 w-3 fill-current" viewBox="0 0 24 24">
+                            <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z" />
+                          </svg>
+                          <span>WhatsApp</span>
+                        </button>
+
+                        {/* Copy Link */}
+                        <button
+                          onClick={(e) => handleCopyNewsLink(item, e)}
+                          title="लिंक कॉपी करें"
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white hover:bg-stone-200 border border-stone-200 text-stone-700 text-[11px] font-semibold transition-colors"
+                        >
+                          {copiedNewsId === item.id ? (
+                            <Check className="h-3 w-3 text-emerald-600" />
+                          ) : (
+                            <Copy className="h-3 w-3" />
+                          )}
+                          <span>{copiedNewsId === item.id ? 'कॉपी!' : 'लिंक'}</span>
+                        </button>
+
+                        {/* Read Full */}
+                        <button
+                          onClick={() => setSelectedNewsForReader(item)}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-stone-900 hover:bg-stone-800 text-white text-[11px] font-bold transition-colors ml-1"
+                        >
+                          <span>पूरा पढ़ें →</span>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 ))
               ) : (
-                <>
-                  <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200/80">
-                    <div className="flex items-center justify-between text-[11px] text-stone-500 mb-1">
-                      <span className="font-semibold text-[#8D2817]">पंचायत विकास</span>
-                      <span>आज 10:30 AM</span>
-                    </div>
-                    <h4 className="text-sm font-bold text-stone-900">ढोटी मुख्य मार्ग पर नई सोलर स्ट्रीट लाइटों का कार्य पूर्ण</h4>
-                    <p className="text-xs text-stone-600 mt-1 leading-relaxed">
-                      ग्राम पंचायत ढोटी के मुख्य बस स्टैंड से चौपाल तक 25 नई सोलर लाइटें स्थापित की गई हैं, जिससे रात्रि में आवागमन सुगम रहेगा।
-                    </p>
-                    <div className="mt-2 text-[10px] text-stone-400">स्रोत: ग्राम पंचायत ढोटी</div>
-                  </div>
-
-                  <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200/80">
-                    <div className="flex items-center justify-between text-[11px] text-stone-500 mb-1">
-                      <span className="font-semibold text-emerald-700">कृषि समाचार</span>
-                      <span>कल</span>
-                    </div>
-                    <h4 className="text-sm font-bold text-stone-900">सरसों व गेहूं की नई समर्थन मूल्य दरें जारी</h4>
-                    <p className="text-xs text-stone-600 mt-1 leading-relaxed">
-                      कृषि मंडी समिति द्वारा किसानों के लिए नई पंजीकरण प्रक्रिया शुरू हो चुकी है। सभी किसान भाई ई-मित्र पर जाकर स्लॉट बुक करें।
-                    </p>
-                    <div className="mt-2 text-[10px] text-stone-400">स्रोत: कृषि उपज मंडी</div>
-                  </div>
-                </>
+                <div className="p-8 text-center text-stone-500 text-xs">
+                  ताज़ा समाचार लोड हो रहे हैं...
+                </div>
               )}
             </div>
 
-            <button
-              onClick={() => setActiveModal(null)}
-              className="mt-4 w-full py-2.5 rounded-xl bg-stone-900 text-white font-medium text-xs hover:bg-stone-800"
-            >
-              बंद करें (Close)
-            </button>
+            {/* Bottom Actions */}
+            <div className="mt-4 pt-3 border-t border-stone-100 flex items-center justify-between gap-3 shrink-0">
+              <a
+                href="/news"
+                className="flex-1 py-2.5 rounded-xl bg-orange-100 hover:bg-orange-200 text-[#8D2817] font-bold text-xs text-center transition-colors"
+              >
+                पूर्ण समाचार पोर्टल खोलें (Open /news) ↗
+              </a>
+              <button
+                onClick={() => setActiveModal(null)}
+                className="py-2.5 px-4 rounded-xl bg-stone-900 text-white font-medium text-xs hover:bg-stone-800 transition-colors"
+              >
+                बंद करें (Close)
+              </button>
+            </div>
           </div>
         </div>
       )}
+
+      {/* Full News Reader Modal */}
+      <NewsReaderModal
+        isOpen={Boolean(selectedNewsForReader)}
+        newsItem={selectedNewsForReader}
+        onClose={() => setSelectedNewsForReader(null)}
+        allNews={newsList}
+        onSelectNews={(item) => setSelectedNewsForReader(item)}
+      />
 
       {/* ================= MODAL: PEOPLE (गाँव डायरेक्टरी) ================= */}
       {activeModal === 'people' && (

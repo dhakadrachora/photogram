@@ -19,10 +19,18 @@ export async function GET(req: NextRequest) {
       .reverse();
   }
 
+  const singleId = searchParams.get('id');
+
   if (type === 'all' || type === 'news') {
+    if (singleId) {
+      const item = contentStore.news.get(singleId);
+      if (item && item.published) {
+        responseData.newsItem = item;
+      }
+    }
     responseData.news = Array.from(contentStore.news.values())
       .filter((n) => n.published)
-      .reverse();
+      .sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));
   }
 
   if (type === 'all' || type === 'people') {
