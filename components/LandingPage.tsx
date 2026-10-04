@@ -28,13 +28,13 @@ import {
   Gift,
   Copy,
   Check,
+  LogIn,
 } from 'lucide-react';
 import { User, AppTab, NewsItem, CommunityUpdate, PresenceUser } from '@/types';
 import { SoundEffects } from '@/lib/audio/sound-effects';
 import { isSiteAdmin } from '@/lib/admin-auth';
 import { PWAInstallButton } from './PWAInstallButton';
 import { NewsReaderModal } from './NewsReaderModal';
-import { GoogleIcon } from './GoogleIcon';
 
 interface LandingPageProps {
   currentUser: User | null;
@@ -192,12 +192,11 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
               <button
                 type="button"
                 onClick={onOpenAuth}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white hover:bg-slate-50 text-slate-900 border border-slate-200 text-xs font-black shadow-xs transition-transform active:scale-95 cursor-pointer"
-                title="Google (Gmail) से सीधे लॉगिन करें"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black shadow-xs transition-transform active:scale-95 cursor-pointer"
+                title="लॉगिन करें"
               >
-                <GoogleIcon className="w-3.5 h-3.5 shrink-0" />
-                <span className="hidden sm:inline">Google लॉगिन</span>
-                <span className="sm:hidden text-[11px]">लॉगिन</span>
+                <LogIn className="w-3.5 h-3.5 shrink-0" />
+                <span className="text-[11px] font-bold">लॉगिन</span>
               </button>
             ) : (
               <div className="flex items-center gap-1.5">
@@ -302,8 +301,8 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
                 </>
               ) : (
                 <>
-                  <GoogleIcon className="w-4 h-4 shrink-0" />
-                  <span className="tracking-wide">Google (Gmail) से लॉगिन करें</span>
+                  <LogIn className="w-4 h-4 shrink-0 text-slate-950" />
+                  <span className="tracking-wide">लॉगिन / साइन-अप करें</span>
                 </>
               )}
             </button>
