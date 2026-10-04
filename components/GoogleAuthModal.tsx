@@ -25,10 +25,12 @@ import { isSiteAdmin } from '@/lib/admin-auth';
 import {
   signUpWithEmail,
   signInWithEmail,
+  signInWithGoogle,
   sendPasswordResetEmail,
   updateUserPassword,
   isSupabaseConfigured,
 } from '@/lib/supabase';
+import { GoogleIcon } from '@/components/GoogleIcon';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -61,6 +63,7 @@ export function GoogleAuthModal({
     return 'login';
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -96,7 +99,29 @@ export function GoogleAuthModal({
     setMode(newMode);
     setErrorMessage(null);
     setSuccessMessage(null);
+    setIsGoogleLoading(false);
+    setIsLoading(false);
     SoundEffects.playTabClick();
+  };
+
+  // 1-Click Direct Google/Gmail Sign In
+  const handleGoogleSignIn = async () => {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setIsGoogleLoading(true);
+    SoundEffects.playTabClick();
+
+    try {
+      const result = await signInWithGoogle();
+      if (result.error) {
+        setErrorMessage(result.error);
+        setIsGoogleLoading(false);
+      }
+      // If successful without error, Supabase will redirect to Google's OAuth consent screen
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Google लॉगिन शुरू करने में समस्या आई। पुनः प्रयास करें।');
+      setIsGoogleLoading(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -303,15 +328,15 @@ export function GoogleAuthModal({
           </h3>
 
           <p className="text-xs text-slate-400 mt-1 max-w-xs">
-            {mode === 'login' && 'ईमेल और पासवर्ड द्वारा सुरक्षित रूप से लॉगिन करें'}
-            {mode === 'signup' && 'नाम, ईमेल और पासवर्ड दर्ज करें (फ़ोन और फ़ोटो वैकल्पिक हैं)'}
+            {mode === 'login' && 'Google (Gmail) से सीधे 1-क्लिक में लॉगिन करें या ईमेल से जारी रखें'}
+            {mode === 'signup' && 'Google (Gmail) से सीधे जुड़ें या नीचे दिए गए फ़ॉर्म को भरें'}
             {mode === 'forgot' && 'अपना पंजीकृत ईमेल दर्ज करें, हम रीसेट लिंक भेजेंगे'}
             {mode === 'reset' && 'अपने खाते के लिए नया सुरक्षित पासवर्ड दर्ज करें'}
           </p>
 
           <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-0.5 rounded-full bg-slate-800/80 border border-slate-700/60 text-[11px] font-medium text-amber-300">
             <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-            <span>Supabase सुरक्षित ऑथेंटिकेशन</span>
+            <span>Google & Supabase सुरक्षित ऑथेंटिकेशन</span>
           </div>
         </div>
 
@@ -332,7 +357,45 @@ export function GoogleAuthModal({
 
         {/* ================= MODE 1: LOGIN ================= */}
         {mode === 'login' && (
-          <form onSubmit={handleLoginSubmit} className="space-y-4">
+          <div className="space-y-4">
+            {/* Primary Google / Gmail Direct Sign-In Button */}
+            <div className="space-y-2">
+              <button
+                type="button"
+                id="google-direct-signin-btn"
+                onClick={handleGoogleSignIn}
+                disabled={isLoading || isGoogleLoading}
+                className="group relative w-full py-3.5 px-4 rounded-2xl bg-white hover:bg-slate-50 text-slate-900 font-black text-sm sm:text-base border border-slate-200 hover:border-slate-300 shadow-xl shadow-black/25 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-60 cursor-pointer"
+              >
+                {isGoogleLoading ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin text-slate-700" />
+                    <span className="text-slate-800 font-bold">Google से कनेक्ट हो रहा है...</span>
+                  </>
+                ) : (
+                  <>
+                    <GoogleIcon className="h-5 w-5 shrink-0 transition-transform group-hover:scale-110" />
+                    <span className="text-slate-900 tracking-tight">Google (Gmail) से सीधे लॉगिन करें</span>
+                  </>
+                )}
+              </button>
+
+              <div className="flex items-center justify-center gap-1.5 text-[11px] text-amber-400/90 font-medium">
+                <Sparkles className="h-3 w-3 text-amber-400 shrink-0" />
+                <span>1-क्लिक सीधा लॉगिन • पासवर्ड की कोई ज़रूरत नहीं</span>
+              </div>
+            </div>
+
+            {/* Visual Divider */}
+            <div className="relative flex items-center justify-center my-3.5">
+              <div className="border-t border-slate-800 w-full" />
+              <span className="bg-slate-900 px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">
+                या ईमेल व पासवर्ड से लॉगिन करें
+              </span>
+              <div className="border-t border-slate-800 w-full" />
+            </div>
+
+            <form onSubmit={handleLoginSubmit} className="space-y-3.5">
             {/* Email Field */}
             <div>
               <label className="block text-xs font-bold text-slate-300 mb-1.5">
@@ -417,11 +480,50 @@ export function GoogleAuthModal({
               </p>
             </div>
           </form>
+        </div>
         )}
 
         {/* ================= MODE 2: SIGN UP ================= */}
         {mode === 'signup' && (
-          <form onSubmit={handleSignUpSubmit} className="space-y-3.5">
+          <div className="space-y-4">
+            {/* Primary Google / Gmail Direct Sign-Up Button */}
+            <div className="space-y-2">
+              <button
+                type="button"
+                id="google-direct-signup-btn"
+                onClick={handleGoogleSignIn}
+                disabled={isLoading || isGoogleLoading}
+                className="group relative w-full py-3.5 px-4 rounded-2xl bg-white hover:bg-slate-50 text-slate-900 font-black text-sm sm:text-base border border-slate-200 hover:border-slate-300 shadow-xl shadow-black/25 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-60 cursor-pointer"
+              >
+                {isGoogleLoading ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin text-slate-700" />
+                    <span className="text-slate-800 font-bold">Google से कनेक्ट हो रहा है...</span>
+                  </>
+                ) : (
+                  <>
+                    <GoogleIcon className="h-5 w-5 shrink-0 transition-transform group-hover:scale-110" />
+                    <span className="text-slate-900 tracking-tight">Google (Gmail) से 1-क्लिक खाता बनाएं</span>
+                  </>
+                )}
+              </button>
+
+              <div className="flex items-center justify-center gap-1.5 text-[11px] text-amber-400/90 font-medium">
+                <Sparkles className="h-3 w-3 text-amber-400 shrink-0" />
+                <span>फ़ॉर्म या पासवर्ड की ज़रूरत नहीं • Gmail से तुरंत सुरक्षित शुरुआत</span>
+              </div>
+            </div>
+
+            {/* Visual Divider */}
+            <div className="relative flex items-center justify-center my-3.5">
+              <div className="border-t border-slate-800 w-full" />
+              <span className="bg-slate-900 px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">
+                या मैन्युअल फ़ॉर्म से खाता बनाएं
+              </span>
+              <div className="border-t border-slate-800 w-full" />
+            </div>
+
+            <form onSubmit={handleSignUpSubmit} className="space-y-3">
             {/* Name Field (Required) */}
             <div>
               <label className="block text-xs font-bold text-slate-300 mb-1">
@@ -611,6 +713,7 @@ export function GoogleAuthModal({
               </p>
             </div>
           </form>
+        </div>
         )}
 
         {/* ================= MODE 3: FORGOT PASSWORD ================= */}

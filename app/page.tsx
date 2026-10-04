@@ -22,6 +22,7 @@ import { PWAInstallBanner } from '@/components/PWAInstallBanner';
 
 import { isSiteAdmin } from '@/lib/admin-auth';
 import { useIsMounted } from '@/lib/useIsMounted';
+import { startProgressBar, doneProgressBar } from '@/lib/progress-bar';
 
 import {
   supabase,
@@ -611,6 +612,14 @@ export default function Home() {
   const [selectedOpponent, setSelectedOpponent] =
     useState<string | undefined>(undefined);
 
+  const handleTabSwitch = (tab: AppTab) => {
+    startProgressBar();
+    setActiveTab(tab);
+    setTimeout(() => {
+      doneProgressBar();
+    }, 200);
+  };
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -782,6 +791,30 @@ export default function Home() {
               dbUser.created_at ||
               appUser.createdAt,
           };
+        } else if (sbUser?.id && appUser?.email) {
+          // Auto-register first-time Google Sign-In user in public.users
+          try {
+            await supabase.from('users').upsert(
+              {
+                id: sbUser.id,
+                email: appUser.email,
+                name: appUser.name,
+                avatar: appUser.avatar,
+                phone: appUser.phone || null,
+                badge: appUser.badge,
+                coins: 50,
+                wins: 0,
+                battles: 0,
+                rank: appUser.rank,
+                role: appUser.role,
+                is_admin: appUser.isAdmin,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: 'id' }
+            );
+          } catch (createErr) {
+            console.warn('Could not auto-insert Google user to public.users:', createErr);
+          }
         }
       } catch (error) {
         console.warn(
@@ -792,6 +825,17 @@ export default function Home() {
 
       if (!cancelled) {
         handleLoginSuccess(appUser);
+        setIsAuthModalOpen(false);
+
+        // Clean up OAuth tokens / code from browser URL
+        if (typeof window !== 'undefined') {
+          if (
+            window.location.hash.includes('access_token') ||
+            window.location.search.includes('code=')
+          ) {
+            window.history.replaceState(null, '', window.location.pathname);
+          }
+        }
       }
     };
 
@@ -1106,7 +1150,7 @@ export default function Home() {
           <button
             type="button"
             onClick={() =>
-              setActiveTab('home')
+              handleTabSwitch('home')
             }
             className="flex items-center gap-1.5 text-xs font-bold text-stone-300 hover:text-white"
           >
@@ -1182,7 +1226,7 @@ export default function Home() {
                   return;
                 }
 
-                setActiveTab(tab);
+                handleTabSwitch(tab);
               }}
               onOpenAuth={() =>
                 setIsAuthModalOpen(true)
@@ -1284,7 +1328,7 @@ export default function Home() {
           <div className="fixed inset-0 z-40 h-[100dvh] w-full bg-slate-950 flex flex-col overflow-hidden">
             <WorldChat
               currentUser={currentUser}
-              onBack={() => setActiveTab('home')}
+              onBack={() => handleTabSwitch('home')}
               onOpenAuth={() =>
                 setIsAuthModalOpen(true)
               }
@@ -1312,7 +1356,7 @@ export default function Home() {
               handleUpdateUser
             }
             onNavigateTab={
-              setActiveTab
+              handleTabSwitch
             }
           />
         )}
@@ -1329,7 +1373,7 @@ export default function Home() {
             }
             onLogout={handleLogout}
             onNavigateTab={
-              setActiveTab
+              handleTabSwitch
             }
             onUpdateUser={
               handleUpdateUser
@@ -1344,7 +1388,7 @@ export default function Home() {
         {activeTab === 'support' && (
           <SupportView
             currentUser={currentUser}
-            onNavigateTab={setActiveTab}
+            onNavigateTab={handleTabSwitch}
             onOpenAuth={() => setIsAuthModalOpen(true)}
           />
         )}
@@ -1354,7 +1398,7 @@ export default function Home() {
             ==================================================== */}
 
         {activeTab === 'rewards' && (
-          <WinnerOffersPage onBack={() => setActiveTab('home')} />
+          <WinnerOffersPage onBack={() => handleTabSwitch('home')} />
         )}
 
       </main>
@@ -1374,7 +1418,7 @@ export default function Home() {
             <button
               type="button"
               onClick={() =>
-                setActiveTab('home')
+                handleTabSwitch('home')
               }
               className={`flex flex-col items-center gap-1 transition-colors ${
                 activeTab === 'home'
@@ -1416,7 +1460,7 @@ export default function Home() {
                     });
                   }
                 } else {
-                  setActiveTab('home');
+                  handleTabSwitch('home');
                 }
               }}
               className="flex flex-col items-center gap-1 text-stone-400 transition-colors hover:text-stone-700"
@@ -1432,7 +1476,7 @@ export default function Home() {
             <button
               type="button"
               onClick={() =>
-                setActiveTab('worldchat')
+                handleTabSwitch('worldchat')
               }
               className="relative flex flex-col items-center gap-1 transition-colors text-stone-400 hover:text-stone-700"
             >
@@ -1448,7 +1492,7 @@ export default function Home() {
             {/* REWARDS */}
             <button
               type="button"
-              onClick={() => setActiveTab('rewards')}
+              onClick={() => handleTabSwitch('rewards')}
               className={`flex flex-col items-center gap-1 transition-colors ${
                 activeTab === 'rewards'
                   ? 'font-medium text-[#2D7D46]'
@@ -1469,7 +1513,7 @@ export default function Home() {
                 if (!currentUser) {
                   setIsAuthModalOpen(true);
                 } else {
-                  setActiveTab(
+                  handleTabSwitch(
                     'profile'
                   );
                 }
@@ -1490,7 +1534,7 @@ export default function Home() {
             {/* SUPPORT */}
             <button
               type="button"
-              onClick={() => setActiveTab('support')}
+              onClick={() => handleTabSwitch('support')}
               className={`flex flex-col items-center gap-1 transition-colors ${
                 activeTab === 'support'
                   ? 'font-medium text-amber-500'

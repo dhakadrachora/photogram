@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
 import { PostHogProvider } from '@/components/PostHogProvider';
+import { TopProgressBar } from '@/components/TopProgressBar';
 import './globals.css';
 
 export const viewport: Viewport = {
@@ -258,7 +259,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="hi">
+    <html lang="hi" suppressHydrationWarning>
       <head>
         {/* Geo-targeting Meta tags for Rajasthan / India */}
         <meta name="geo.region" content="IN-RJ" />
@@ -271,26 +272,33 @@ export default function RootLayout({
         <meta name="revisit-after" content="1 days" />
         <meta name="author" content="DHOTI AALE Team" />
 
-        {/* Google AdSense Verification & Auto Ads Script */}
+        {/* Google AdSense Verification Meta */}
         <meta name="google-adsense-account" content="ca-pub-2229349785904510" />
-        <script
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2229349785904510"
-          crossOrigin="anonymous"
-        />
 
         {/* Schema.org Structured Data */}
         <script
+          id="schema-jsonld"
           type="application/ld+json"
+          suppressHydrationWarning
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdGraph) }}
         />
       </head>
       <body suppressHydrationWarning>
+        <TopProgressBar />
         <PostHogProvider>
           {children}
         </PostHogProvider>
 
+        {/* Google AdSense Auto Ads - loaded safely after hydration */}
         <Script
+          id="google-adsense"
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2229349785904510"
+          strategy="afterInteractive"
+          crossOrigin="anonymous"
+        />
+
+        <Script
+          id="google-identity"
           src="https://accounts.google.com/gsi/client"
           strategy="afterInteractive"
         />

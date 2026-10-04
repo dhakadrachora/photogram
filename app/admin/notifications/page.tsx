@@ -246,7 +246,7 @@ export default function AdminNotificationsPage() {
               <div className="p-8 text-center text-xs text-slate-500">Loading broadcast history...</div>
             ) : broadcastHistory.length === 0 ? (
               <div className="p-8 rounded-xl bg-slate-900 border border-slate-800 text-center text-xs text-slate-400">
-                No recent broadcast messages. Click "Compose Broadcast" above to send your first message.
+                No recent broadcast messages. Click &quot;Compose Broadcast&quot; above to send your first message.
               </div>
             ) : (
               <div className="space-y-2">

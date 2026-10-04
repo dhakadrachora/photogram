@@ -20,6 +20,7 @@ import {
   Bot,
   ArrowLeft,
 } from 'lucide-react';
+import { GoogleIcon } from '@/components/GoogleIcon';
 
 interface WorldChatProps {
   currentUser: User | null;
@@ -804,10 +805,11 @@ export function WorldChat({
           ) : (
             <button
               onClick={onOpenAuth}
-              className="flex items-center gap-1 sm:gap-1.5 rounded-xl sm:rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-3 py-1.5 text-xs shadow-md transition-all active:scale-95 shrink-0"
+              className="flex items-center gap-1.5 rounded-xl sm:rounded-2xl bg-white hover:bg-slate-100 text-slate-900 font-bold px-3 py-1.5 text-xs shadow-md transition-all active:scale-95 shrink-0 cursor-pointer"
+              title="Google (Gmail) से लॉगिन करें"
             >
-              <LogIn className="h-3.5 w-3.5" />
-              <span>Login</span>
+              <GoogleIcon className="h-3.5 w-3.5 shrink-0" />
+              <span>Google लॉगिन</span>
             </button>
           )}
         </div>
@@ -1025,13 +1027,13 @@ export function WorldChat({
             {!currentUser && (
               <div
                 onClick={onOpenAuth}
-                className="mb-2 flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold cursor-pointer hover:bg-amber-500/25 active:scale-[0.99] transition-all"
+                className="mb-2 flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-900 text-xs font-bold cursor-pointer shadow-md active:scale-[0.99] transition-all"
               >
-                <div className="flex items-center gap-1.5">
-                  <Lock className="h-3.5 w-3.5 text-amber-400" />
-                  <span>चौपाल में संदेश भेजने के लिए 1-क्लिक लॉगिन करें</span>
+                <div className="flex items-center gap-2">
+                  <GoogleIcon className="h-4 w-4 shrink-0" />
+                  <span className="font-extrabold text-slate-900">चौपाल में संदेश भेजने के लिए Google (Gmail) से लॉगिन करें</span>
                 </div>
-                <span className="text-[10px] bg-amber-500 text-slate-950 px-2 py-0.5 rounded-lg font-black">Login</span>
+                <span className="text-[10px] bg-slate-950 text-white px-2.5 py-1 rounded-lg font-black shrink-0">1-क्लिक लॉगिन</span>
               </div>
             )}
 

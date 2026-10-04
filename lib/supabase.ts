@@ -103,15 +103,18 @@ export function mapSupabaseUserToAppUser(sbUser: {
   id: string;
   email?: string | null;
   user_metadata?: Record<string, any>;
+  app_metadata?: Record<string, any>;
   created_at?: string;
 }): User {
   const email = (sbUser.email || '').trim().toLowerCase();
   const metadata = sbUser.user_metadata || {};
+  const appMetadata = sbUser.app_metadata || {};
   const admin = isSiteAdmin(email);
 
   const name =
     metadata.full_name ||
     metadata.name ||
+    metadata.user_name ||
     (email ? email.split('@')[0] : 'Dhoti Resident');
 
   const avatar =
@@ -120,6 +123,12 @@ export function mapSupabaseUserToAppUser(sbUser: {
     `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(sbUser.id)}`;
 
   const phone = metadata.phone || undefined;
+
+  const isGoogle =
+    appMetadata.provider === 'google' ||
+    Boolean(metadata.iss?.includes('google')) ||
+    Boolean(metadata.avatar_url?.includes('googleusercontent')) ||
+    Boolean(metadata.picture?.includes('googleusercontent'));
 
   return {
     id: sbUser.id,
@@ -132,7 +141,7 @@ export function mapSupabaseUserToAppUser(sbUser: {
     wins: 0,
     battles: 0,
     rank: admin ? 'Super Admin 👑' : 'Resident',
-    isGoogle: false,
+    isGoogle,
     role: admin ? 'admin' : 'resident',
     isAdmin: admin,
     createdAt: sbUser.created_at || Date.now(),
@@ -330,6 +339,64 @@ export async function signInWithEmail({
       user: null,
       session: null,
       error: err?.message || 'लॉगिन विफल रहा।',
+    };
+  }
+}
+
+/* ============================================================
+   GOOGLE OAUTH SIGN IN
+   ============================================================ */
+
+export async function signInWithGoogle(
+  redirectToUrl?: string
+): Promise<{ error?: string }> {
+  if (!isSupabaseConfigured()) {
+    return {
+      error:
+        'Supabase कॉन्फ़िगर नहीं है। कृपया Supabase URL और Anon Key सेट करें।',
+    };
+  }
+
+  try {
+    const origin =
+      typeof window !== 'undefined' ? window.location.origin : '';
+    const redirectTarget = redirectToUrl || origin;
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: redirectTarget,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'select_account',
+        },
+      },
+    });
+
+    if (error) {
+      const errLower = error.message.toLowerCase();
+      if (
+        errLower.includes('provider is not enabled') ||
+        errLower.includes('unsupported provider')
+      ) {
+        return {
+          error:
+            'Google Provider Supabase में सक्रिय (Enable) नहीं है। कृपया Supabase Dashboard -> Authentication -> Providers -> Google को Enable करें।',
+        };
+      }
+      return { error: error.message };
+    }
+
+    if (data?.url && typeof window !== 'undefined') {
+      window.location.href = data.url;
+    }
+
+    return {};
+  } catch (err: any) {
+    return {
+      error:
+        err?.message ||
+        'Google साइन-इन शुरू करने में समस्या आई। पुनः प्रयास करें।',
     };
   }
 }

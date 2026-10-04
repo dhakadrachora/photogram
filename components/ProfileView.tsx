@@ -28,6 +28,7 @@ import {
   HelpCircle,
 } from 'lucide-react';
 import { SoundEffects } from '@/lib/audio/sound-effects';
+import { GoogleIcon } from './GoogleIcon';
 import { PWAInstallButton } from './PWAInstallButton';
 import { updateUserProfileDetails } from '@/lib/supabase';
 import { isSiteAdmin } from '@/lib/admin-auth';
@@ -142,10 +143,16 @@ export function ProfileView({
           </p>
           <button
             onClick={onOpenAuth}
-            className="mt-6 w-full flex items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black py-3.5 px-6 shadow-xl transition-all"
+            className="mt-6 w-full flex items-center justify-center gap-3 rounded-2xl bg-white hover:bg-slate-100 text-slate-900 font-black py-3.5 px-6 shadow-xl transition-all cursor-pointer active:scale-95"
           >
-            <LogIn className="h-5 w-5 text-slate-950" />
-            <span>लॉगिन / साइन-अप करें (Sign In)</span>
+            <GoogleIcon className="h-5 w-5" />
+            <span>Google (Gmail) से सीधे लॉगिन करें</span>
+          </button>
+          <button
+            onClick={onOpenAuth}
+            className="mt-2.5 w-full flex items-center justify-center gap-2 rounded-2xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 text-slate-300 font-bold py-2.5 px-4 text-xs transition-all cursor-pointer"
+          >
+            <span>ईमेल / पासवर्ड से लॉगिन करें</span>
           </button>
         </div>
       </div>

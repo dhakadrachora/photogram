@@ -3,6 +3,7 @@
 import React, { useEffect, Suspense } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { initPostHog, trackEvent } from '@/lib/posthog';
+import { NetworkGuard } from '@/components/NetworkGuard';
 
 function PostHogPageViewTracker() {
   const pathname = usePathname();
@@ -38,6 +39,7 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
       <Suspense fallback={null}>
         <PostHogPageViewTracker />
       </Suspense>
+      <NetworkGuard />
       {children}
     </>
   );

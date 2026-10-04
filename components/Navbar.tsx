@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { User, AppTab } from '@/types';
 import { isSiteAdmin } from '@/lib/admin-auth';
+import { startProgressBar, doneProgressBar } from '@/lib/progress-bar';
 import {
   Home,
   MessageSquare,
@@ -16,6 +17,7 @@ import {
   AlertCircle,
   Gift,
 } from 'lucide-react';
+import { GoogleIcon } from '@/components/GoogleIcon';
 
 interface NavbarProps {
   activeTab: AppTab;
@@ -48,14 +50,22 @@ export function Navbar({
   const isAdmin = isSiteAdmin(currentUser?.email);
 
   const handleTabClick = (tab: AppTab) => {
+    startProgressBar();
     setActiveTab(tab);
     setMobileMenuOpen(false);
+    setTimeout(() => {
+      doneProgressBar();
+    }, 250);
   };
 
   const handleOpenReport = () => {
+    startProgressBar();
     setMobileMenuOpen(false);
     if (setActiveTab) {
       setActiveTab('support');
+      setTimeout(() => {
+        doneProgressBar();
+      }, 250);
     } else {
       window.location.href = '/support';
     }
@@ -266,10 +276,11 @@ export function Navbar({
             <button
               id="login-navbar-button"
               onClick={onOpenAuth}
-              className="flex items-center gap-2 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black px-4 py-2 text-xs shadow-md shadow-amber-500/20 transition-all active:scale-95"
+              className="flex items-center gap-2 rounded-full bg-white hover:bg-slate-100 text-slate-900 border border-slate-200 font-black px-3.5 py-1.5 text-xs shadow-md shadow-white/5 transition-all active:scale-95 cursor-pointer"
+              title="Google (Gmail) से सीधे 1-क्लिक लॉगिन करें"
             >
-              <UserIcon className="w-3.5 h-3.5 text-slate-950" />
-              <span className="whitespace-nowrap hidden sm:inline">लॉगिन / साइन-अप</span>
+              <GoogleIcon className="w-3.5 h-3.5 shrink-0" />
+              <span className="whitespace-nowrap hidden sm:inline">Google से लॉगिन</span>
               <span className="whitespace-nowrap sm:hidden text-xs">लॉगिन</span>
             </button>
           )}
@@ -381,6 +392,19 @@ export function Navbar({
             <span>सहायता व शिकायत (24/7 Support)</span>
           </button>
 
+          {/* Direct Google Login in Mobile Drawer */}
+          {!currentUser && (
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                onOpenAuth();
+              }}
+              className="w-full mt-2 flex items-center justify-center gap-2.5 px-4 py-3 rounded-2xl bg-white hover:bg-slate-100 text-slate-900 font-black text-sm shadow-md transition-all active:scale-95 cursor-pointer"
+            >
+              <GoogleIcon className="h-4 w-4 shrink-0" />
+              <span>Google (Gmail) से सीधे लॉगिन करें</span>
+            </button>
+          )}
         </div>
       )}
     </header>

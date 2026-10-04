@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { BarChart3, Users, Swords, Vote, Newspaper, Building2, Image, Video, RefreshCw } from 'lucide-react';
+import { BarChart3, Users, Swords, Vote, Newspaper, Building2, Image as ImageIcon, Video, RefreshCw } from 'lucide-react';
 import { adminFetch } from '@/lib/admin/api';
 import { DashboardMetrics } from '@/lib/admin/types';
 import { AdminLoading } from '@/components/admin/AdminLoading';
@@ -109,7 +109,7 @@ export default function AdminAnalyticsPage() {
 
         <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex items-center gap-3">
           <div className="p-2.5 rounded-xl bg-teal-500/10 text-teal-400 border border-teal-500/20">
-            <Image className="h-5 w-5" />
+            <ImageIcon className="h-5 w-5" />
           </div>
           <div>
             <div className="text-[11px] text-slate-400 font-semibold">Village Photos</div>
