@@ -1,6 +1,7 @@
 import { MetadataRoute } from 'next';
 import { createServerClient, isSupabaseConfigured } from '@/lib/supabase';
 import { VIRAL_30_NEWS } from '@/lib/data/viral-news';
+import { VIRAL_20_TOOLS } from '@/lib/data/tools-data';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = 'https://www.dhotiaale.online';
@@ -12,6 +13,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: now,
       changeFrequency: 'daily',
       priority: 1.0,
+    },
+    {
+      url: `${baseUrl}/tools`,
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.95,
     },
     {
       url: `${baseUrl}/news`,
