@@ -55,7 +55,18 @@ function NewsContent() {
       const res = await fetch('/api/content?type=news', { cache: 'no-store' });
       const data = await res.json();
       if (Array.isArray(data.news) && data.news.length > 0) {
-        setNewsList(data.news);
+        // Merge API news with FALLBACK_NEWS so no researched posts are ever lost
+        const mergedMap = new Map<string, NewsItem>();
+        for (const item of FALLBACK_NEWS) {
+          if (item && item.id) mergedMap.set(item.id, item);
+        }
+        for (const item of data.news) {
+          if (item && item.id) mergedMap.set(item.id, item);
+        }
+        const mergedList = Array.from(mergedMap.values()).sort(
+          (a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0)
+        );
+        setNewsList(mergedList);
       }
     } catch (e) {
       console.warn('Could not fetch news, using fallback list', e);
