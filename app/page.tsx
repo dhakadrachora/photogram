@@ -22,6 +22,7 @@ import GoogleAuthModal from '@/components/GoogleAuthModal';
 import { PWAInstallBanner } from '@/components/PWAInstallBanner';
 import { FloatingChatWidget } from '@/components/FloatingChatWidget';
 import { EarnCoinsModal } from '@/components/EarnCoinsModal';
+import { AppSplashScreen } from '@/components/AppSplashScreen';
 
 import { isSiteAdmin } from '@/lib/admin-auth';
 import { useIsMounted } from '@/lib/useIsMounted';
@@ -1560,6 +1561,11 @@ export default function Home() {
           }
         }}
       />
+
+      {/* ======================================================
+          NATIVE APP LAUNCH SPLASH SCREEN (IMAGE + WORKING PROGRESS BAR)
+          ====================================================== */}
+      <AppSplashScreen />
 
     </div>
   );

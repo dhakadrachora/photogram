@@ -310,6 +310,26 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth, onOpenEarn
             <span>गाँव चौपाल चैट</span>
           </button>
         </div>
+
+        {/* Featured Village Portrait Showcase Banner */}
+        <div className="relative z-10 w-full max-w-sm sm:max-w-md mt-6 rounded-3xl overflow-hidden border border-amber-500/40 shadow-2xl shadow-amber-500/10 group">
+          <div className="relative w-full aspect-[4/3] sm:aspect-[16/10] overflow-hidden bg-slate-900">
+            <img
+              src="/dhoti-splash.jpg"
+              alt="ढोटी आले - गाँव चौपाल व संस्कृति"
+              className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent" />
+            <div className="absolute bottom-3 left-3 right-3 text-left">
+              <span className="inline-block px-2.5 py-0.5 rounded-full bg-amber-500/90 text-slate-950 font-black text-[10px] uppercase tracking-wider mb-1">
+                मेरा गाँव • मेरा गौरव 🚩
+              </span>
+              <p className="text-xs font-bold text-white leading-tight">
+                ढोटी गांव की खबरें, लोग, जानकारी और गतिविधियां एक जगह।
+              </p>
+            </div>
+          </div>
+        </div>
       </section>
       {/* END: HeroSection */}
 
