@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import Link from 'next/link';
 import {
   AlertCircle,
   Send,
@@ -81,7 +82,7 @@ export function SupportView({
     setTimeout(() => setNotice(null), 4500);
   };
 
-  const getAuthHeaders = async (): Promise<Record<string, string>> => {
+  const getAuthHeaders = useCallback(async (): Promise<Record<string, string>> => {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -106,7 +107,7 @@ export function SupportView({
     }
 
     return headers;
-  };
+  }, [currentUser]);
 
   // Fetch all user reports
   const fetchReports = useCallback(async (quiet = false) => {
@@ -130,7 +131,7 @@ export function SupportView({
     } finally {
       if (!quiet) setIsLoading(false);
     }
-  }, [currentUser]);
+  }, [currentUser, getAuthHeaders]);
 
   // Load specific report thread
   const loadReportThread = useCallback(async (reportId: string, quiet = false) => {
@@ -150,7 +151,7 @@ export function SupportView({
     } catch (err) {
       console.warn('Failed to load thread:', err);
     }
-  }, [currentUser]);
+  }, [getAuthHeaders]);
 
   // Initial load
   useEffect(() => {
@@ -355,13 +356,13 @@ export function SupportView({
                 <ArrowLeft className="h-4 w-4 text-amber-400" />
               </button>
             ) : isStandalonePage ? (
-              <a
+              <Link
                 href="/"
                 className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors flex items-center gap-1.5 text-xs font-bold"
               >
                 <ArrowLeft className="h-4 w-4 text-amber-400" />
                 <span className="hidden sm:inline">गाँव होम</span>
-              </a>
+              </Link>
             ) : null}
 
             <div>

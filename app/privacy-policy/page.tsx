@@ -125,7 +125,7 @@ export default function PrivacyPolicyPage() {
           <section className="space-y-2">
             <h2 className="text-base font-bold text-stone-900 flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-amber-600" />
-              <span>5. Children's Privacy Protection (COPPA)</span>
+              <span>5. Children&apos;s Privacy Protection (COPPA)</span>
             </h2>
             <p>
               Protecting the privacy of children is important to us. DHOTI AALE does not knowingly collect personally identifiable information from children under the age of 13. If you believe your child has provided such information, please contact us immediately and we will promptly remove it from our database.

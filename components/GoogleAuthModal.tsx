@@ -96,6 +96,7 @@ export function GoogleAuthModal({
     setMode(newMode);
     setErrorMessage(null);
     setSuccessMessage(null);
+    setIsLoading(false);
     SoundEffects.playTabClick();
   };
 
@@ -303,15 +304,15 @@ export function GoogleAuthModal({
           </h3>
 
           <p className="text-xs text-slate-400 mt-1 max-w-xs">
-            {mode === 'login' && 'ईमेल और पासवर्ड द्वारा सुरक्षित रूप से लॉगिन करें'}
-            {mode === 'signup' && 'नाम, ईमेल और पासवर्ड दर्ज करें (फ़ोन और फ़ोटो वैकल्पिक हैं)'}
+            {mode === 'login' && 'ईमेल और पासवर्ड से अपने खाते में लॉगिन करें'}
+            {mode === 'signup' && 'DHOTI AALE परिवार से जुड़ने के लिए अपना खाता बनाएं'}
             {mode === 'forgot' && 'अपना पंजीकृत ईमेल दर्ज करें, हम रीसेट लिंक भेजेंगे'}
             {mode === 'reset' && 'अपने खाते के लिए नया सुरक्षित पासवर्ड दर्ज करें'}
           </p>
 
           <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-0.5 rounded-full bg-slate-800/80 border border-slate-700/60 text-[11px] font-medium text-amber-300">
             <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-            <span>Supabase सुरक्षित ऑथेंटिकेशन</span>
+            <span>सुरक्षित ऑथेंटिकेशन (Secure Authentication)</span>
           </div>
         </div>
 
@@ -332,7 +333,8 @@ export function GoogleAuthModal({
 
         {/* ================= MODE 1: LOGIN ================= */}
         {mode === 'login' && (
-          <form onSubmit={handleLoginSubmit} className="space-y-4">
+          <div className="space-y-4">
+            <form onSubmit={handleLoginSubmit} className="space-y-3.5">
             {/* Email Field */}
             <div>
               <label className="block text-xs font-bold text-slate-300 mb-1.5">
@@ -417,11 +419,13 @@ export function GoogleAuthModal({
               </p>
             </div>
           </form>
+        </div>
         )}
 
         {/* ================= MODE 2: SIGN UP ================= */}
         {mode === 'signup' && (
-          <form onSubmit={handleSignUpSubmit} className="space-y-3.5">
+          <div className="space-y-4">
+            <form onSubmit={handleSignUpSubmit} className="space-y-3">
             {/* Name Field (Required) */}
             <div>
               <label className="block text-xs font-bold text-slate-300 mb-1">
@@ -611,6 +615,7 @@ export function GoogleAuthModal({
               </p>
             </div>
           </form>
+        </div>
         )}
 
         {/* ================= MODE 3: FORGOT PASSWORD ================= */}

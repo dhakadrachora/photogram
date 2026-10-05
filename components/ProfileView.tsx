@@ -142,10 +142,10 @@ export function ProfileView({
           </p>
           <button
             onClick={onOpenAuth}
-            className="mt-6 w-full flex items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black py-3.5 px-6 shadow-xl transition-all"
+            className="mt-6 w-full flex items-center justify-center gap-2 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-3.5 px-6 shadow-xl transition-all cursor-pointer active:scale-95"
           >
-            <LogIn className="h-5 w-5 text-slate-950" />
-            <span>लॉगिन / साइन-अप करें (Sign In)</span>
+            <LogIn className="h-5 w-5" />
+            <span>लॉगिन करें (Sign In / Register)</span>
           </button>
         </div>
       </div>

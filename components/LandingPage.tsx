@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import {
   ArrowRight,
   Newspaper,
@@ -27,6 +28,7 @@ import {
   Gift,
   Copy,
   Check,
+  LogIn,
 } from 'lucide-react';
 import { User, AppTab, NewsItem, CommunityUpdate, PresenceUser } from '@/types';
 import { SoundEffects } from '@/lib/audio/sound-effects';
@@ -183,10 +185,20 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
             </div>
           </div>
 
-          {/* Right Header Actions: Install Button + User Profile */}
+          {/* Right Header Actions: Install Button + User Profile / Google Login */}
           <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-2">
             <PWAInstallButton variant="header" />
-            {currentUser && (
+            {!currentUser ? (
+              <button
+                type="button"
+                onClick={onOpenAuth}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black shadow-xs transition-transform active:scale-95 cursor-pointer"
+                title="लॉगिन करें"
+              >
+                <LogIn className="w-3.5 h-3.5 shrink-0" />
+                <span className="text-[11px] font-bold">लॉगिन</span>
+              </button>
+            ) : (
               <div className="flex items-center gap-1.5">
                 {isAdmin && (
                   <a
@@ -265,25 +277,35 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
           {/* App Install / Update CTA Button */}
           <PWAInstallButton variant="hero" />
 
-          {/* Login / Profile CTA Button */}
-          <button
-            onClick={() => {
-              SoundEffects.playBell();
-              if (currentUser) {
-                onNavigateTab('profile');
-              } else {
-                onOpenAuth();
-              }
-            }}
-            id="hero-login-btn"
-            className="w-full sm:w-auto flex-1 py-2.5 px-5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:scale-[0.98] transition-all duration-150 text-slate-950 font-black rounded-full text-xs shadow-md shadow-amber-500/20 flex items-center justify-center gap-2"
-            type="button"
-          >
-            <UserCheck className="w-4 h-4 text-slate-950 shrink-0" />
-            <span className="tracking-wide">
-              {currentUser ? `Signed in as ${currentUser.name}` : 'लॉगिन / साइन-अप करें'}
-            </span>
-          </button>
+            <button
+              onClick={() => {
+                SoundEffects.playBell();
+                if (currentUser) {
+                  onNavigateTab('profile');
+                } else {
+                  onOpenAuth();
+                }
+              }}
+              id="hero-login-btn"
+              className={`w-full sm:w-auto flex-1 py-2.5 px-5 active:scale-[0.98] transition-all duration-150 font-black rounded-full text-xs shadow-md flex items-center justify-center gap-2 cursor-pointer ${
+                currentUser
+                  ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-amber-500/20'
+                  : 'bg-white hover:bg-slate-100 text-slate-900 border border-slate-200 hover:border-slate-300 shadow-slate-950/20'
+              }`}
+              type="button"
+            >
+              {currentUser ? (
+                <>
+                  <UserCheck className="w-4 h-4 text-slate-950 shrink-0" />
+                  <span className="tracking-wide">Signed in as {currentUser.name}</span>
+                </>
+              ) : (
+                <>
+                  <LogIn className="w-4 h-4 shrink-0 text-slate-950" />
+                  <span className="tracking-wide">लॉगिन / साइन-अप करें</span>
+                </>
+              )}
+            </button>
         </div>
       </section>
       {/* END: HeroSection */}
@@ -689,7 +711,7 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
                   <span className="transition group-open:rotate-180">▾</span>
                 </summary>
                 <p className="mt-2 text-stone-600 leading-relaxed">
-                  हाँ, DHOTI AALE एक Progressive Web App (PWA) है। आप इसे किसी भी ब्राउज़र में चला सकते हैं या 'Install App' पर क्लिक करके बिना प्ले स्टोर के सीधे फोन में सेव कर सकते हैं।
+                  हाँ, DHOTI AALE एक Progressive Web App (PWA) है। आप इसे किसी भी ब्राउज़र में चला सकते हैं या &apos;Install App&apos; पर क्लिक करके बिना प्ले स्टोर के सीधे फोन में सेव कर सकते हैं।
                 </p>
               </details>
             </div>
@@ -711,17 +733,17 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
 
             {/* Compliance Policy Links */}
             <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs font-semibold text-stone-600">
-              <a href="/news" className="text-[#8D2817] font-bold hover:underline">गाँव समाचार (News)</a>
+              <Link href="/news" className="text-[#8D2817] font-bold hover:underline">गाँव समाचार (News)</Link>
               <span className="text-stone-300">•</span>
-              <a href="/about" className="hover:text-amber-800 transition-colors">About Us</a>
+              <Link href="/about" className="hover:text-amber-800 transition-colors">About Us</Link>
               <span className="text-stone-300">•</span>
-              <a href="/privacy-policy" className="hover:text-amber-800 transition-colors">Privacy Policy</a>
+              <Link href="/privacy-policy" className="hover:text-amber-800 transition-colors">Privacy Policy</Link>
               <span className="text-stone-300">•</span>
-              <a href="/terms" className="hover:text-amber-800 transition-colors">Terms &amp; Conditions</a>
+              <Link href="/terms" className="hover:text-amber-800 transition-colors">Terms &amp; Conditions</Link>
               <span className="text-stone-300">•</span>
-              <a href="/contact" className="hover:text-amber-800 transition-colors">Contact Us</a>
+              <Link href="/contact" className="hover:text-amber-800 transition-colors">Contact Us</Link>
               <span className="text-stone-300">•</span>
-              <a href="/support" className="hover:text-amber-800 transition-colors">24/7 Support Desk</a>
+              <Link href="/support" className="hover:text-amber-800 transition-colors">24/7 Support Desk</Link>
             </div>
           </div>
 
@@ -753,12 +775,12 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <a
+                <Link
                   href="/news"
                   className="hidden sm:inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-[#8D2817] text-xs font-bold transition-colors"
                 >
                   <span>सभी समाचार देखें ↗</span>
-                </a>
+                </Link>
                 <button
                   onClick={() => setActiveModal(null)}
                   className="p-1.5 rounded-full hover:bg-stone-100 text-stone-400 hover:text-stone-700"
@@ -864,12 +886,12 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
 
             {/* Bottom Actions */}
             <div className="mt-4 pt-3 border-t border-stone-100 flex items-center justify-between gap-3 shrink-0">
-              <a
+              <Link
                 href="/news"
                 className="flex-1 py-2.5 rounded-xl bg-orange-100 hover:bg-orange-200 text-[#8D2817] font-bold text-xs text-center transition-colors"
               >
                 पूर्ण समाचार पोर्टल खोलें (Open /news) ↗
-              </a>
+              </Link>
               <button
                 onClick={() => setActiveModal(null)}
                 className="py-2.5 px-4 rounded-xl bg-stone-900 text-white font-medium text-xs hover:bg-stone-800 transition-colors"

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthenticatedUser, verifyAdminRequestAsync } from '@/lib/admin-auth';
+import { getAuthenticatedUser, verifyAdminRequestAsync, SITE_OWNER_EMAIL } from '@/lib/admin-auth';
 import { fetchProblemReportWithMessages, addReportMessage } from '@/lib/reports';
 
 export const dynamic = 'force-dynamic';
@@ -50,7 +50,7 @@ export async function POST(
       ? 'Admin 👑'
       : user?.user_metadata?.full_name || user?.user_metadata?.name || headerName || resolvedUserEmail?.split('@')[0] || 'User';
     const senderEmail = isAdmin
-      ? 'rohitdhakaddhoti143@gmail.com'
+      ? (user?.email || SITE_OWNER_EMAIL)
       : user?.email || resolvedUserEmail || '';
 
     const newMsg = await addReportMessage({
