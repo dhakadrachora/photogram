@@ -135,7 +135,24 @@ export default function PrivacyPolicyPage() {
           <section className="space-y-2">
             <h2 className="text-base font-bold text-stone-900 flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-amber-600" />
-              <span>6. Contact Information</span>
+              <span>6. User Account & Data Deletion Policy</span>
+            </h2>
+            <p>
+              Users have the right to request deletion of their account and all associated personal data at any time. If you wish to permanently delete your DHOTI AALE account, uploaded photos, battle records, or chat history, you may submit a request by:
+            </p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>Emailing our administration at <strong>rohitdhakaddhoti143@gmail.com</strong> with the subject line <em>&quot;Account Deletion Request&quot;</em>.</li>
+              <li>Submitting a request through our official <a href="https://www.dhotiaale.online/contact" className="text-amber-700 underline font-bold">Contact Page</a>.</li>
+            </ul>
+            <p className="text-stone-500 text-xs">
+              Upon receiving your verified request, all your account records, profile identifiers, and stored content will be permanently removed from our databases within 48 business hours.
+            </p>
+          </section>
+
+          <section className="space-y-2">
+            <h2 className="text-base font-bold text-stone-900 flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-amber-600" />
+              <span>7. Contact Information</span>
             </h2>
             <p>
               If you have any questions, concerns, or requests regarding this Privacy Policy, please reach out to our site administration:
