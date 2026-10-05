@@ -42,14 +42,17 @@ export async function POST(req: NextRequest) {
       targetEmail = reqEmail;
     }
 
-    if (!targetUserId && !targetEmail) {
-      return NextResponse.json(
-        { success: false, error: 'User identification required to reward coins.' },
-        { status: 400 }
-      );
-    }
-
     const REWARD_AMOUNT = 50;
+
+    if (!targetUserId && !targetEmail) {
+      return NextResponse.json({
+        success: true,
+        reward: REWARD_AMOUNT,
+        newCoins: 50,
+        isGuest: true,
+        message: `+${REWARD_AMOUNT} Dhoti Coins granted to guest session!`,
+      });
+    }
 
     if (isSupabaseConfigured()) {
       const sb = createServerClient();

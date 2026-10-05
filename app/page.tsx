@@ -1558,6 +1558,11 @@ export default function Home() {
             } catch (e) {
               console.warn('Could not update stored coins:', e);
             }
+          } else {
+            try {
+              localStorage.setItem('dhoti_guest_coins', newCoins.toString());
+              window.dispatchEvent(new Event('storage'));
+            } catch (e) {}
           }
         }}
       />

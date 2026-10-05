@@ -199,11 +199,7 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth, onOpenEarn
               id="landing-earn-coins-btn"
               onClick={() => {
                 SoundEffects.playTap();
-                if (currentUser) {
-                  onOpenEarnCoins?.();
-                } else {
-                  onOpenAuth();
-                }
+                onOpenEarnCoins?.();
               }}
               className="flex items-center gap-1 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-[11px] font-black shadow-md shadow-amber-500/20 transition-transform active:scale-95 cursor-pointer"
               title="विज्ञापन देखकर 50 सिक्के कमाएँ"
@@ -366,6 +362,41 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth, onOpenEarn
             <div className="flex items-center gap-1 text-xs font-bold text-rose-600 shrink-0 group-hover:translate-x-1 transition-transform">
               <span className="hidden sm:inline">Claim Karein</span>
               <ChevronRight className="h-4 w-4" />
+            </div>
+          </div>
+        </div>
+
+        {/* Watch Ad & Earn 50 Coins Quick Banner */}
+        <div
+          id="earn-coins-teaser-card"
+          onClick={() => {
+            SoundEffects.playTap();
+            onOpenEarnCoins?.();
+          }}
+          className="mb-4 group relative overflow-hidden rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 p-[1.5px] shadow-sm hover:shadow-md cursor-pointer transition-all duration-200 active:scale-[0.99]"
+        >
+          <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-950 px-4 py-3 border border-amber-500/20">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 shadow-md font-black">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs sm:text-sm font-black text-amber-300">
+                    🎁 विज्ञापन देखें और +50 धोती सिक्के पाएं!
+                  </span>
+                  <span className="rounded-full bg-amber-400/20 border border-amber-400/40 px-2 py-0.5 text-[9px] font-bold text-amber-300 animate-pulse">
+                    Rewarded Video Ad
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-300">
+                  छोटा 15-सेकंड विज्ञापन देखें और अपनी प्रोफाइल व बैटल के लिए सिक्के तुरंत कमाएं
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 text-xs font-black shadow-sm shrink-0 group-hover:scale-105 transition-transform">
+              <span>ऐड देखें</span>
+              <ChevronRight className="h-3.5 w-3.5" />
             </div>
           </div>
         </div>
