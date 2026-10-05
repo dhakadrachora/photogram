@@ -1482,13 +1482,7 @@ export default function Home() {
             {/* 5. PROFILE */}
             <button
               type="button"
-              onClick={() => {
-                if (!currentUser) {
-                  setIsAuthModalOpen(true);
-                } else {
-                  handleTabSwitch('profile');
-                }
-              }}
+              onClick={() => handleTabSwitch('profile')}
               className={`flex flex-col items-center gap-0.5 transition-all active:scale-95 cursor-pointer ${
                 activeTab === 'profile'
                   ? 'text-amber-400 font-bold'
@@ -1534,6 +1528,8 @@ export default function Home() {
       <FloatingChatWidget
         currentUser={currentUser}
         onOpenAuth={() => setIsAuthModalOpen(true)}
+        activeTab={activeTab}
+        onNavigateWorldChat={() => handleTabSwitch('worldchat')}
       />
 
     </div>
