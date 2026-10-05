@@ -8,16 +8,7 @@ export function AppSplashScreen() {
   const [isFading, setIsFading] = useState(false);
 
   useEffect(() => {
-    // Check if splash was already shown this session
-    if (typeof window !== 'undefined') {
-      const alreadyShown = sessionStorage.getItem('dhoti_splash_shown');
-      if (alreadyShown) {
-        setIsVisible(false);
-        return;
-      }
-    }
-
-    // Step progress forward smoothly
+    // Step progress forward smoothly from initial load to 100%
     const interval = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 95) {
@@ -28,7 +19,7 @@ export function AppSplashScreen() {
         if (prev < 80) return prev + 20;
         return prev + 15;
       });
-    }, 220);
+    }, 180);
 
     return () => clearInterval(interval);
   }, []);
@@ -37,17 +28,15 @@ export function AppSplashScreen() {
     if (progress >= 100) {
       const timer = setTimeout(() => {
         setIsFading(true);
-        if (typeof window !== 'undefined') {
-          sessionStorage.setItem('dhoti_splash_shown', 'true');
-        }
         setTimeout(() => {
           setIsVisible(false);
-        }, 500);
-      }, 300);
+        }, 450);
+      }, 250);
 
       return () => clearTimeout(timer);
     }
   }, [progress]);
+
 
   if (!isVisible) return null;
 
@@ -64,7 +53,8 @@ export function AppSplashScreen() {
           src="/dhoti-splash.jpg"
           alt="DHOTI AALE - राजस्थान का डिजिटल गाँव समुदाय"
           className="w-full h-full object-cover object-center filter brightness-[0.88] contrast-[1.05]"
-          priority="true"
+          loading="eager"
+          decoding="sync"
         />
         {/* Soft Vignette Overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/60 pointer-events-none" />
