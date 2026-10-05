@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Newspaper, Plus, Search, Edit2, Trash2, Eye, EyeOff, Calendar } from 'lucide-react';
+import { Newspaper, Plus, Search, Edit2, Trash2, Eye, EyeOff, Calendar, Sparkles, Loader2 } from 'lucide-react';
 import { NewsItem } from '@/types';
 import { adminFetch } from '@/lib/admin/api';
 import { AdminTable, Column } from '@/components/admin/AdminTable';
@@ -26,6 +26,27 @@ export default function AdminNewsPage() {
   // Delete dialog
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+
+  const handleGenerateAiNews = async () => {
+    setIsGeneratingAi(true);
+    try {
+      const res = await fetch('/api/cron/daily-news?secret=dhoti_news_cron_secret', {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (data.success) {
+        success(`Success! Generated & published ${data.count || 3} fresh articles.`);
+        fetchNews();
+      } else {
+        toastError(data.error || 'Failed to auto-generate news');
+      }
+    } catch (e: any) {
+      toastError(e?.message || 'Error triggering AI news generation');
+    } finally {
+      setIsGeneratingAi(false);
+    }
+  };
 
   const fetchNews = useCallback(async () => {
     setIsLoading(true);
@@ -179,16 +200,32 @@ export default function AdminNewsPage() {
           <p className="text-xs text-slate-400">Manage, draft, and publish village community news.</p>
         </div>
 
-        <button
-          onClick={() => {
-            setEditingItem(null);
-            setIsFormOpen(true);
-          }}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md shadow-amber-500/20 transition-all active:scale-95 shrink-0"
-        >
-          <Plus className="h-4 w-4" />
-          <span>Post New Article</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleGenerateAiNews}
+            disabled={isGeneratingAi}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-md shadow-purple-600/20 transition-all active:scale-95 shrink-0 disabled:opacity-50 cursor-pointer"
+            title="Automatically generate today's news articles with AI"
+          >
+            {isGeneratingAi ? (
+              <Loader2 className="h-4 w-4 animate-spin text-white" />
+            ) : (
+              <Sparkles className="h-4 w-4 text-amber-300" />
+            )}
+            <span>{isGeneratingAi ? 'AI Writing News...' : '⚡ AI Auto-Publish'}</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setEditingItem(null);
+              setIsFormOpen(true);
+            }}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md shadow-amber-500/20 transition-all active:scale-95 shrink-0 cursor-pointer"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Post New Article</span>
+          </button>
+        </div>
       </div>
 
       {/* Search Bar */}
