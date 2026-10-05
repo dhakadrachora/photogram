@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "online.dhotiaale.www.twa",
+        "sha256_cert_fingerprints": ["37:B1:59:95:79:73:F2:EC:12:60:F6:87:A0:C5:7A:A1:66:F1:17:55:A4:44:4B:CC:7D:66:D7:F5:C7:1E:88:28"]
+      }
+    }]
