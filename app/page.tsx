@@ -21,6 +21,7 @@ import { VoiceAssistant } from '@/components/VoiceAssistant';
 import GoogleAuthModal from '@/components/GoogleAuthModal';
 import { PWAInstallBanner } from '@/components/PWAInstallBanner';
 import { FloatingChatWidget } from '@/components/FloatingChatWidget';
+import { EarnCoinsModal } from '@/components/EarnCoinsModal';
 
 import { isSiteAdmin } from '@/lib/admin-auth';
 import { useIsMounted } from '@/lib/useIsMounted';
@@ -611,6 +612,9 @@ export default function Home() {
     useState<AppTab>('home');
 
   const [isAuthModalOpen, setIsAuthModalOpen] =
+    useState(false);
+
+  const [isEarnCoinsModalOpen, setIsEarnCoinsModalOpen] =
     useState(false);
 
   const [selectedOpponent, setSelectedOpponent] =
@@ -1235,6 +1239,9 @@ export default function Home() {
               onOpenAuth={() =>
                 setIsAuthModalOpen(true)
               }
+              onOpenEarnCoins={() =>
+                setIsEarnCoinsModalOpen(true)
+              }
             />
 
             {/* WINNER REWARDS ON LANDING PAGE */}
@@ -1530,6 +1537,28 @@ export default function Home() {
         onOpenAuth={() => setIsAuthModalOpen(true)}
         activeTab={activeTab}
         onNavigateWorldChat={() => handleTabSwitch('worldchat')}
+      />
+
+      {/* ======================================================
+          REWARDED VIDEO AD MODAL (EARN 50 COINS)
+          ====================================================== */}
+
+      <EarnCoinsModal
+        isOpen={isEarnCoinsModalOpen}
+        onClose={() => setIsEarnCoinsModalOpen(false)}
+        currentUser={currentUser}
+        onOpenAuth={() => setIsAuthModalOpen(true)}
+        onCoinsRewarded={(newCoins) => {
+          if (currentUser) {
+            const updated = { ...currentUser, coins: newCoins, dhotiCoins: newCoins };
+            try {
+              localStorage.setItem('dhoti_user', JSON.stringify(updated));
+              window.dispatchEvent(new Event('storage'));
+            } catch (e) {
+              console.warn('Could not update stored coins:', e);
+            }
+          }
+        }}
       />
 
     </div>

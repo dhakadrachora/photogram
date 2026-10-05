@@ -17,6 +17,7 @@ import {
   AlertCircle,
   Gift,
   LogIn,
+  Sparkles,
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -27,6 +28,7 @@ interface NavbarProps {
   onLogout: () => void;
   onlineCount: number;
   onOpenReportModal?: () => void;
+  onOpenEarnCoins?: () => void;
 }
 
 export function CrownIcon({ className = 'w-6 h-6 text-amber-400' }: { className?: string }) {
@@ -45,6 +47,7 @@ export function Navbar({
   onLogout,
   onlineCount,
   onOpenReportModal,
+  onOpenEarnCoins,
 }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isAdmin = isSiteAdmin(currentUser?.email);
@@ -225,6 +228,19 @@ export function Navbar({
                 <Coins className="h-3.5 w-3.5 text-amber-400" />
                 <span>{currentUser.dhotiCoins ?? currentUser.coins ?? 100}</span>
               </div>
+
+              {/* Earn Coins with Rewarded Ad */}
+              <button
+                type="button"
+                id="earn-coins-reward-btn"
+                onClick={() => onOpenEarnCoins?.()}
+                className="flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 px-2.5 py-1 text-[11px] font-black text-slate-950 shadow-md shadow-amber-500/25 active:scale-95 transition-all cursor-pointer"
+                title="विज्ञापन देखें और फ्री 50 सिक्के कमाएँ"
+              >
+                <Sparkles className="h-3 w-3 text-slate-950" />
+                <span className="hidden sm:inline">+50 Coins</span>
+                <span className="sm:hidden">+50</span>
+              </button>
 
               {/* Avatar Pill */}
               <div

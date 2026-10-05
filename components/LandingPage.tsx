@@ -41,9 +41,10 @@ interface LandingPageProps {
   currentUser: User | null;
   onNavigateTab: (tab: AppTab) => void;
   onOpenAuth: () => void;
+  onOpenEarnCoins?: () => void;
 }
 
-export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingPageProps) {
+export function LandingPage({ currentUser, onNavigateTab, onOpenAuth, onOpenEarnCoins }: LandingPageProps) {
   const isAdmin = isSiteAdmin(currentUser?.email);
 
   // Modals for interactive cards
@@ -191,7 +192,26 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
           </div>
 
           {/* Right Header Actions: Install Button + User Profile / Login */}
-          <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-2">
+          <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1.5 sm:gap-2">
+            {/* Earn Coins with Rewarded Ad Button */}
+            <button
+              type="button"
+              id="landing-earn-coins-btn"
+              onClick={() => {
+                SoundEffects.playTap();
+                if (currentUser) {
+                  onOpenEarnCoins?.();
+                } else {
+                  onOpenAuth();
+                }
+              }}
+              className="flex items-center gap-1 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-[11px] font-black shadow-md shadow-amber-500/20 transition-transform active:scale-95 cursor-pointer"
+              title="विज्ञापन देखकर 50 सिक्के कमाएँ"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-slate-950" />
+              <span>+50 Coins</span>
+            </button>
+
             <PWAInstallButton variant="header" />
             {!currentUser ? (
               <button
