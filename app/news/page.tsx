@@ -13,10 +13,13 @@ import {
   Share2,
   Calendar,
   Flame,
+  Swords,
 } from 'lucide-react';
 import { NewsItem } from '@/types';
 import { NewsCard } from '@/components/NewsCard';
 import { NewsReaderModal } from '@/components/NewsReaderModal';
+import { AdBanner } from '@/components/AdBanner';
+import { PWAInstallButton } from '@/components/PWAInstallButton';
 import { VIRAL_30_NEWS } from '@/lib/data/viral-news';
 
 // High quality fallback village & trending news articles
@@ -299,6 +302,9 @@ function NewsContent() {
           </div>
         )}
 
+        {/* In-feed AdBanner for Monetization */}
+        <AdBanner slot="2345678901" className="my-4 shadow-xs" label="विज्ञापन / Sponsored" />
+
         {/* Articles Grid */}
         <section className="space-y-4">
           <div className="flex items-center justify-between">
@@ -345,6 +351,21 @@ function NewsContent() {
         allNews={newsList}
         onSelectNews={(item) => handleReadArticle(item)}
       />
+
+      {/* Mobile Floating App CTA Bar */}
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-md border-t border-amber-500/40 p-2.5 flex items-center justify-between gap-2 shadow-2xl">
+        <PWAInstallButton
+          variant="pill"
+          className="flex-1 text-center py-2 text-xs font-bold"
+        />
+        <Link
+          href="/#battle"
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md text-center"
+        >
+          <Swords className="w-3.5 h-3.5 shrink-0" />
+          <span>फोटो बैटल खेलें</span>
+        </Link>
+      </div>
     </div>
   );
 }

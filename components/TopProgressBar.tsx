@@ -14,29 +14,14 @@ function ProgressBarInner() {
   const trickleTimerRef = useRef<NodeJS.Timeout | null>(null);
   const completeTimerRef = useRef<NodeJS.Timeout | null>(null);
   const resetTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const activeRequestsRef = useRef(0);
+  const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const clearAllTimers = useCallback(() => {
     if (trickleTimerRef.current) clearInterval(trickleTimerRef.current);
     if (completeTimerRef.current) clearTimeout(completeTimerRef.current);
     if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+    if (safetyTimeoutRef.current) clearTimeout(safetyTimeoutRef.current);
   }, []);
-
-  const start = useCallback(() => {
-    clearAllTimers();
-    setIsFading(false);
-    setIsVisible(true);
-    setProgress((prev) => (prev > 0 && prev < 90 ? prev : 18));
-
-    trickleTimerRef.current = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 92) return prev;
-        if (prev < 40) return prev + Math.floor(Math.random() * 14) + 8;
-        if (prev < 70) return prev + Math.floor(Math.random() * 6) + 4;
-        return prev + Math.floor(Math.random() * 2) + 1;
-      });
-    }, 150);
-  }, [clearAllTimers]);
 
   const done = useCallback(() => {
     clearAllTimers();
@@ -49,9 +34,30 @@ function ProgressBarInner() {
         setIsVisible(false);
         setProgress(0);
         setIsFading(false);
-      }, 350);
-    }, 200);
+      }, 250);
+    }, 120);
   }, [clearAllTimers]);
+
+  const start = useCallback(() => {
+    clearAllTimers();
+    setIsFading(false);
+    setIsVisible(true);
+    setProgress(25);
+
+    // Trickle progress forward
+    trickleTimerRef.current = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 88) return prev;
+        if (prev < 50) return prev + Math.floor(Math.random() * 12) + 8;
+        return prev + Math.floor(Math.random() * 4) + 2;
+      });
+    }, 120);
+
+    // Automatic safety guard: NEVER stay stuck on screen for more than 1.8 seconds
+    safetyTimeoutRef.current = setTimeout(() => {
+      done();
+    }, 1800);
+  }, [clearAllTimers, done]);
 
   const setExplicit = useCallback((percent: number) => {
     clearAllTimers();
@@ -63,12 +69,12 @@ function ProgressBarInner() {
     }
   }, [clearAllTimers, done]);
 
-  // Trigger on route and search param changes
+  // Finish immediately on pathname or search parameter change
   useEffect(() => {
     done();
   }, [pathname, searchParams, done]);
 
-  // Intercept global custom events, link clicks, and fetch requests
+  // Intercept global custom events and valid link navigations
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -93,10 +99,13 @@ function ProgressBarInner() {
       const href = target.getAttribute('href');
       const targetAttr = target.getAttribute('target');
 
+      // Ignore hash links (/#battle, #worldchat, etc.) and external targets
       if (
         href &&
         href.startsWith('/') &&
         !href.startsWith('//') &&
+        !href.includes('#') &&
+        href !== pathname &&
         targetAttr !== '_blank' &&
         !e.ctrlKey &&
         !e.metaKey &&
@@ -116,45 +125,30 @@ function ProgressBarInner() {
       window.removeEventListener('app:progress:set', handleSet);
       document.removeEventListener('click', handleLinkClick);
     };
-  }, [clearAllTimers, start, done, setExplicit]);
+  }, [clearAllTimers, start, done, setExplicit, pathname]);
 
   if (!isVisible && progress === 0) return null;
 
   return (
-    <>
-      {/* 1. TOP PROGRESS BAR */}
+    <div
+      aria-hidden="true"
+      className="fixed top-0 left-0 right-0 z-[999999] pointer-events-none h-[3px] overflow-hidden"
+      style={{
+        opacity: isFading ? 0 : 1,
+        transition: 'opacity 250ms ease-out',
+      }}
+    >
+      {/* Sleek Gradient Bar with Golden-Amber Glow */}
       <div
-        aria-hidden="true"
-        className="fixed top-0 left-0 right-0 z-[999999] pointer-events-none h-[3.5px] overflow-hidden"
+        className="h-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-300 relative shadow-[0_0_12px_rgba(245,158,11,0.9)]"
         style={{
-          opacity: isFading ? 0 : 1,
-          transition: 'opacity 300ms ease-out',
+          width: `${progress}%`,
+          transition: progress === 100 ? 'width 120ms ease-out' : 'width 200ms ease-out',
         }}
       >
-        {/* Progress Track Background Glow */}
-        <div
-          className="h-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-400 relative shadow-[0_0_16px_rgba(245,158,11,0.95),0_0_8px_rgba(234,88,12,0.9)]"
-          style={{
-            width: `${progress}%`,
-            transition: progress === 100 ? 'width 150ms ease-out' : 'width 250ms ease-out',
-          }}
-        >
-          {/* Leading edge glow peg */}
-          <div className="absolute right-0 top-0 bottom-0 w-28 bg-gradient-to-r from-transparent via-amber-200 to-white opacity-95 blur-[0.5px] shadow-[0_0_16px_#f59e0b,0_0_10px_#fbbf24]" />
-        </div>
+        <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-r from-transparent via-white/80 to-white blur-[0.5px]" />
       </div>
-
-      {/* 2. TOP RIGHT SUBTLE PULSE SPINNER */}
-      {isVisible && !isFading && (
-        <div
-          aria-hidden="true"
-          className="fixed top-3 right-3 z-[999999] pointer-events-none flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-950/80 border border-amber-500/40 shadow-lg backdrop-blur-md text-[10px] font-bold text-amber-400 animate-in fade-in zoom-in-95 duration-200"
-        >
-          <span className="h-2 w-2 rounded-full bg-amber-400 animate-ping" />
-          <span className="font-mono">{Math.round(progress)}%</span>
-        </div>
-      )}
-    </>
+    </div>
   );
 }
 
