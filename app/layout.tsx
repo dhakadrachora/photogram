@@ -60,6 +60,10 @@ export const metadata: Metadata = {
     },
   },
 
+  verification: {
+    google: 'google479d07a73cf8816c',
+  },
+
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
