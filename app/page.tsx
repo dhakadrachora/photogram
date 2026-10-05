@@ -19,6 +19,7 @@ import { InstagramReelsBooster } from '@/components/InstagramReelsBooster';
 import { VoiceAssistant } from '@/components/VoiceAssistant';
 import GoogleAuthModal from '@/components/GoogleAuthModal';
 import { PWAInstallBanner } from '@/components/PWAInstallBanner';
+import { FloatingChatWidget } from '@/components/FloatingChatWidget';
 
 import { isSiteAdmin } from '@/lib/admin-auth';
 import { useIsMounted } from '@/lib/useIsMounted';
@@ -1529,6 +1530,16 @@ export default function Home() {
           ====================================================== */}
 
       <PWAInstallBanner />
+
+      {/* ======================================================
+          WORLD CHAT WIDGET
+          ====================================================== */}
+
+      {/* World Chat Widget - Social/Friendly conversations */}
+      <FloatingChatWidget
+        currentUser={currentUser}
+        onOpenAuth={() => setIsAuthModalOpen(true)}
+      />
 
     </div>
   );
