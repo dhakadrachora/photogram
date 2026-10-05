@@ -36,9 +36,13 @@ export async function syncAllContentFromSupabase() {
         fetchSupabaseUpdates().catch(() => []),
       ]);
 
-    if (Array.isArray(sbNews)) {
+    if (Array.isArray(sbNews) && sbNews.length > 0) {
       contentStore.news.clear();
       for (const item of sbNews) contentStore.news.set(item.id, item);
+    } else if (contentStore.news.size === 0) {
+      // Load fallback viral 30 news
+      const { VIRAL_30_NEWS } = require('@/lib/data/viral-news');
+      for (const item of VIRAL_30_NEWS) contentStore.news.set(item.id, item);
     }
     if (Array.isArray(sbPeople)) {
       contentStore.people.clear();
