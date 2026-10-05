@@ -287,7 +287,7 @@ export function EarnCoinsModal({
               ref={adInsRef}
               className="adsbygoogle"
               style={{ display: 'block', width: '100%', textAlign: 'center' }}
-              data-ad-client="ca-pub-2229349785904510"
+              data-ad-client=""
               data-ad-slot="1466913269"
               data-ad-format="rectangle,horizontal"
               data-adtest="on"

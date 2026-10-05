@@ -109,7 +109,7 @@ export function AdBanner({
             width: '100%',
             textAlign: 'center',
           }}
-          data-ad-client="ca-pub-2229349785904510"
+          data-ad-client=""
           data-ad-slot={slot}
           data-ad-format={format}
           data-adtest="on"

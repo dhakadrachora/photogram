@@ -277,7 +277,7 @@ export default function RootLayout({
         <meta name="author" content="DHOTI AALE Team" />
 
         {/* Google AdSense Verification Meta */}
-        <meta name="google-adsense-account" content="ca-pub-2229349785904510" />
+        
 
         {/* Schema.org Structured Data */}
         <script
@@ -294,12 +294,7 @@ export default function RootLayout({
         </PostHogProvider>
 
         {/* Google AdSense Auto Ads - loaded safely after hydration */}
-        <Script
-          id="google-adsense"
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2229349785904510"
-          strategy="afterInteractive"
-          crossOrigin="anonymous"
-        />
+        
       </body>
     </html>
   );
