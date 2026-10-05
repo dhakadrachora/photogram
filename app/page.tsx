@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 
 import { User, AppTab } from '@/types';
+import Link from 'next/link';
 import { LandingPage } from '@/components/LandingPage';
 import { WorldChat } from '@/components/WorldChat';
 import { BattleArena } from '@/components/BattleArena';
@@ -48,6 +49,8 @@ import {
   Loader2,
   RefreshCw,
   Headphones,
+  Swords,
+  Newspaper,
 } from 'lucide-react';
 
 /* ============================================================
@@ -1410,145 +1413,93 @@ export default function Home() {
 
       {activeTab !== 'worldchat' && (
         <nav
-          className="fixed inset-x-0 bottom-0 z-30 w-full border-t border-stone-200 bg-white/95 shadow-lg backdrop-blur-md"
+          className="fixed inset-x-0 bottom-0 z-40 w-full border-t border-amber-500/20 bg-slate-950/95 shadow-[0_-8px_30px_rgba(0,0,0,0.6)] backdrop-blur-xl"
           data-purpose="mobile-bottom-nav"
         >
-          <div className="mx-auto flex max-w-xl items-center justify-between px-5 py-2">
-
-            {/* HOME */}
+          <div className="mx-auto flex max-w-md items-center justify-around px-2 py-1.5">
+            {/* 1. HOME */}
             <button
               type="button"
-              onClick={() =>
-                handleTabSwitch('home')
-              }
-              className={`flex flex-col items-center gap-1 transition-colors ${
+              onClick={() => handleTabSwitch('home')}
+              className={`flex flex-col items-center gap-0.5 transition-all active:scale-95 cursor-pointer ${
                 activeTab === 'home'
-                  ? 'font-medium text-[#2D7D46]'
-                  : 'text-stone-400 hover:text-stone-700'
+                  ? 'text-amber-400 font-bold'
+                  : 'text-slate-400 hover:text-slate-200 font-medium'
               }`}
             >
-              <HomeIcon className="h-5 w-5" />
-
-              <span className="text-[10px]">
-                Home
-              </span>
+              <div className={`p-1 rounded-xl transition-all ${activeTab === 'home' ? 'bg-amber-400/15' : ''}`}>
+                <HomeIcon className="h-5 w-5" />
+              </div>
+              <span className="text-[10px] tracking-tight">होम</span>
             </button>
 
-            {/* EXPLORE */}
-            <button
-              type="button"
-              onClick={() => {
-                if (
-                  activeTab === 'home'
-                ) {
-                  const el =
-                    document.getElementById(
-                      'features-section'
-                    );
-
-                  if (el) {
-                    el.scrollIntoView({
-                      behavior: 'smooth',
-                    });
-                  } else {
-                    const rewards =
-                      document.getElementById(
-                        'winner-rewards'
-                      );
-
-                    rewards?.scrollIntoView({
-                      behavior: 'smooth',
-                    });
-                  }
-                } else {
-                  handleTabSwitch('home');
-                }
-              }}
-              className="flex flex-col items-center gap-1 text-stone-400 transition-colors hover:text-stone-700"
+            {/* 2. NEWS */}
+            <Link
+              href="/news"
+              className="flex flex-col items-center gap-0.5 text-slate-400 hover:text-slate-200 font-medium transition-all active:scale-95 cursor-pointer"
             >
-              <Compass className="h-5 w-5" />
+              <div className="p-1 rounded-xl">
+                <Newspaper className="h-5 w-5" />
+              </div>
+              <span className="text-[10px] tracking-tight">समाचार</span>
+            </Link>
 
-              <span className="text-[10px]">
-                Explore
-              </span>
-            </button>
-
-            {/* WORLD CHAT */}
+            {/* 3. CENTER RAISED ACTION: BATTLE ARENA */}
             <button
               type="button"
-              onClick={() =>
-                handleTabSwitch('worldchat')
-              }
-              className="relative flex flex-col items-center gap-1 transition-colors text-stone-400 hover:text-stone-700"
+              onClick={() => handleTabSwitch('battle')}
+              className="relative -top-3.5 flex flex-col items-center group cursor-pointer"
+              title="फोटो बैटल खेलें"
             >
-              <MessageSquare className="h-5 w-5" />
-
-              <span className="text-[10px]">
-                Chaupal
+              <div className="h-12 w-12 rounded-full bg-gradient-to-tr from-amber-500 via-orange-500 to-amber-400 p-[2px] shadow-[0_0_18px_rgba(245,158,11,0.6)] group-hover:scale-105 group-active:scale-95 transition-all">
+                <div className="h-full w-full rounded-full bg-slate-950 flex items-center justify-center text-amber-400 group-hover:text-amber-300">
+                  <Swords className="h-5 w-5 animate-pulse" />
+                </div>
+              </div>
+              <span className="text-[9px] font-black text-amber-400 mt-0.5 tracking-wider uppercase">
+                बैटल
               </span>
-
-              <span className="absolute right-1.5 top-0 h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
             </button>
 
-            {/* REWARDS */}
+            {/* 4. WORLD CHAT */}
             <button
               type="button"
-              onClick={() => handleTabSwitch('rewards')}
-              className={`flex flex-col items-center gap-1 transition-colors ${
-                activeTab === 'rewards'
-                  ? 'font-medium text-[#2D7D46]'
-                  : 'text-stone-400 hover:text-stone-700'
+              onClick={() => handleTabSwitch('worldchat')}
+              className={`relative flex flex-col items-center gap-0.5 transition-all active:scale-95 cursor-pointer ${
+                (activeTab as string) === 'worldchat'
+                  ? 'text-amber-400 font-bold'
+                  : 'text-slate-400 hover:text-slate-200 font-medium'
               }`}
             >
-              <Gift className="h-5 w-5" />
-
-              <span className="text-[10px]">
-                Rewards
-              </span>
+              <div className={`p-1 rounded-xl transition-all ${(activeTab as string) === 'worldchat' ? 'bg-amber-400/15' : ''}`}>
+                <MessageSquare className="h-5 w-5" />
+              </div>
+              <span className="text-[10px] tracking-tight">चौपाल</span>
+              <span className="absolute right-2 top-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-slate-950 animate-ping" />
+              <span className="absolute right-2 top-0.5 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-slate-950" />
             </button>
 
-            {/* PROFILE */}
+            {/* 5. PROFILE */}
             <button
               type="button"
               onClick={() => {
                 if (!currentUser) {
                   setIsAuthModalOpen(true);
                 } else {
-                  handleTabSwitch(
-                    'profile'
-                  );
+                  handleTabSwitch('profile');
                 }
               }}
-              className={`flex flex-col items-center gap-1 transition-colors ${
+              className={`flex flex-col items-center gap-0.5 transition-all active:scale-95 cursor-pointer ${
                 activeTab === 'profile'
-                  ? 'font-medium text-[#2D7D46]'
-                  : 'text-stone-400 hover:text-stone-700'
+                  ? 'text-amber-400 font-bold'
+                  : 'text-slate-400 hover:text-slate-200 font-medium'
               }`}
             >
-              <UserIcon className="h-5 w-5" />
-
-              <span className="text-[10px]">
-                Profile
-              </span>
+              <div className={`p-1 rounded-xl transition-all ${activeTab === 'profile' ? 'bg-amber-400/15' : ''}`}>
+                <UserIcon className="h-5 w-5" />
+              </div>
+              <span className="text-[10px] tracking-tight">प्रोफाइल</span>
             </button>
-
-            {/* SUPPORT */}
-            <button
-              type="button"
-              onClick={() => handleTabSwitch('support')}
-              className={`flex flex-col items-center gap-1 transition-colors ${
-                activeTab === 'support'
-                  ? 'font-medium text-amber-500'
-                  : 'text-stone-400 hover:text-stone-700'
-              }`}
-            >
-              <Headphones className="h-5 w-5" />
-
-              <span className="text-[10px]">
-                Support
-              </span>
-            </button>
-
           </div>
         </nav>
       )}

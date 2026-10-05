@@ -35,6 +35,7 @@ import { SoundEffects } from '@/lib/audio/sound-effects';
 import { isSiteAdmin } from '@/lib/admin-auth';
 import { PWAInstallButton } from './PWAInstallButton';
 import { NewsReaderModal } from './NewsReaderModal';
+import { AdBanner } from './AdBanner';
 
 interface LandingPageProps {
   currentUser: User | null;
@@ -166,33 +167,37 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
     <div className="w-full flex flex-col bg-stone-50 text-stone-800 antialiased selection:bg-amber-200">
       {/* BEGIN: TopBar Header */}
       <header
-        className="w-full pt-3 px-4 sm:px-6 pb-2.5 flex items-center justify-between z-20 bg-stone-50/90 backdrop-blur-sm sticky top-0 border-b border-stone-200/70"
+        className="w-full pt-3 px-4 sm:px-6 pb-2.5 flex items-center justify-between z-30 bg-slate-950/95 backdrop-blur-xl sticky top-0 border-b border-amber-500/20 shadow-lg"
         data-purpose="header-bar"
       >
         <div className="w-full max-w-5xl mx-auto flex items-center justify-between relative">
-          <div className="flex items-center gap-2.5 mx-auto text-center" data-purpose="brand-logo">
+          <div className="flex items-center gap-2.5 mx-auto sm:mx-0 text-center select-none" data-purpose="brand-logo">
             {/* Official DHOTI AALE App Logo */}
-            <div className="w-10 h-10 rounded-2xl overflow-hidden border border-amber-400/50 shadow-sm shrink-0 bg-slate-900">
+            <div className="relative w-10 h-10 rounded-2xl overflow-hidden border border-amber-400/60 shadow-lg shrink-0 bg-slate-900 ring-2 ring-amber-500/25">
               <img src="/app-logo.png" alt="DHOTI AALE" className="w-full h-full object-cover" />
+              <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+              </span>
             </div>
             <div className="flex flex-col text-left leading-none">
-              <span className="font-heritage tracking-widest text-base text-stone-900 font-bold uppercase">
-                DHOTI
+              <span className="tracking-widest text-base font-black uppercase bg-gradient-to-r from-amber-300 via-amber-400 to-orange-400 bg-clip-text text-transparent">
+                DHOTI AALE
               </span>
-              <span className="text-[11px] tracking-[0.25em] text-[#C25E29] font-bold uppercase">
-                AALE
+              <span className="text-[10px] tracking-[0.2em] text-amber-400/90 font-bold uppercase mt-0.5">
+                डिजिटल गाँव पोर्टल 👑
               </span>
             </div>
           </div>
 
-          {/* Right Header Actions: Install Button + User Profile / Google Login */}
+          {/* Right Header Actions: Install Button + User Profile / Login */}
           <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-2">
             <PWAInstallButton variant="header" />
             {!currentUser ? (
               <button
                 type="button"
                 onClick={onOpenAuth}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black shadow-xs transition-transform active:scale-95 cursor-pointer"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 text-xs font-black shadow-md shadow-amber-500/20 transition-transform active:scale-95 cursor-pointer"
                 title="लॉगिन करें"
               >
                 <LogIn className="w-3.5 h-3.5 shrink-0" />
@@ -204,7 +209,7 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
                   <a
                     href="/admin"
                     id="landing-admin-btn"
-                    className="flex items-center gap-1 bg-amber-500 hover:bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full text-[10px] font-black shadow-xs transition-transform active:scale-95"
+                    className="flex items-center gap-1 bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 px-2.5 py-1 rounded-full text-[10px] font-black shadow-sm transition-transform active:scale-95"
                     title="Admin Control Center"
                   >
                     <span>👑 Admin</span>
@@ -212,10 +217,10 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
                 )}
                 <div
                   onClick={() => onNavigateTab('profile')}
-                  className="flex items-center gap-1.5 cursor-pointer bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 rounded-full text-xs font-bold text-amber-900 shadow-xs"
+                  className="flex items-center gap-1.5 cursor-pointer bg-slate-900 border border-amber-500/30 px-3 py-1 rounded-full text-xs font-bold text-amber-300 shadow-sm hover:border-amber-400/60"
                 >
                   <span className="max-w-[80px] truncate text-[11px]">{currentUser.name}</span>
-                  {isAdmin && <Crown className="h-3.5 w-3.5 text-amber-600" />}
+                  {isAdmin && <Crown className="h-3.5 w-3.5 text-amber-400" />}
                 </div>
               </div>
             )}
@@ -226,86 +231,64 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
 
       {/* BEGIN: HeroSection */}
       <section
-        className="w-full desert-gradient pt-4 pb-8 px-4 sm:px-6 relative overflow-hidden flex flex-col items-center text-center"
+        className="w-full bg-gradient-to-b from-slate-950 via-[#180e07] to-stone-900 pt-6 pb-10 px-4 sm:px-6 relative overflow-hidden flex flex-col items-center text-center text-white"
         data-purpose="hero-banner"
       >
-        {/* Background Sand Dunes & Cultural Shapes */}
-        <div className="absolute inset-0 pointer-events-none opacity-35 z-0">
-          {/* Desert Sun */}
-          <div className="absolute -right-6 top-3 w-36 h-36 rounded-full bg-amber-200/60 blur-xl"></div>
-          {/* Dunes Vector Silhouette */}
-          <svg className="absolute bottom-0 w-full h-36" fill="none" preserveAspectRatio="none" viewBox="0 0 400 120">
-            <path d="M0 80 Q 90 40 190 70 T 400 35 L 400 120 L 0 120 Z" fill="#D39F6E" fillOpacity="0.35"></path>
-            <path d="M0 95 Q 120 70 240 90 T 400 65 L 400 120 L 0 120 Z" fill="#C58B55" fillOpacity="0.45"></path>
-          </svg>
-          {/* Distant Camel Caravan Silhouettes */}
-          <div className="absolute bottom-10 right-8 flex items-end gap-2 text-stone-700/40 text-xs">
-            <span className="text-stone-600/40 text-xs">🌴</span>
-            <span className="text-stone-600/30 text-sm">⛰️</span>
-          </div>
-        </div>
+        {/* Ambient Lights */}
+        <div className="absolute -right-12 top-0 w-72 h-72 rounded-full bg-amber-500/15 blur-3xl pointer-events-none" />
+        <div className="absolute -left-12 bottom-0 w-72 h-72 rounded-full bg-orange-600/15 blur-3xl pointer-events-none" />
 
-        {/* Main Hindi & English Headline Block */}
-        <div className="relative z-10 max-w-xl mt-2">
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-hindi-head text-stone-900 leading-tight mb-2 tracking-tight">
-            ढोटी की अपनी<br />
-            <span className="text-[#8D2817]">डिजिटल पहचान</span>
+        {/* Main Badge & Headline */}
+        <div className="relative z-10 max-w-xl mt-1 space-y-2.5">
+          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[11px] font-bold shadow-sm">
+            <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+            <span>राजस्थान का #1 डिजिटल गाँव समुदाय 👑</span>
+          </div>
+
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-white leading-tight tracking-tight">
+            ढोटी की अपनी <br />
+            <span className="bg-gradient-to-r from-amber-400 via-orange-400 to-amber-300 bg-clip-text text-transparent">
+              डिजिटल पहचान
+            </span>
           </h1>
-          <p className="text-xs sm:text-sm md:text-base text-stone-700 font-hindi font-medium px-2 leading-relaxed">
-            राजस्थान का पहला डिजिटल गाँव समुदाय |<br />
-            <span className="text-[11px] sm:text-xs text-stone-600 font-body">Rajasthan&apos;s Digital Village Community.</span>
+
+          <p className="text-xs sm:text-sm md:text-base text-slate-300 font-medium px-2 leading-relaxed max-w-md mx-auto">
+            गाँव चौपाल वर्ल्ड चैट, लाइव फोटो बैटल और ताज़ा समाचार — राजस्थान की संस्कृति डिजिटल युग में।
           </p>
         </div>
 
-        {/* Primary & Secondary Call to Actions + PWA Install Button */}
-        <div className="relative z-10 w-full max-w-sm sm:max-w-xl flex flex-col sm:flex-row items-center justify-center gap-2.5 mt-5" data-purpose="cta-buttons">
-          {/* Primary Green Button: Explore DHOTI AALE */}
+        {/* Action CTAs */}
+        <div className="relative z-10 w-full max-w-sm sm:max-w-xl flex flex-col sm:flex-row items-center justify-center gap-3 mt-6" data-purpose="cta-buttons">
+          {/* Battle CTA */}
           <button
             onClick={() => {
               SoundEffects.playTap();
-              const el = document.getElementById('features-section');
-              if (el) el.scrollIntoView({ behavior: 'smooth' });
+              onNavigateTab('battle');
             }}
-            id="explore-dhoti-aale-btn"
-            className="w-full sm:w-auto flex-1 py-2.5 px-5 bg-[#2D7D46] hover:bg-[#1E5830] active:scale-[0.98] transition-all duration-150 text-white rounded-full font-semibold text-xs tracking-wide shadow-md shadow-emerald-900/20 flex items-center justify-center gap-2"
+            id="hero-play-battle-btn"
+            className="w-full sm:w-auto flex-1 py-3 px-6 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-400 hover:from-amber-400 hover:to-orange-400 active:scale-[0.98] transition-all text-slate-950 rounded-full font-black text-xs tracking-wide shadow-lg shadow-amber-500/30 flex items-center justify-center gap-2 cursor-pointer"
             type="button"
           >
-            <span>Explore DHOTI AALE</span>
-            <ArrowRight className="h-3.5 w-3.5" />
+            <Swords className="h-4 w-4" />
+            <span>लाइव फोटो बैटल खेलें</span>
           </button>
 
-          {/* App Install / Update CTA Button */}
+          {/* App Install CTA */}
           <PWAInstallButton variant="hero" />
 
-            <button
-              onClick={() => {
-                SoundEffects.playBell();
-                if (currentUser) {
-                  onNavigateTab('profile');
-                } else {
-                  onOpenAuth();
-                }
-              }}
-              id="hero-login-btn"
-              className={`w-full sm:w-auto flex-1 py-2.5 px-5 active:scale-[0.98] transition-all duration-150 font-black rounded-full text-xs shadow-md flex items-center justify-center gap-2 cursor-pointer ${
-                currentUser
-                  ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-amber-500/20'
-                  : 'bg-white hover:bg-slate-100 text-slate-900 border border-slate-200 hover:border-slate-300 shadow-slate-950/20'
-              }`}
-              type="button"
-            >
-              {currentUser ? (
-                <>
-                  <UserCheck className="w-4 h-4 text-slate-950 shrink-0" />
-                  <span className="tracking-wide">Signed in as {currentUser.name}</span>
-                </>
-              ) : (
-                <>
-                  <LogIn className="w-4 h-4 shrink-0 text-slate-950" />
-                  <span className="tracking-wide">लॉगिन / साइन-अप करें</span>
-                </>
-              )}
-            </button>
+          {/* World Chat CTA */}
+          <button
+            onClick={() => {
+              SoundEffects.playTap();
+              onNavigateTab('worldchat');
+            }}
+            id="hero-world-chat-btn"
+            className="w-full sm:w-auto flex-1 py-3 px-5 bg-slate-900/90 hover:bg-slate-800/90 border border-slate-700 hover:border-amber-500/40 active:scale-[0.98] transition-all text-white rounded-full font-bold text-xs shadow-md flex items-center justify-center gap-2 cursor-pointer"
+            type="button"
+          >
+            <MessageSquare className="h-4 w-4 text-emerald-400" />
+            <span>गाँव चौपाल चैट</span>
+          </button>
         </div>
       </section>
       {/* END: HeroSection */}
@@ -346,6 +329,9 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth }: LandingP
             </div>
           </div>
         </div>
+
+        {/* In-feed AdBanner for Monetization */}
+        <AdBanner slot="4567890123" className="mb-5 shadow-xs" label="प्रायोजित / Sponsored by Google" />
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 sm:gap-4 md:gap-5">
           {/* CARD 1: News / ताज़ा समाचार */}
