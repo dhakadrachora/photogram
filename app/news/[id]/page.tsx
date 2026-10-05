@@ -6,6 +6,7 @@ import { Newspaper, ArrowLeft, RefreshCw } from 'lucide-react';
 import { createServerClient } from '@/lib/supabase';
 import { NewsItem } from '@/types';
 import { NewsArticleClient } from './NewsArticleClient';
+import { VIRAL_30_NEWS } from '@/lib/data/viral-news';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -20,24 +21,27 @@ async function getNewsItem(id: string): Promise<NewsItem | null> {
       .eq('id', id)
       .maybeSingle();
 
-    if (error || !data) return null;
-
-    return {
-      id: data.id,
-      title: data.title,
-      category: data.category,
-      excerpt: data.excerpt,
-      content: data.content,
-      imageUrl: data.image_url || data.imageUrl || '',
-      author: data.author || 'DHOTI AALE',
-      published: data.published ?? true,
-      createdAt: data.created_at ? new Date(data.created_at).getTime() : Date.now(),
-      views: data.views || 0,
-    };
+    if (!error && data) {
+      return {
+        id: data.id,
+        title: data.title,
+        category: data.category,
+        excerpt: data.excerpt,
+        content: data.content,
+        imageUrl: data.image_url || data.imageUrl || '',
+        author: data.author || 'DHOTI AALE',
+        published: data.published ?? true,
+        createdAt: data.created_at ? new Date(data.created_at).getTime() : Date.now(),
+        views: data.views || 0,
+      };
+    }
   } catch (e) {
-    console.error('Error fetching news server item:', e);
-    return null;
+    console.error('Error fetching news server item from supabase:', e);
   }
+
+  // Fallback to local 30 viral news
+  const fallback = VIRAL_30_NEWS.find((n) => n.id === id);
+  return fallback || null;
 }
 
 async function getAllNews(): Promise<NewsItem[]> {
@@ -50,21 +54,25 @@ async function getAllNews(): Promise<NewsItem[]> {
       .order('created_at', { ascending: false })
       .limit(6);
 
-    return (data || []).map((item) => ({
-      id: item.id,
-      title: item.title,
-      category: item.category,
-      excerpt: item.excerpt,
-      content: item.content,
-      imageUrl: item.image_url || item.imageUrl || '',
-      author: item.author || 'DHOTI AALE',
-      published: true,
-      createdAt: item.created_at ? new Date(item.created_at).getTime() : Date.now(),
-      views: item.views || 0,
-    }));
+    if (data && data.length > 0) {
+      return (data || []).map((item) => ({
+        id: item.id,
+        title: item.title,
+        category: item.category,
+        excerpt: item.excerpt,
+        content: item.content,
+        imageUrl: item.image_url || item.imageUrl || '',
+        author: item.author || 'DHOTI AALE',
+        published: true,
+        createdAt: item.created_at ? new Date(item.created_at).getTime() : Date.now(),
+        views: item.views || 0,
+      }));
+    }
   } catch {
-    return [];
+    // ignore
   }
+
+  return VIRAL_30_NEWS.slice(0, 6);
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
