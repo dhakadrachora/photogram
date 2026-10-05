@@ -23,19 +23,25 @@ export async function GET(req: NextRequest) {
   const singleId = searchParams.get('id');
 
   if (type === 'all' || type === 'news') {
-    let newsItems = Array.from(contentStore.news.values()).filter((n) => n.published);
-    if (newsItems.length === 0) {
-      newsItems = VIRAL_30_NEWS;
-      for (const item of VIRAL_30_NEWS) contentStore.news.set(item.id, item);
+    const storeItems = Array.from(contentStore.news.values()).filter((n) => n.published);
+    const combinedMap = new Map<string, any>();
+    for (const item of VIRAL_30_NEWS) {
+      if (item && item.id) combinedMap.set(item.id, item);
     }
+    for (const item of storeItems) {
+      if (item && item.id) combinedMap.set(item.id, item);
+    }
+    const allNews = Array.from(combinedMap.values()).sort(
+      (a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0)
+    );
 
     if (singleId) {
-      const item = contentStore.news.get(singleId) || VIRAL_30_NEWS.find((n) => n.id === singleId);
-      if (item && item.published) {
+      const item = combinedMap.get(singleId);
+      if (item) {
         responseData.newsItem = item;
       }
     }
-    responseData.news = newsItems.sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));
+    responseData.news = allNews;
   }
 
   if (type === 'all' || type === 'people') {
