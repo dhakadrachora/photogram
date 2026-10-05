@@ -148,6 +148,38 @@ export default async function NewsDetailPage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen bg-stone-50 text-stone-800 antialiased pb-16">
+      {/* Schema.org NewsArticle Structured Data for Google News & Search Ranking */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'NewsArticle',
+            headline: item.title,
+            description: item.excerpt || item.content?.slice(0, 160) || item.title,
+            image: item.imageUrl ? [item.imageUrl] : ['https://www.dhotiaale.online/app-logo.png'],
+            datePublished: new Date(item.createdAt).toISOString(),
+            dateModified: new Date(item.createdAt).toISOString(),
+            author: {
+              '@type': 'Person',
+              name: item.author || 'DHOTI AALE Editorial',
+            },
+            publisher: {
+              '@type': 'Organization',
+              name: 'DHOTI AALE',
+              logo: {
+                '@type': 'ImageObject',
+                url: 'https://www.dhotiaale.online/app-logo.png',
+              },
+            },
+            mainEntityOfPage: {
+              '@type': 'WebPage',
+              '@id': `https://www.dhotiaale.online/news/${encodeURIComponent(item.id)}`,
+            },
+          }),
+        }}
+      />
+
       {/* Top Bar */}
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-stone-200/90 shadow-xs">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
