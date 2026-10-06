@@ -165,10 +165,10 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth, onOpenEarn
   );
 
   return (
-    <div className="w-full flex flex-col bg-stone-50 text-stone-800 antialiased selection:bg-amber-200">
+    <div className="w-full flex flex-col bg-[#06090f] text-slate-100 antialiased selection:bg-amber-500/30 min-h-screen">
       {/* BEGIN: TopBar Header */}
       <header
-        className="w-full pt-3 px-4 sm:px-6 pb-2.5 flex items-center justify-between z-30 bg-slate-950/95 backdrop-blur-xl sticky top-0 border-b border-amber-500/20 shadow-lg"
+        className="w-full pt-3 px-4 sm:px-6 pb-2.5 flex items-center justify-between z-30 bg-slate-950/90 backdrop-blur-xl sticky top-0 border-b border-amber-500/20 shadow-2xl shadow-black/60"
         data-purpose="header-bar"
       >
         <div className="w-full max-w-5xl mx-auto flex items-center justify-between relative">
@@ -338,28 +338,28 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth, onOpenEarn
             SoundEffects.playTap();
             onNavigateTab('rewards');
           }}
-          className="mb-4 group relative overflow-hidden rounded-2xl bg-gradient-to-r from-amber-500 via-rose-500 to-purple-600 p-[1.5px] shadow-sm hover:shadow-md cursor-pointer transition-all duration-200 active:scale-[0.99]"
+          className="mb-4 group relative overflow-hidden rounded-2xl bg-gradient-to-r from-amber-500 via-rose-500 to-purple-600 p-[1px] shadow-lg shadow-purple-950/30 cursor-pointer transition-all duration-200 active:scale-[0.99]"
         >
-          <div className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3">
+          <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-950/90 px-4 py-3 border border-white/5">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-rose-500 text-white shadow-sm">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-rose-500 text-slate-950 font-black shadow-md">
                 <Gift className="h-5 w-5" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs sm:text-sm font-black text-stone-900">
+                  <span className="text-xs sm:text-sm font-black text-white">
                     🎁 100 Free Instagram Reels Views
                   </span>
-                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-bold text-emerald-700">
+                  <span className="rounded-full bg-emerald-500/20 border border-emerald-500/30 px-2 py-0.5 text-[9px] font-bold text-emerald-400">
                     मुफ़्त
                   </span>
                 </div>
-                <p className="text-[11px] text-stone-500">
+                <p className="text-[11px] text-slate-400">
                   हर 3 घंटे में रील्स लिंक डालें और फ्री व्यूज बूस्ट पाएं
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-1 text-xs font-bold text-rose-600 shrink-0 group-hover:translate-x-1 transition-transform">
+            <div className="flex items-center gap-1 text-xs font-bold text-amber-400 shrink-0 group-hover:translate-x-1 transition-transform">
               <span className="hidden sm:inline">Claim Karein</span>
               <ChevronRight className="h-4 w-4" />
             </div>
@@ -412,26 +412,26 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth, onOpenEarn
               SoundEffects.playTap();
               setActiveModal('news');
             }}
-            className="card-glass border border-stone-200/90 rounded-2xl p-3.5 sm:p-4 shadow-sm hover:shadow-md active:scale-[0.98] cursor-pointer transition-all duration-150 flex flex-col justify-between"
+            className="glass-premium rounded-2xl p-4 shadow-xl hover:border-amber-500/40 active:scale-[0.98] cursor-pointer transition-all duration-200 flex flex-col justify-between group"
             data-purpose="feature-news"
           >
             <div>
-              <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-200 flex items-center justify-center text-[#8D2817] mb-2.5">
-                <Newspaper className="h-5 w-5 text-[#8D2817]" />
+              <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-2.5 group-hover:scale-110 transition-transform">
+                <Newspaper className="h-5 w-5" />
               </div>
               <div className="flex items-center gap-1.5">
-                <h2 className="font-bold text-stone-900 text-sm">News</h2>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-medium">ताज़ा</span>
+                <h2 className="font-bold text-white text-sm">News</h2>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">ताज़ा</span>
               </div>
-              <p className="text-[11px] text-stone-500 mt-1 leading-tight line-clamp-2">
+              <p className="text-[11px] text-slate-400 mt-1 leading-tight line-clamp-2">
                 {newsList.length > 0 ? newsList[0].title : 'ढोटी पंचायत विकास कार्य एवं मुख्य समाचार...'}
               </p>
             </div>
-            <div className="mt-3 pt-2 border-t border-stone-100 flex items-center justify-between text-[11px] text-stone-600">
-              <span className="text-[10px] text-stone-400">
+            <div className="mt-3 pt-2 border-t border-white/5 flex items-center justify-between text-[11px] text-slate-400">
+              <span className="text-[10px] text-amber-400/90 font-medium">
                 {newsList.length > 0 ? `${newsList.length} खबरें • पढ़ें` : 'आज के मुख्य बिंदु'}
               </span>
-              <ChevronRight className="h-3 w-3 text-stone-400" />
+              <ChevronRight className="h-3.5 w-3.5 text-amber-400 group-hover:translate-x-1 transition-transform" />
             </div>
           </article>
 
@@ -442,28 +442,28 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth, onOpenEarn
               SoundEffects.playTap();
               onNavigateTab('worldchat');
             }}
-            className="card-glass border border-stone-200/90 rounded-2xl p-3.5 shadow-sm hover:shadow-md active:scale-[0.98] cursor-pointer transition-all duration-150 flex flex-col justify-between"
+            className="glass-premium rounded-2xl p-4 shadow-xl hover:border-emerald-500/40 active:scale-[0.98] cursor-pointer transition-all duration-200 flex flex-col justify-between group"
             data-purpose="feature-chat"
           >
             <div>
-              <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-[#2D7D46] mb-2.5">
-                <MessageSquare className="h-5 w-5 text-[#2D7D46]" />
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mb-2.5 group-hover:scale-110 transition-transform">
+                <MessageSquare className="h-5 w-5" />
               </div>
               <div className="flex items-center justify-between">
-                <h2 className="font-bold text-stone-900 text-sm">World Chat</h2>
-                <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-semibold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> लाइव
+                <h2 className="font-bold text-white text-sm">World Chat</h2>
+                <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-bold bg-emerald-500/20 px-1.5 py-0.5 rounded border border-emerald-500/30">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> लाइव
                 </span>
               </div>
-              <p className="text-[11px] text-stone-500 mt-1 leading-tight">
-                गाँव चौपाल चर्चा व संदेश
+              <p className="text-[11px] text-slate-400 mt-1 leading-tight">
+                गाँव चौपाल चर्चा व देसी संदेश
               </p>
             </div>
             {/* User Profile Avatars Cluster */}
-            <div className="mt-3 pt-2 border-t border-stone-100 flex items-center justify-between">
+            <div className="mt-3 pt-2 border-t border-white/5 flex items-center justify-between">
               <div className="flex -space-x-2 overflow-hidden">
                 {visiblePeople.slice(0, 3).map((person) => (
-                  <div key={person.userId} className="inline-block h-6 w-6 rounded-full ring-2 ring-white bg-stone-200 overflow-hidden text-[10px] flex items-center justify-center font-bold text-stone-700" title={person.userName}>
+                  <div key={person.userId} className="inline-block h-6 w-6 rounded-full ring-2 ring-slate-900 bg-slate-800 overflow-hidden text-[10px] flex items-center justify-center font-bold text-amber-300" title={person.userName}>
                     {person.userAvatar ? (
                       <img src={person.userAvatar} alt="" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
                     ) : (
@@ -472,6 +472,7 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth, onOpenEarn
                   </div>
                 ))}
               </div>
+              <ChevronRight className="h-3.5 w-3.5 text-emerald-400 group-hover:translate-x-1 transition-transform" />
             </div>
           </article>
 
@@ -482,77 +483,77 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth, onOpenEarn
               SoundEffects.playTap();
               onNavigateTab('battle');
             }}
-            className="card-glass border border-stone-200/90 rounded-2xl p-3.5 shadow-sm hover:shadow-md active:scale-[0.98] cursor-pointer transition-all duration-150 flex flex-col justify-between"
+            className="glass-premium rounded-2xl p-4 shadow-xl hover:border-amber-500/40 active:scale-[0.98] cursor-pointer transition-all duration-200 flex flex-col justify-between group"
             data-purpose="feature-battle"
           >
             <div>
-              <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-700 mb-2.5">
-                <Swords className="h-5 w-5 text-amber-700" />
+              <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-2.5 group-hover:scale-110 transition-transform">
+                <Swords className="h-5 w-5" />
               </div>
-              <h2 className="font-bold text-stone-900 text-sm">Battle</h2>
-              <p className="text-[11px] text-stone-500 mt-1 leading-tight">
+              <h2 className="font-bold text-white text-sm">Battle Arena</h2>
+              <p className="text-[11px] text-slate-400 mt-1 leading-tight">
                 गाँव प्रश्नोत्तरी व ज्ञान मुकाबला
               </p>
             </div>
-            <div className="mt-3 pt-2 border-t border-stone-100 flex items-center justify-between">
-              <span className="text-[10px] font-medium text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full">क्विज़ चैलेंज</span>
-              <Trophy className="h-3.5 w-3.5 text-amber-500" />
+            <div className="mt-3 pt-2 border-t border-white/5 flex items-center justify-between">
+              <span className="text-[10px] font-bold text-amber-400 bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 rounded-full">क्विज़ चैलेंज</span>
+              <Trophy className="h-3.5 w-3.5 text-amber-400 group-hover:scale-110 transition-transform" />
             </div>
           </article>
 
-          {/* CARD 4: AI Assistant / DHOTI AALE AI वॉइस मैन */}
+          {/* CARD 4: AI Assistant */}
           <article
             id="feature-card-ai"
             onClick={() => {
               SoundEffects.playTap();
               onNavigateTab('assistant');
             }}
-            className="card-glass border border-amber-300/80 bg-gradient-to-b from-amber-50/60 to-orange-50/40 rounded-2xl p-3.5 shadow-sm hover:shadow-md active:scale-[0.98] cursor-pointer transition-all duration-150 flex flex-col justify-between"
+            className="glass-premium border-amber-500/30 rounded-2xl p-4 shadow-xl hover:border-amber-400 active:scale-[0.98] cursor-pointer transition-all duration-200 flex flex-col justify-between group"
             data-purpose="feature-ai"
           >
             <div>
-              <div className="w-10 h-10 rounded-xl bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-800 mb-2.5">
-                <Bot className="h-5 w-5 text-amber-700" />
+              <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-300 mb-2.5 group-hover:scale-110 transition-transform">
+                <Bot className="h-5 w-5" />
               </div>
               <div className="flex items-center justify-between">
-                <h2 className="font-bold text-stone-900 text-sm">DHOTI AALE (AI)</h2>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-200/80 text-amber-900 font-bold">वॉइस</span>
+                <h2 className="font-bold text-white text-sm">DHOTI AI</h2>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">वॉइस</span>
               </div>
-              <p className="text-[11px] text-stone-600 mt-1 leading-tight">
-                &ldquo;राम राम भाईसाहब!&rdquo; अखाड़े में कौन आगे है, कौन जीतेगा व ताज़ा अपडेट्स
+              <p className="text-[11px] text-slate-400 mt-1 leading-tight">
+                &ldquo;राम राम भाईसाहब!&rdquo; अखाड़ा और सरकारी ताज़ा अपडेट्स
               </p>
             </div>
-            <div className="mt-3 pt-2 border-t border-amber-200/60 flex items-center justify-between">
-              <span className="text-[10px] text-amber-800 font-bold">🎙️ देसी AI वॉइस मैन</span>
-              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+            <div className="mt-3 pt-2 border-t border-white/5 flex items-center justify-between">
+              <span className="text-[10px] text-amber-300 font-bold">🎙️ देसी AI वॉइस</span>
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
             </div>
           </article>
 
-          {/* CARD 5: People / गाँव डायरेक्टरी */}
+          {/* CARD 5: People */}
           <article
             id="feature-card-people"
             onClick={() => {
               SoundEffects.playTap();
               setActiveModal('people');
             }}
-            className="card-glass border border-stone-200/90 rounded-2xl p-3.5 shadow-sm hover:shadow-md active:scale-[0.98] cursor-pointer transition-all duration-150 flex flex-col justify-between"
+            className="glass-premium rounded-2xl p-4 shadow-xl hover:border-purple-500/40 active:scale-[0.98] cursor-pointer transition-all duration-200 flex flex-col justify-between group"
             data-purpose="feature-people"
           >
             <div>
-              <div className="w-10 h-10 rounded-xl bg-purple-50 border border-purple-200 flex items-center justify-center text-purple-700 mb-2.5">
-                <Users className="h-5 w-5 text-purple-700" />
+              <div className="w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400 mb-2.5 group-hover:scale-110 transition-transform">
+                <Users className="h-5 w-5" />
               </div>
-              <h2 className="font-bold text-stone-900 text-sm">People</h2>
-              <p className="text-[11px] text-stone-500 mt-1 leading-tight">
+              <h2 className="font-bold text-white text-sm">People</h2>
+              <p className="text-[11px] text-slate-400 mt-1 leading-tight">
                 गाँव के निवासी व प्रवासी संपर्क
               </p>
             </div>
-            <div className="mt-3 pt-2 border-t border-stone-100 flex items-center justify-between">
+            <div className="mt-3 pt-2 border-t border-white/5 flex items-center justify-between">
               <div className="flex items-center -space-x-1.5">
                 {visiblePeople.slice(0, 3).map((person) => (
                   <div
                     key={person.userId}
-                    className="relative w-5 h-5 rounded-full bg-stone-200 border border-white overflow-hidden flex items-center justify-center text-[9px] font-bold text-stone-700"
+                    className="relative w-5 h-5 rounded-full bg-slate-800 border border-slate-700 overflow-hidden flex items-center justify-center text-[9px] font-bold text-purple-300"
                     title={person.userName}
                   >
                     {person.userAvatar ? (
@@ -563,45 +564,45 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth, onOpenEarn
                   </div>
                 ))}
               </div>
-              <span className="text-[10px] text-stone-600 font-medium">{onlineCount} सदस्य ऑनलाइन</span>
+              <span className="text-[10px] text-slate-400 font-medium">{onlineCount} ऑनलाइन</span>
             </div>
           </article>
 
-          {/* CARD 6: Latest Updates / सूचनाएं */}
+          {/* CARD 6: Latest Updates */}
           <article
             id="feature-card-updates"
             onClick={() => {
               SoundEffects.playTap();
               setActiveModal('updates');
             }}
-            className="card-glass border border-stone-200/90 rounded-2xl p-3.5 shadow-sm hover:shadow-md active:scale-[0.98] cursor-pointer transition-all duration-150 flex flex-col justify-between"
+            className="glass-premium rounded-2xl p-4 shadow-xl hover:border-rose-500/40 active:scale-[0.98] cursor-pointer transition-all duration-200 flex flex-col justify-between group"
             data-purpose="feature-updates"
           >
             <div>
-              <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center text-[#8D2817] mb-2.5 relative">
-                <Bell className="h-5 w-5 text-[#8D2817]" />
-                <span className="absolute top-2 right-2 w-2 h-2 bg-red-600 rounded-full animate-ping"></span>
-                <span className="absolute top-2 right-2 w-2 h-2 bg-red-600 rounded-full"></span>
+              <div className="w-10 h-10 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400 mb-2.5 relative group-hover:scale-110 transition-transform">
+                <Bell className="h-5 w-5" />
+                <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full animate-ping"></span>
+                <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full"></span>
               </div>
-              <h2 className="font-bold text-stone-900 text-sm">Latest Updates</h2>
-              <p className="text-[11px] text-stone-500 mt-1 leading-tight">
+              <h2 className="font-bold text-white text-sm">Updates</h2>
+              <p className="text-[11px] text-slate-400 mt-1 leading-tight">
                 सरकारी घोषणाएं व गाँव आयोजन
               </p>
             </div>
-            <div className="mt-3 pt-2 border-t border-stone-100 flex items-center justify-between">
-              <span className="text-[10px] text-rose-700 font-medium font-hindi">नया नोटिस</span>
-              <Megaphone className="h-3 w-3 text-stone-400" />
+            <div className="mt-3 pt-2 border-t border-white/5 flex items-center justify-between">
+              <span className="text-[10px] text-rose-400 font-bold bg-rose-500/20 px-2 py-0.5 rounded border border-rose-500/30">नया नोटिस</span>
+              <Megaphone className="h-3.5 w-3.5 text-rose-400" />
             </div>
           </article>
         </div>
 
         {/* Community Pride Banner */}
-        <div className="mt-5 rounded-2xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border border-amber-300/40 p-3.5 text-center">
-          <div className="text-xs font-bold text-stone-900 flex items-center justify-center gap-1.5">
-            <Sparkles className="h-4 w-4 text-[#C25E29]" />
+        <div className="mt-5 rounded-2xl bg-gradient-to-r from-amber-500/10 via-purple-500/10 to-amber-500/10 border border-amber-500/30 p-3.5 text-center">
+          <div className="text-xs font-bold text-amber-300 flex items-center justify-center gap-1.5">
+            <Sparkles className="h-4 w-4 text-amber-400" />
             <span>आपणो ढोटी गाँव - एक कदम डिजिटल विकास री ओर</span>
           </div>
-          <p className="text-[11px] text-stone-600 font-hindi mt-1">
+          <p className="text-[11px] text-slate-400 font-hindi mt-1">
             गाँव चौपाल, प्रतियोगिता और एआई मददगार के साथ अपनी आवाज को मंच दें।
           </p>
         </div>
@@ -612,7 +613,7 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth, onOpenEarn
             SoundEffects.playTap();
             onNavigateTab('support');
           }}
-          className="mt-3 rounded-2xl bg-slate-900 border border-amber-500/30 p-3.5 flex items-center justify-between cursor-pointer hover:border-amber-500/60 hover:bg-slate-800 transition-all shadow-sm group"
+          className="mt-3 rounded-2xl bg-slate-900/90 border border-amber-500/30 p-3.5 flex items-center justify-between cursor-pointer hover:border-amber-500/60 hover:bg-slate-800/90 transition-all shadow-xl group"
         >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
@@ -634,16 +635,16 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth, onOpenEarn
         {/* =========================================================
             SEMANTIC SEO & KNOWLEDGE BASE SECTION (CRAWLABLE CONTENT)
             ========================================================= */}
-        <section aria-label="DHOTI AALE डिजिटल गाँव जानकारी एवं विशेषताएँ" className="mt-8 pt-6 border-t border-stone-200/80 space-y-6">
+        <section aria-label="DHOTI AALE डिजिटल गाँव जानकारी एवं विशेषताएँ" className="mt-8 pt-6 border-t border-white/10 space-y-6">
           <div className="text-center space-y-1">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300">
-              <Crown className="h-3.5 w-3.5 text-amber-700" />
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+              <Crown className="h-3.5 w-3.5 text-amber-400" />
               <span>राजस्थान का #1 डिजिटल गाँव मंच</span>
             </div>
-            <h2 className="text-lg sm:text-xl font-black text-stone-900 tracking-tight">
+            <h2 className="text-lg sm:text-xl font-black text-white tracking-tight">
               DHOTI AALE (ढोटी आले) - डिजिटल पहचान, मुकाबला और चौपाल
             </h2>
-            <p className="text-xs text-stone-600 max-w-xl mx-auto leading-relaxed">
+            <p className="text-xs text-slate-400 max-w-xl mx-auto leading-relaxed">
               ढोटी गाँव (राजस्थान) का आधुनिक वेब पोर्टल जहाँ ग्रामीण संस्कृति, युवा प्रतिभा और आर्टिफिशियल इंटेलिजेंस (AI) एक साथ जुड़ते हैं।
             </p>
           </div>
@@ -656,17 +657,17 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth, onOpenEarn
                 SoundEffects.playTap();
                 onNavigateTab('battle');
               }}
-              className="p-4 rounded-2xl bg-white border border-stone-200 shadow-sm hover:border-[#C25E29] hover:shadow-md transition-all cursor-pointer group"
+              className="p-4 rounded-2xl glass-premium border border-white/10 shadow-lg hover:border-amber-500/40 transition-all cursor-pointer group"
             >
               <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-xl bg-orange-100 text-[#C25E29] flex items-center justify-center font-bold">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
                   ⚔️
                 </div>
-                <h3 className="text-sm font-bold text-stone-900 group-hover:text-[#C25E29] transition-colors">
+                <h3 className="text-sm font-bold text-white group-hover:text-amber-400 transition-colors">
                   लाइव फोटो बैटल एरीना (Photo Battles)
                 </h3>
               </div>
-              <p className="text-xs text-stone-600 leading-relaxed">
+              <p className="text-xs text-slate-400 leading-relaxed">
                 अपनी सबसे शानदार फोटो अपलोड करें, साथी निवासियों को 1v1 मुकाबले में चुनौती दें और लाइव वोटों के ज़रिए गाँव के चैंपियन बनें। विजेताओं को आकर्षक रिवॉर्ड्स और पहचान दी जाती है।
               </p>
             </div>
@@ -677,17 +678,17 @@ export function LandingPage({ currentUser, onNavigateTab, onOpenAuth, onOpenEarn
                 SoundEffects.playTap();
                 onNavigateTab('assistant');
               }}
-              className="p-4 rounded-2xl bg-white border border-stone-200 shadow-sm hover:border-amber-500 hover:shadow-md transition-all cursor-pointer group"
+              className="p-4 rounded-2xl glass-premium border border-white/10 shadow-lg hover:border-amber-500/40 transition-all cursor-pointer group"
             >
               <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
                   🤖
                 </div>
-                <h3 className="text-sm font-bold text-stone-900 group-hover:text-amber-700 transition-colors">
+                <h3 className="text-sm font-bold text-white group-hover:text-amber-400 transition-colors">
                   DHOTI AALE AI वॉइस असिस्टेंट
                 </h3>
               </div>
-              <p className="text-xs text-stone-600 leading-relaxed">
+              <p className="text-xs text-slate-400 leading-relaxed">
                 गाँव का अपना बुद्धिमान डिजिटल साथी जो हिंदी, अंग्रेजी और राजस्थानी में आपकी बात समझता है। गाँव की जानकारी, मुकाबले की स्थिति और सरकारी योजनाओं की सहायता एक आवाज़ में प्राप्त करें।
               </p>
             </div>
