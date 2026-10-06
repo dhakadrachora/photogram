@@ -69,6 +69,42 @@ export function VoiceAssistant({
   const [isTextChatOpen, setIsTextChatOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Autonomous Swarm Agent Runner State
+  const [activeAgentModal, setActiveAgentModal] = useState<{
+    id: string;
+    name: string;
+    icon: string;
+    badge: string;
+    desc: string;
+  } | null>(null);
+  const [agentPrompt, setAgentPrompt] = useState<string>('');
+  const [agentRunning, setAgentRunning] = useState<boolean>(false);
+  const [agentOutput, setAgentOutput] = useState<string | null>(null);
+  const [copiedResult, setCopiedResult] = useState<boolean>(false);
+
+  const runSwarmAgentTask = async (agentId: string, customText?: string) => {
+    try {
+      setAgentRunning(true);
+      setAgentOutput(null);
+      const promptToSend = customText !== undefined ? customText : agentPrompt;
+      const res = await fetch('/api/ai/swarm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentId, prompt: promptToSend }),
+      });
+      const data = await res.json();
+      if (data?.result) {
+        setAgentOutput(data.result);
+      } else {
+        setAgentOutput('एजेंट ने कार्य प्रोसेस कर दिया है।');
+      }
+    } catch (err: any) {
+      setAgentOutput(`एरर: ${err?.message || 'टास्क प्रोसेस नहीं हो सका'}`);
+    } finally {
+      setAgentRunning(false);
+    }
+  };
+
   const liveSessionRef = useRef<LiveSession | null>(null);
   const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toolTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -521,8 +557,22 @@ export function VoiceAssistant({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {/* Agent 1 */}
-                <div className="p-3 rounded-xl bg-slate-900/80 border border-amber-500/30 hover:border-amber-400/60 transition-all flex items-start gap-3 group">
-                  <div className="w-9 h-9 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 text-base">
+                <div
+                  onClick={() => {
+                    SoundEffects.playTap();
+                    setActiveAgentModal({
+                      id: 'voice_man',
+                      name: 'Desi Voice Man (गाँव वॉइस मैन)',
+                      icon: '🎙️',
+                      badge: '24x7 Live Voice',
+                      desc: 'देसी हिंदी व राजस्थानी लाइव वॉइस चैट और अखाड़ा गाइड',
+                    });
+                    setAgentPrompt('');
+                    setAgentOutput(null);
+                  }}
+                  className="p-3 rounded-xl bg-slate-900/80 border border-amber-500/30 hover:border-amber-400 hover:bg-slate-800/90 cursor-pointer transition-all flex items-start gap-3 group shadow-lg"
+                >
+                  <div className="w-9 h-9 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 text-base group-hover:scale-110 transition-transform">
                     🎙️
                   </div>
                   <div>
@@ -537,8 +587,22 @@ export function VoiceAssistant({
                 </div>
 
                 {/* Agent 2 */}
-                <div className="p-3 rounded-xl bg-slate-900/80 border border-sky-500/30 hover:border-sky-400/60 transition-all flex items-start gap-3 group">
-                  <div className="w-9 h-9 rounded-lg bg-sky-500/20 border border-sky-500/30 flex items-center justify-center text-sky-400 shrink-0 text-base">
+                <div
+                  onClick={() => {
+                    SoundEffects.playTap();
+                    setActiveAgentModal({
+                      id: 'seo_writer',
+                      name: 'SEO & Viral News Agent',
+                      icon: '✍️',
+                      badge: 'Auto-Publish Engine',
+                      desc: 'डेली ऑटोमेटेड ट्रेंडिंग न्यूज़ आर्टिकल्स और एसईओ ब्लॉग्स',
+                    });
+                    setAgentPrompt('');
+                    setAgentOutput(null);
+                  }}
+                  className="p-3 rounded-xl bg-slate-900/80 border border-sky-500/30 hover:border-sky-400 hover:bg-slate-800/90 cursor-pointer transition-all flex items-start gap-3 group shadow-lg"
+                >
+                  <div className="w-9 h-9 rounded-lg bg-sky-500/20 border border-sky-500/30 flex items-center justify-center text-sky-400 shrink-0 text-base group-hover:scale-110 transition-transform">
                     ✍️
                   </div>
                   <div>
@@ -553,8 +617,22 @@ export function VoiceAssistant({
                 </div>
 
                 {/* Agent 3 */}
-                <div className="p-3 rounded-xl bg-slate-900/80 border border-emerald-500/30 hover:border-emerald-400/60 transition-all flex items-start gap-3 group">
-                  <div className="w-9 h-9 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 text-base">
+                <div
+                  onClick={() => {
+                    SoundEffects.playTap();
+                    setActiveAgentModal({
+                      id: 'freelance_pitcher',
+                      name: 'Freelance Pitch & Client Hunter',
+                      icon: '💼',
+                      badge: 'Global Outreach',
+                      desc: 'वेब डेवलपमेंट, वीडियो और एसईओ के लिए हाई-कन्वर्टिंग क्लाइंट आउटरीच',
+                    });
+                    setAgentPrompt('');
+                    setAgentOutput(null);
+                  }}
+                  className="p-3 rounded-xl bg-slate-900/80 border border-emerald-500/30 hover:border-emerald-400 hover:bg-slate-800/90 cursor-pointer transition-all flex items-start gap-3 group shadow-lg"
+                >
+                  <div className="w-9 h-9 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 text-base group-hover:scale-110 transition-transform">
                     💼
                   </div>
                   <div>
@@ -569,8 +647,22 @@ export function VoiceAssistant({
                 </div>
 
                 {/* Agent 4 */}
-                <div className="p-3 rounded-xl bg-slate-900/80 border border-purple-500/30 hover:border-purple-400/60 transition-all flex items-start gap-3 group">
-                  <div className="w-9 h-9 rounded-lg bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0 text-base">
+                <div
+                  onClick={() => {
+                    SoundEffects.playTap();
+                    setActiveAgentModal({
+                      id: 'studio_3d',
+                      name: '3D Video & Cinematic Studio Agent',
+                      icon: '🎬',
+                      badge: 'Cinematic 8K',
+                      desc: '8K 3D डॉक्यूमेंट्री, थ्री.जेएस विजुअल्स और रील्स क्रिएटर',
+                    });
+                    setAgentPrompt('');
+                    setAgentOutput(null);
+                  }}
+                  className="p-3 rounded-xl bg-slate-900/80 border border-purple-500/30 hover:border-purple-400 hover:bg-slate-800/90 cursor-pointer transition-all flex items-start gap-3 group shadow-lg"
+                >
+                  <div className="w-9 h-9 rounded-lg bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0 text-base group-hover:scale-110 transition-transform">
                     🎬
                   </div>
                   <div>
@@ -585,8 +677,22 @@ export function VoiceAssistant({
                 </div>
 
                 {/* Agent 5 */}
-                <div className="p-3 rounded-xl bg-slate-900/80 border border-rose-500/30 hover:border-rose-400/60 transition-all flex items-start gap-3 group">
-                  <div className="w-9 h-9 rounded-lg bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-rose-400 shrink-0 text-base">
+                <div
+                  onClick={() => {
+                    SoundEffects.playTap();
+                    setActiveAgentModal({
+                      id: 'job_hunter',
+                      name: 'Remote Job Outreach Hunter',
+                      icon: '🎯',
+                      badge: 'Batch Auto',
+                      desc: 'इंटरनेशनल व डोमेस्टिक रिमोट जॉब्स सर्च व ऑटो-अप्लाई',
+                    });
+                    setAgentPrompt('');
+                    setAgentOutput(null);
+                  }}
+                  className="p-3 rounded-xl bg-slate-900/80 border border-rose-500/30 hover:border-rose-400 hover:bg-slate-800/90 cursor-pointer transition-all flex items-start gap-3 group shadow-lg"
+                >
+                  <div className="w-9 h-9 rounded-lg bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-rose-400 shrink-0 text-base group-hover:scale-110 transition-transform">
                     🎯
                   </div>
                   <div>
@@ -601,8 +707,22 @@ export function VoiceAssistant({
                 </div>
 
                 {/* Agent 6 */}
-                <div className="p-3 rounded-xl bg-slate-900/80 border border-indigo-500/30 hover:border-indigo-400/60 transition-all flex items-start gap-3 group">
-                  <div className="w-9 h-9 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0 text-base">
+                <div
+                  onClick={() => {
+                    SoundEffects.playTap();
+                    setActiveAgentModal({
+                      id: 'dev_bot',
+                      name: 'Full-Stack Dev Bot',
+                      icon: '💻',
+                      badge: 'Vercel & Next',
+                      desc: 'नेक्स्ट.जेएस आर्किटेक्चर, एपीआई, बग फिक्सिंग व सीआई/सीडी',
+                    });
+                    setAgentPrompt('');
+                    setAgentOutput(null);
+                  }}
+                  className="p-3 rounded-xl bg-slate-900/80 border border-indigo-500/30 hover:border-indigo-400 hover:bg-slate-800/90 cursor-pointer transition-all flex items-start gap-3 group shadow-lg"
+                >
+                  <div className="w-9 h-9 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0 text-base group-hover:scale-110 transition-transform">
                     💻
                   </div>
                   <div>
@@ -907,49 +1027,107 @@ export function VoiceAssistant({
       </div>
 
       {/* ========================================================
-          FULL CHAT HISTORY MODAL
+          AUTONOMOUS AI AGENT WORKSPACE MODAL
           ======================================================== */}
-      {isTextChatOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="relative w-full max-w-lg rounded-3xl bg-slate-900 border border-slate-700 p-5 shadow-2xl flex flex-col h-[480px]">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-amber-400" />
-                <h3 className="font-bold text-white text-sm">
-                  DHOTI AALE AI Call History
-                </h3>
+      {activeAgentModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
+          <div className="relative w-full max-w-xl rounded-3xl bg-slate-900/95 border border-amber-500/40 p-5 sm:p-6 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3.5 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-xl">
+                  {activeAgentModal.icon}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-extrabold text-white text-sm sm:text-base">
+                      {activeAgentModal.name}
+                    </h3>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                      {activeAgentModal.badge}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {activeAgentModal.desc}
+                  </p>
+                </div>
               </div>
 
               <button
-                onClick={() => setIsTextChatOpen(false)}
-                className="text-slate-400 hover:text-white text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-800"
+                onClick={() => {
+                  SoundEffects.playTap();
+                  setActiveAgentModal(null);
+                }}
+                className="text-slate-400 hover:text-white text-xs font-semibold px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors"
               >
-                बंद करें
+                ✕ बंद करें
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto py-3 space-y-3">
-              {chatHistory.map((item, idx) => (
-                <div
-                  key={idx}
-                  className={`flex flex-col ${
-                    item.sender === 'user' ? 'items-end' : 'items-start'
-                  }`}
-                >
-                  <span className="text-[10px] text-slate-400 mb-1">
-                    {item.sender === 'user' ? 'आप' : 'DHOTI AALE (AI)'} • {item.time}
-                  </span>
-                  <div
-                    className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-xs sm:text-sm font-medium ${
-                      item.sender === 'user'
-                        ? 'bg-amber-500 text-slate-950 rounded-tr-none'
-                        : 'bg-slate-800 text-slate-100 rounded-tl-none border border-slate-700'
-                    }`}
+            {/* Modal Body & Quick Action Prompts */}
+            <div className="flex-1 overflow-y-auto py-4 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-300 mb-1.5 block">
+                  एजेंट को क्या काम देना है? (कस्टम निर्देश या तुरंत कार्य चुनें)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="जैसे: नया वायरल आर्टिकल लिखो, कोल्ड ईमेल भेजो..."
+                    value={agentPrompt}
+                    onChange={(e) => setAgentPrompt(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !agentRunning) {
+                        runSwarmAgentTask(activeAgentModal.id);
+                      }
+                    }}
+                    className="flex-1 rounded-xl bg-slate-950 border border-slate-700 px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-amber-400 placeholder-slate-500 shadow-inner"
+                  />
+                  <button
+                    onClick={() => runSwarmAgentTask(activeAgentModal.id)}
+                    disabled={agentRunning}
+                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs sm:text-sm transition-all shadow-md active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
                   >
-                    {item.text}
-                  </div>
+                    {agentRunning ? (
+                      <>
+                        <Zap className="h-4 w-4 animate-spin" />
+                        <span>काम चालू है...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4" />
+                        <span>एजेंट रन करें</span>
+                      </>
+                    )}
+                  </button>
                 </div>
-              ))}
+              </div>
+
+              {/* Agent Execution Result Output */}
+              {agentOutput && (
+                <div className="rounded-2xl bg-slate-950/90 border border-amber-500/30 p-4 relative space-y-2 animate-in fade-in">
+                  <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                    <span className="text-[11px] font-bold text-amber-400 flex items-center gap-1.5">
+                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+                      कार्य परिणाम (Live Agent Output)
+                    </span>
+                    <button
+                      onClick={() => {
+                        SoundEffects.playTap();
+                        navigator.clipboard.writeText(agentOutput);
+                        setCopiedResult(true);
+                        setTimeout(() => setCopiedResult(false), 2000);
+                      }}
+                      className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors"
+                    >
+                      {copiedResult ? '✓ कॉपी हो गया' : '📋 कॉपी करें'}
+                    </button>
+                  </div>
+                  <pre className="text-xs text-slate-200 whitespace-pre-wrap font-sans leading-relaxed">
+                    {agentOutput}
+                  </pre>
+                </div>
+              )}
             </div>
           </div>
         </div>
