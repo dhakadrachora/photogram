@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { contentStore } from '@/lib/content-store';
 import { syncAllContentFromSupabase } from '@/lib/cache/content-cache';
 import { VIRAL_30_NEWS } from '@/lib/data/viral-news';
+import { fetchLivePublicNews, fetchLiveMarketData } from '@/lib/services/live-public-feeds';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +15,10 @@ export async function GET(req: NextRequest) {
 
   const responseData: Record<string, any> = {};
 
+  if (type === 'all' || type === 'market') {
+    responseData.market = await fetchLiveMarketData();
+  }
+
   if (type === 'all' || type === 'updates') {
     responseData.updates = Array.from(contentStore.updates.values())
       .filter((u) => u.published)
@@ -23,11 +28,19 @@ export async function GET(req: NextRequest) {
   const singleId = searchParams.get('id');
 
   if (type === 'all' || type === 'news') {
+    const liveApiNews = await fetchLivePublicNews();
     const storeItems = Array.from(contentStore.news.values()).filter((n) => n.published);
     const combinedMap = new Map<string, any>();
+    
+    // 1. Live Public APIs News
+    for (const item of liveApiNews) {
+      if (item && item.id) combinedMap.set(item.id, item);
+    }
+    // 2. High-converting Curated News
     for (const item of VIRAL_30_NEWS) {
       if (item && item.id) combinedMap.set(item.id, item);
     }
+    // 3. Supabase / Store News
     for (const item of storeItems) {
       if (item && item.id) combinedMap.set(item.id, item);
     }
