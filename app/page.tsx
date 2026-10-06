@@ -1147,23 +1147,23 @@ export default function Home() {
      ========================================================== */
 
   return (
-    <div className="min-h-screen w-full bg-stone-50 text-stone-800 flex flex-col antialiased selection:bg-amber-200">
+    <div className="min-h-screen w-full bg-[#05070D] text-slate-100 flex flex-col antialiased selection:bg-cyan-500/30">
 
       {/* ======================================================
           TOP SUB NAV
           ====================================================== */}
 
       {activeTab !== 'home' && activeTab !== 'worldchat' && (
-        <div className="sticky top-0 z-30 flex w-full items-center justify-between border-b border-stone-800 bg-stone-900 px-4 py-2.5 text-white shadow-sm">
+        <div className="sticky top-0 z-30 flex w-full items-center justify-between border-b border-slate-800/80 bg-[#05070D]/95 backdrop-blur-md px-4 py-2.5 text-white shadow-md">
 
           <button
             type="button"
             onClick={() =>
               handleTabSwitch('home')
             }
-            className="flex items-center gap-1.5 text-xs font-bold text-stone-300 hover:text-white"
+            className="flex items-center gap-1.5 text-xs font-bold text-slate-300 hover:text-white transition-colors"
           >
-            <ArrowLeft className="h-4 w-4 text-[#C25E29]" />
+            <ArrowLeft className="h-4 w-4 text-cyan-400" />
 
             <span>
               गाँव होम (Home)
@@ -1173,21 +1173,21 @@ export default function Home() {
           <span className="text-xs font-bold uppercase tracking-wider text-amber-400">
 
             {activeTab === 'battle'
-              ? 'मुकाबला (Battle)'
+              ? '⚔️ मुकाबला (Battle)'
               : activeTab === 'assistant'
-              ? 'AI Assistant 🔒'
+              ? '🎙️ AI Assistant'
               : activeTab === 'profile'
-              ? 'Profile'
+              ? '👤 Profile'
               : activeTab === 'support'
-              ? 'सहायता व सपोर्ट (Support 24/7)'
-              : 'Rewards & Offers'}
+              ? '🎧 सहायता व सपोर्ट (Support 24/7)'
+              : '🎁 Rewards & Offers'}
 
           </span>
 
           <div className="flex items-center gap-2">
 
             {currentUser ? (
-              <span className="max-w-[100px] truncate text-[11px] font-medium text-stone-300">
+              <span className="max-w-[100px] truncate text-[11px] font-medium text-slate-300">
                 {currentUser.name}
               </span>
             ) : (
@@ -1196,7 +1196,7 @@ export default function Home() {
                 onClick={() =>
                   setIsAuthModalOpen(true)
                 }
-                className="text-[11px] font-bold text-blue-400 hover:underline"
+                className="text-[11px] font-bold text-cyan-400 hover:underline"
               >
                 Login
               </button>
