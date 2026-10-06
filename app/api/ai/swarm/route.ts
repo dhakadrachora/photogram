@@ -32,22 +32,16 @@ export async function POST(req: NextRequest) {
 "ढोटी आले पोर्टल पर जानें राजस्थान के आधुनिक डिजिटल गाँव, लाइव फोटो बैटल, देसी AI वॉइस मैन और ताज़ा सरकारी अपडेट्स की पूरी जानकारी।"`;
         break;
 
-      case 'freelance_pitcher':
-        responseText = `💼 **[Freelance Client Hunter Agent Pitch]**
-**Subject:** High-Performance Web Apps & AI Automation for Your Business – Rohit Kumar Nagar
+      case 'krishi_mitra':
+        responseText = `🌾 **[कृषि मित्र व मंडी भाव AI]**
+**आज के प्रमुख मंडी भाव व फसल सलाह (हाड़ौती संभाग / कोटा मंडी):**
+- **सोयाबीन:** ₹4,400 - ₹4,850 प्रति क्विंटल (बाजार सामान्य)
+- **गेहूं:** ₹2,550 - ₹2,780 प्रति क्विंटल (मजबूत मांग)
+- **सरसों:** ₹5,100 - ₹5,450 प्रति क्विंटल (स्थिर)
+- **लहसुन:** ₹8,000 - ₹14,000 प्रति क्विंटल (गुणवत्ता अनुसार)
 
-**Email Pitch:**
-Hi [Client / Agency Team],
-
-I noticed your platform is scaling up and thought you might be looking to streamline your web performance and customer experience.
-
-I specialize in building lightning-fast Next.js / TypeScript web applications and custom autonomous AI workflows (like real-time voice bots and automated content pipelines) that drive conversions.
-
-Would you be open to a quick 5-minute chat or demo to see how we can optimize your project?
-
-Best regards,
-**Rohit Kumar Nagar**
-Portfolio: dhotiaale.vercel.app | rohitdhakaddhoti143@gmail.com`;
+**मौसम व कृषि सलाह:**
+आगामी 48 घंटों में मौसम साफ रहेगा। सिंचाई व खाद (यूरिया/डीएपी) देने के लिए अनुकूल समय है। किसी भी कीट प्रकोप के लिए जैविक नीम स्प्रे का उपयोग करें।`;
         break;
 
       case 'studio_3d':

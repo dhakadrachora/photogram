@@ -616,16 +616,16 @@ export function VoiceAssistant({
                   </div>
                 </div>
 
-                {/* Agent 3 */}
+                {/* Agent 3 - Krishi & Mandi AI */}
                 <div
                   onClick={() => {
                     SoundEffects.playTap();
                     setActiveAgentModal({
-                      id: 'freelance_pitcher',
-                      name: 'Freelance Pitch & Client Hunter',
-                      icon: '💼',
-                      badge: 'Global Outreach',
-                      desc: 'वेब डेवलपमेंट, वीडियो और एसईओ के लिए हाई-कन्वर्टिंग क्लाइंट आउटरीच',
+                      id: 'krishi_mitra',
+                      name: 'Krishi & Mandi Mitra AI (कृषि मित्र)',
+                      icon: '🌾',
+                      badge: 'Mandi Bhav & Krishi',
+                      desc: 'फसलों के लाइव मंडी भाव, मौसम अपडेट व जैविक खेती सलाह',
                     });
                     setAgentPrompt('');
                     setAgentOutput(null);
@@ -633,15 +633,15 @@ export function VoiceAssistant({
                   className="p-3 rounded-xl bg-slate-900/80 border border-emerald-500/30 hover:border-emerald-400 hover:bg-slate-800/90 cursor-pointer transition-all flex items-start gap-3 group shadow-lg"
                 >
                   <div className="w-9 h-9 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 text-base group-hover:scale-110 transition-transform">
-                    💼
+                    🌾
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-bold text-white group-hover:text-emerald-300">Freelance Pitcher</span>
-                      <span className="text-[9px] px-1 bg-emerald-500/20 text-emerald-300 rounded font-bold">Global Outreach</span>
+                      <span className="text-xs font-bold text-white group-hover:text-emerald-300">Krishi & Mandi AI</span>
+                      <span className="text-[9px] px-1 bg-emerald-500/20 text-emerald-300 rounded font-bold">मंडी भाव</span>
                     </div>
                     <p className="text-[11px] text-slate-400 mt-0.5 leading-tight">
-                      वेब डेवलपमेंट, वीडियो और एसईओ के लिए क्लाइंट हंटिंग
+                      फसलों के ताज़ा मंडी भाव, मौसम अपडेट व खेती सलाह
                     </p>
                   </div>
                 </div>
