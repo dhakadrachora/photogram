@@ -504,6 +504,119 @@ export function VoiceAssistant({
                 बटन दबाते ही घंटी बजेगी और DHOTI AALE कॉल उठाएगा!
               </p>
             </div>
+
+            {/* 🤖 DEPLOYED AUTONOMOUS AI AGENT SWARM HUB */}
+            <div className="mt-10 w-full max-w-2xl px-2">
+              <div className="flex items-center justify-between mb-3 px-1">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-amber-400" />
+                  <span className="text-xs sm:text-sm font-black text-white uppercase tracking-wider">
+                    Autonomous AI Swarm (ऑल एआई एजेंट्स)
+                  </span>
+                </div>
+                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                  6 Agents Active 🟢
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {/* Agent 1 */}
+                <div className="p-3 rounded-xl bg-slate-900/80 border border-amber-500/30 hover:border-amber-400/60 transition-all flex items-start gap-3 group">
+                  <div className="w-9 h-9 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 text-base">
+                    🎙️
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-white group-hover:text-amber-300">Desi Voice Man</span>
+                      <span className="text-[9px] px-1 bg-amber-500/20 text-amber-300 rounded font-bold">24x7 Voice</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5 leading-tight">
+                      देसी हिंदी व राजस्थानी लाइव वॉइस चैट और अखाड़ा गाइड
+                    </p>
+                  </div>
+                </div>
+
+                {/* Agent 2 */}
+                <div className="p-3 rounded-xl bg-slate-900/80 border border-sky-500/30 hover:border-sky-400/60 transition-all flex items-start gap-3 group">
+                  <div className="w-9 h-9 rounded-lg bg-sky-500/20 border border-sky-500/30 flex items-center justify-center text-sky-400 shrink-0 text-base">
+                    ✍️
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-white group-hover:text-sky-300">SEO & Viral News</span>
+                      <span className="text-[9px] px-1 bg-sky-500/20 text-sky-300 rounded font-bold">Auto-Publish</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5 leading-tight">
+                      डेली ऑटोमेटेड न्यूज़ आर्टिकल्स और ट्रेंडिंग ब्लॉग पब्लिशर
+                    </p>
+                  </div>
+                </div>
+
+                {/* Agent 3 */}
+                <div className="p-3 rounded-xl bg-slate-900/80 border border-emerald-500/30 hover:border-emerald-400/60 transition-all flex items-start gap-3 group">
+                  <div className="w-9 h-9 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 text-base">
+                    💼
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-white group-hover:text-emerald-300">Freelance Pitcher</span>
+                      <span className="text-[9px] px-1 bg-emerald-500/20 text-emerald-300 rounded font-bold">Global Outreach</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5 leading-tight">
+                      वेब डेवलपमेंट, वीडियो और एसईओ के लिए क्लाइंट हंटिंग
+                    </p>
+                  </div>
+                </div>
+
+                {/* Agent 4 */}
+                <div className="p-3 rounded-xl bg-slate-900/80 border border-purple-500/30 hover:border-purple-400/60 transition-all flex items-start gap-3 group">
+                  <div className="w-9 h-9 rounded-lg bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0 text-base">
+                    🎬
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-white group-hover:text-purple-300">3D Video & Studio</span>
+                      <span className="text-[9px] px-1 bg-purple-500/20 text-purple-300 rounded font-bold">Cinematic</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5 leading-tight">
+                      8K 3D डॉक्यूमेंट्री, थ्री.जेएस विजुअल्स और रील्स क्रिएटर
+                    </p>
+                  </div>
+                </div>
+
+                {/* Agent 5 */}
+                <div className="p-3 rounded-xl bg-slate-900/80 border border-rose-500/30 hover:border-rose-400/60 transition-all flex items-start gap-3 group">
+                  <div className="w-9 h-9 rounded-lg bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-rose-400 shrink-0 text-base">
+                    🎯
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-white group-hover:text-rose-300">Remote Job Hunter</span>
+                      <span className="text-[9px] px-1 bg-rose-500/20 text-rose-300 rounded font-bold">Batch Auto</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5 leading-tight">
+                      इंटरनेशनल व डोमेस्टिक रिमोट जॉब्स सर्च व ऑटो-अप्लाई
+                    </p>
+                  </div>
+                </div>
+
+                {/* Agent 6 */}
+                <div className="p-3 rounded-xl bg-slate-900/80 border border-indigo-500/30 hover:border-indigo-400/60 transition-all flex items-start gap-3 group">
+                  <div className="w-9 h-9 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0 text-base">
+                    💻
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-white group-hover:text-indigo-300">Full-Stack Dev Bot</span>
+                      <span className="text-[9px] px-1 bg-indigo-500/20 text-indigo-300 rounded font-bold">Vercel & Next</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5 leading-tight">
+                      नेक्स्ट.जेएस आर्किटेक्चर, एपीआई, बग फिक्सिंग व सीआई/सीडी
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
