@@ -43,17 +43,14 @@ export async function fetchLivePublicNews(): Promise<NewsItem[]> {
           liveItems.push({
             id: `live-feed-${item.guid || item.link || Math.random().toString(36).substring(7)}`,
             title: item.title || 'ताज़ा समाचार अपडेट',
-            summary: cleanDesc || item.title,
+            excerpt: cleanDesc || item.title || 'ताज़ा समाचार अपडेट',
             content: `${cleanDesc}\n\nपूरी खबर पढ़ने के लिए मूल स्रोत देखें: ${item.link || '#'}`,
             category: (feed.category as any) || 'World',
             imageUrl: item.thumbnail || item.enclosure?.link || 'https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=800&auto=format&fit=crop&q=80',
-            sourceUrl: item.link || 'https://dhotiaale.vercel.app',
-            authorName: item.author || 'Dhotiaale Live AI Desk',
+            author: item.author || 'Dhotiaale Live AI Desk',
             published: true,
             createdAt: item.pubDate ? new Date(item.pubDate).getTime() : Date.now(),
-            readTime: '3 min read',
-            views: Math.floor(Math.random() * 800) + 250,
-            likes: Math.floor(Math.random() * 150) + 40
+            views: Math.floor(Math.random() * 800) + 250
           });
         });
       }
