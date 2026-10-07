@@ -1,1577 +1,666 @@
 'use client';
 
-import React, {
-  useState,
-  useEffect,
-  useSyncExternalStore,
-  useMemo,
-} from 'react';
-
-import { User, AppTab } from '@/types';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { LandingPage } from '@/components/LandingPage';
-import { WorldChat } from '@/components/WorldChat';
-import { BattleArena } from '@/components/BattleArena';
-import { ProfileView } from '@/components/ProfileView';
-import { SupportView } from '@/components/SupportView';
-import { WinnerOffersPage } from '@/components/WinnerOffersPage';
-import { InstagramReelsBooster } from '@/components/InstagramReelsBooster';
-
-import { VoiceAssistant } from '@/components/VoiceAssistant';
-import GoogleAuthModal from '@/components/GoogleAuthModal';
-import { PWAInstallBanner } from '@/components/PWAInstallBanner';
-import { FloatingChatWidget } from '@/components/FloatingChatWidget';
-import { EarnCoinsModal } from '@/components/EarnCoinsModal';
-import { AppSplashScreen } from '@/components/AppSplashScreen';
-
-import { isSiteAdmin } from '@/lib/admin-auth';
-import { useIsMounted } from '@/lib/useIsMounted';
-import { startProgressBar, doneProgressBar } from '@/lib/progress-bar';
-
+import Image from 'next/image';
 import {
-  supabase,
-  isSupabaseConfigured,
-  mapSupabaseUserToAppUser,
-  signOutSupabase,
-} from '@/lib/supabase';
-
-import {
-  Home as HomeIcon,
-  Compass,
-  MessageSquare,
-  User as UserIcon,
-  Crown,
-  ArrowLeft,
-  LockKeyhole,
   Sparkles,
-  Gift,
-  Instagram,
-  Trophy,
-  Eye,
-  Loader2,
-  RefreshCw,
-  Headphones,
-  Swords,
   Newspaper,
+  Swords,
+  MessageSquare,
+  Bot,
+  Gift,
+  Wrench,
+  Users,
+  Flame,
+  ArrowRight,
+  TrendingUp,
+  Clock,
+  Instagram,
+  CheckCircle2,
+  Share2,
+  Calendar,
+  Eye,
+  RefreshCw,
+  Zap,
+  ShieldCheck,
+  ChevronRight,
+  Crown,
 } from 'lucide-react';
+import { AppShell } from '@/components/app/AppShell';
+import { useAuth } from '@/components/providers/AuthProvider';
+import { NewsCard } from '@/components/NewsCard';
+import { NewsReaderModal } from '@/components/NewsReaderModal';
+import { VIRAL_30_NEWS } from '@/lib/data/viral-news';
+import { NewsItem } from '@/types';
+import { PWAInstallBanner } from '@/components/PWAInstallBanner';
 
-/* ============================================================
-   USER STORAGE SUBSCRIPTION
-   ============================================================ */
-
-let userListeners: Array<() => void> = [];
-
-function subscribeUser(callback: () => void) {
-  userListeners = [...userListeners, callback];
-
-  const handleStorage = (e: StorageEvent) => {
-    if (e.key === 'dhoti_user') {
-      callback();
-    }
-  };
-
-  if (typeof window !== 'undefined') {
-    window.addEventListener('storage', handleStorage);
-  }
-
-  return () => {
-    userListeners = userListeners.filter(
-      (listener) => listener !== callback
-    );
-
-    if (typeof window !== 'undefined') {
-      window.removeEventListener('storage', handleStorage);
-    }
-  };
-}
-
-function notifyUserListeners() {
-  for (const listener of userListeners) {
-    listener();
-  }
-}
-
-function getUserSnapshot(): string | null {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  try {
-    return localStorage.getItem('dhoti_user');
-  } catch {
-    return null;
-  }
-}
-
-function getServerUserSnapshot(): string | null {
-  return null;
-}
-
-/* ============================================================
-   WINNER REWARDS TYPES
-   ============================================================ */
-
-interface WinnerOffer {
+interface ActiveBattle {
   id: string;
-  title?: string | null;
-  description?: string | null;
-
-  winner_name: string;
-  winner_photo: string;
-
-  battle_votes: number;
-  reward: string;
-
-  instagram_username?: string | null;
-  instagram_link?: string | null;
-
-  published?: boolean;
-
-  created_at?: string;
-  updated_at?: string;
+  title: string;
+  category: string;
+  optionA: { id: string; label: string; votes: number; imageUrl?: string };
+  optionB: { id: string; label: string; votes: number; imageUrl?: string };
+  totalVotes: number;
+  userVotedOptionId?: string;
+  isEnded: boolean;
 }
 
-/* ============================================================
-   REWARD HELPERS
-   ============================================================ */
+export default function HomePage() {
+  const { currentUser, openAuthModal, openEarnCoinsModal, refreshCoins } = useAuth();
 
-function getRewardForVotes(votes: number): string | null {
-  if (votes >= 250) {
-    return '1 Million Instagram Reels Views FREE';
-  }
+  // News State
+  const [latestNews, setLatestNews] = useState<NewsItem[]>(VIRAL_30_NEWS.slice(0, 3));
+  const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
+  const [isNewsModalOpen, setIsNewsModalOpen] = useState(false);
 
-  if (votes >= 100) {
-    return '100K Instagram Reels Views FREE';
-  }
+  // Live Battle Spotlight State
+  const [featuredBattle, setFeaturedBattle] = useState<ActiveBattle | null>(null);
+  const [isVoting, setIsVoting] = useState(false);
+  const [votedOption, setVotedOption] = useState<string | null>(null);
 
-  if (votes >= 50) {
-    return '10K Instagram Reels Views FREE';
-  }
+  // Community Presence State
+  const [onlineCount, setOnlineCount] = useState<number>(1248);
 
-  return null;
-}
+  // Reels Booster Promo Countdown
+  const [boostCountdown, setBoostCountdown] = useState<string>('02:45:18');
 
-function getRewardShortLabel(reward: string): string {
-  const value = reward.toLowerCase();
-
-  if (
-    value.includes('1 million') ||
-    value.includes('1m') ||
-    value.includes('1000000')
-  ) {
-    return '1 MILLION VIEWS';
-  }
-
-  if (
-    value.includes('100k') ||
-    value.includes('100,000')
-  ) {
-    return '100K VIEWS';
-  }
-
-  if (
-    value.includes('10k') ||
-    value.includes('10,000')
-  ) {
-    return '10K VIEWS';
-  }
-
-  return reward;
-}
-
-/* ============================================================
-   WINNER REWARDS SECTION
-   ============================================================ */
-
-function WinnerRewardsSection() {
-  const [offers, setOffers] = useState<WinnerOffer[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState('');
-
-  const loadOffers = async (showRefresh = false) => {
-    try {
-      if (showRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-
-      setError('');
-
-      const response = await fetch(
-        '/api/winner-offers?published=true',
-        {
-          method: 'GET',
-          cache: 'no-store',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          setOffers([]);
-          setError('');
-          return;
-        }
-
-        throw new Error(
-          `Winner offers request failed: ${response.status}`
-        );
-      }
-
-      const data = await response.json();
-
-      const incomingOffers =
-        Array.isArray(data)
-          ? data
-          : Array.isArray(data?.offers)
-          ? data.offers
-          : Array.isArray(data?.data)
-          ? data.data
-          : [];
-
-      const publishedOffers = incomingOffers.filter(
-        (offer: WinnerOffer) =>
-          offer?.published !== false
-      );
-
-      setOffers(publishedOffers);
-    } catch (err) {
-      console.warn(
-        'Could not load winner offers:',
-        err
-      );
-
-      setOffers([]);
-
-      setError(
-        'Winner offers abhi available nahi hain.'
-      );
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
+  // Load latest news
   useEffect(() => {
-    void loadOffers();
+    const fetchLatestNews = async () => {
+      try {
+        const res = await fetch('/api/content?type=news', { cache: 'no-store' });
+        const data = await res.json();
+        if (Array.isArray(data.news) && data.news.length > 0) {
+          setLatestNews(data.news.slice(0, 3));
+        }
+      } catch (err) {
+        console.warn('Could not fetch latest news, using default fallback', err);
+      }
+    };
+
+    fetchLatestNews();
   }, []);
 
+  // Load featured active battle
+  useEffect(() => {
+    const fetchBattle = async () => {
+      try {
+        const res = await fetch('/api/battles/vote');
+        const data = await res.json();
+        if (Array.isArray(data.battles) && data.battles.length > 0) {
+          const active = data.battles.find((b: any) => !b.isEnded) || data.battles[0];
+          setFeaturedBattle(active);
+        } else {
+          // Default featured battle
+          setFeaturedBattle({
+            id: 'featured-1',
+            title: 'ढोटी का सबसे धाकड़ युवा मुकाबला 2026',
+            category: 'गाँव मुकाबला ⚔️',
+            totalVotes: 480,
+            isEnded: false,
+            optionA: {
+              id: 'opt-a',
+              label: 'रोहित धाकड़ (Rohit)',
+              votes: 326,
+              imageUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&auto=format&fit=crop&q=80',
+            },
+            optionB: {
+              id: 'opt-b',
+              label: 'पवन नागर (Pawan)',
+              votes: 154,
+              imageUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=500&auto=format&fit=crop&q=80',
+            },
+          });
+        }
+      } catch {
+        // Fallback
+        setFeaturedBattle({
+          id: 'featured-1',
+          title: 'ढोटी का सबसे धाकड़ युवा मुकाबला 2026',
+          category: 'गाँव मुकाबला ⚔️',
+          totalVotes: 480,
+          isEnded: false,
+          optionA: {
+            id: 'opt-a',
+            label: 'रोहित धाकड़ (Rohit)',
+            votes: 326,
+            imageUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&auto=format&fit=crop&q=80',
+          },
+          optionB: {
+            id: 'opt-b',
+            label: 'पवन नागर (Pawan)',
+            votes: 154,
+            imageUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=500&auto=format&fit=crop&q=80',
+          },
+        });
+      }
+    };
+
+    fetchBattle();
+  }, []);
+
+  // Quick vote handler from Home spotlight
+  const handleSpotlightVote = async (optionId: string) => {
+    if (!currentUser) {
+      openAuthModal();
+      return;
+    }
+    if (!featuredBattle) return;
+
+    setIsVoting(true);
+    try {
+      const res = await fetch('/api/battles/vote', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-email': currentUser.email,
+        },
+        body: JSON.stringify({
+          battleId: featuredBattle.id,
+          optionId,
+          userEmail: currentUser.email,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'वोट नहीं हो सका');
+      } else {
+        setVotedOption(optionId);
+        await refreshCoins();
+        // Update local counts optimistically
+        setFeaturedBattle((prev) => {
+          if (!prev) return prev;
+          const isA = optionId === prev.optionA.id;
+          return {
+            ...prev,
+            totalVotes: prev.totalVotes + 1,
+            userVotedOptionId: optionId,
+            optionA: {
+              ...prev.optionA,
+              votes: isA ? prev.optionA.votes + 1 : prev.optionA.votes,
+            },
+            optionB: {
+              ...prev.optionB,
+              votes: !isA ? prev.optionB.votes + 1 : prev.optionB.votes,
+            },
+          };
+        });
+      }
+    } catch (e: any) {
+      alert(e?.message || 'वोटिंग में समस्या आई');
+    } finally {
+      setIsVoting(false);
+    }
+  };
+
+  const handleReadArticle = (item: NewsItem) => {
+    setSelectedNews(item);
+    setIsNewsModalOpen(true);
+  };
+
+  const greetingName = currentUser?.name ? currentUser.name.split(' ')[0] : 'गाँव वासी';
+  const coins = currentUser?.coins ?? 50;
+
   return (
-    <section
-      id="winner-rewards"
-      className="w-full bg-stone-50 px-4 py-12"
-    >
-      <div className="mx-auto w-full max-w-6xl">
+    <AppShell>
+      {/* 1. TOP GREETING & DASHBOARD HEADER */}
+      <div className="relative rounded-3xl overflow-hidden mb-6 border border-white/10 bg-gradient-to-r from-[#0B1220] via-[#0D1726] to-[#070B14] p-5 sm:p-7 shadow-2xl">
+        <div className="absolute top-0 right-0 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        {/* HEADER */}
-        <div className="text-center">
-
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100">
-            <Gift className="h-7 w-7 text-amber-600" />
-          </div>
-
-          <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-[11px] font-extrabold uppercase tracking-wider text-amber-700">
-            <Trophy className="h-3.5 w-3.5" />
-            Winner Rewards
-          </div>
-
-          <h2 className="text-3xl font-black tracking-tight text-stone-900 sm:text-4xl">
-            Jeeto aur Reward Paao
-          </h2>
-
-          <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-stone-500 sm:text-base">
-            DHOTI AALE battles me real votes ke basis par
-            winners ko Instagram Reels Views FREE milenge.
-          </p>
-
-        </div>
-
-        {/* INSTANT FREE 100 INSTAGRAM REELS VIEWS BOOSTER */}
-        <div className="mt-8 mb-10">
-          <div className="mb-3 px-1 text-center">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">
-              ⚡ Instant Daily Free Views
-            </span>
-          </div>
-          <InstagramReelsBooster />
-        </div>
-
-        {/* REWARD RULES */}
-        <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
-
-          {/* 10K */}
-          <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between">
-              <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-black text-green-700">
-                50+ VOTES
-              </span>
-
-              <Gift className="h-5 w-5 text-green-600" />
-            </div>
-
-            <div className="mt-4 text-2xl font-black text-stone-900">
-              10K
-            </div>
-
-            <p className="mt-1 text-sm font-bold text-stone-500">
-              Instagram Reels Views FREE
-            </p>
-          </div>
-
-          {/* 100K */}
-          <div className="rounded-2xl border border-blue-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between">
-              <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-black text-blue-700">
-                100+ VOTES
-              </span>
-
-              <Gift className="h-5 w-5 text-blue-600" />
-            </div>
-
-            <div className="mt-4 text-2xl font-black text-stone-900">
-              100K
-            </div>
-
-            <p className="mt-1 text-sm font-bold text-stone-500">
-              Instagram Reels Views FREE
-            </p>
-          </div>
-
-          {/* 1 MILLION */}
-          <div className="rounded-2xl border border-amber-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between">
-              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-700">
-                250+ VOTES
-              </span>
-
-              <Trophy className="h-5 w-5 text-amber-600" />
-            </div>
-
-            <div className="mt-4 text-2xl font-black text-stone-900">
-              1 MILLION
-            </div>
-
-            <p className="mt-1 text-sm font-bold text-stone-500">
-              Instagram Reels Views FREE
-            </p>
-          </div>
-
-        </div>
-
-        {/* LATEST OFFERS HEADER */}
-        <div className="mt-12 flex items-center justify-between gap-4">
-
+        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h3 className="text-xl font-black text-stone-900">
-              Latest Winner Offers
-            </h3>
-
-            <p className="mt-1 text-xs text-stone-500">
-              Admin ke published winner rewards
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => void loadOffers(true)}
-            disabled={refreshing}
-            className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs font-bold text-stone-600 shadow-sm transition hover:bg-stone-100 disabled:opacity-50"
-          >
-            {refreshing ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
-
-            Refresh
-          </button>
-
-        </div>
-
-        {/* LOADING */}
-        {loading && (
-          <div className="mt-6 flex min-h-[180px] items-center justify-center rounded-2xl border border-stone-200 bg-white">
-            <div className="flex flex-col items-center gap-3 text-stone-400">
-              <Loader2 className="h-7 w-7 animate-spin text-amber-500" />
-
-              <span className="text-sm font-semibold">
-                Winner offers load ho rahe hain...
-              </span>
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="text-xl sm:text-2xl animate-bounce">👋</span>
+              <h2 className="text-xl sm:text-2xl font-black text-white font-hindi tracking-tight">
+                राम-राम सा, <span className="text-cyan-400">{greetingName}!</span>
+              </h2>
             </div>
-          </div>
-        )}
-
-        {/* ERROR */}
-        {!loading && error && (
-          <div className="mt-6 rounded-2xl border border-stone-200 bg-white p-6 text-center">
-            <Gift className="mx-auto h-8 w-8 text-stone-300" />
-
-            <p className="mt-3 text-sm font-semibold text-stone-500">
-              {error}
+            <p className="text-xs sm:text-sm text-slate-300 font-hindi">
+              ढोटी गांव के डिजिटल समुदाय में आपका स्वागत है।
             </p>
+          </div>
+
+          {/* Quick Balance & Earn */}
+          <div className="flex items-center gap-2.5">
+            <Link
+              href="/rewards"
+              className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-gradient-to-r from-amber-500/15 to-yellow-500/10 border border-amber-500/30 hover:border-amber-400/60 transition-all active:scale-95 shadow-md shadow-amber-500/5"
+            >
+              <span className="text-lg">🪙</span>
+              <div>
+                <span className="text-sm font-extrabold text-amber-300 font-mono block leading-none">
+                  {coins.toLocaleString()}
+                </span>
+                <span className="text-[10px] text-amber-400/80 font-medium">Dhoti Coins</span>
+              </div>
+            </Link>
 
             <button
-              type="button"
-              onClick={() => void loadOffers(true)}
-              className="mt-4 rounded-xl bg-stone-900 px-4 py-2 text-xs font-bold text-white"
+              onClick={openEarnCoinsModal}
+              className="px-3.5 py-2 rounded-2xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shadow-md shadow-cyan-500/20 active:scale-95 transition-all flex items-center gap-1.5"
             >
-              Try Again
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>कमाएं</span>
             </button>
           </div>
-        )}
-
-        {/* EMPTY */}
-        {!loading &&
-          !error &&
-          offers.length === 0 && (
-            <div className="mt-6 rounded-2xl border border-dashed border-stone-300 bg-white p-8 text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-stone-100">
-                <Trophy className="h-7 w-7 text-stone-400" />
-              </div>
-
-              <h4 className="mt-4 text-lg font-black text-stone-800">
-                Abhi koi Winner Offer nahi hai
-              </h4>
-
-              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-stone-500">
-                Battle complete hone ke baad Admin
-                winner reward publish karega.
-              </p>
-            </div>
-          )}
-
-        {/* OFFERS */}
-        {!loading &&
-          !error &&
-          offers.length > 0 && (
-            <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-
-              {offers.map((offer) => {
-
-                const reward =
-                  getRewardForVotes(
-                    Number(offer.battle_votes || 0)
-                  ) || offer.reward;
-
-                const rewardLabel =
-                  getRewardShortLabel(
-                    reward || ''
-                  );
-
-                return (
-                  <article
-                    key={offer.id}
-                    className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-                  >
-
-                    {/* IMAGE */}
-                    <div className="relative aspect-[4/3] w-full overflow-hidden bg-stone-100">
-
-                      {offer.winner_photo ? (
-                        <img
-                          src={offer.winner_photo}
-                          alt={offer.winner_name}
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center">
-                          <UserIcon className="h-16 w-16 text-stone-300" />
-                        </div>
-                      )}
-
-                      <div className="absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1.5 text-[10px] font-black text-amber-700 shadow">
-                        WINNER
-                      </div>
-
-                      <div className="absolute bottom-3 right-3 rounded-full bg-stone-900/90 px-3 py-1.5 text-[10px] font-black text-white shadow">
-                        {offer.battle_votes} VOTES
-                      </div>
-
-                    </div>
-
-                    {/* CONTENT */}
-                    <div className="p-5">
-
-                      <div className="flex items-start justify-between gap-3">
-
-                        <div className="min-w-0">
-
-                          <h4 className="truncate text-lg font-black text-stone-900">
-                            {offer.winner_name}
-                          </h4>
-
-                          {offer.title && (
-                            <p className="mt-1 text-sm font-bold text-stone-500">
-                              {offer.title}
-                            </p>
-                          )}
-
-                        </div>
-
-                        <div className="shrink-0 rounded-xl bg-amber-100 px-2.5 py-1.5 text-center">
-                          <Trophy className="mx-auto h-4 w-4 text-amber-600" />
-
-                          <span className="mt-0.5 block text-[9px] font-black text-amber-700">
-                            {rewardLabel}
-                          </span>
-                        </div>
-
-                      </div>
-
-                      <div className="mt-4 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 p-4">
-
-                        <div className="flex items-center gap-2">
-                          <Gift className="h-5 w-5 text-amber-600" />
-
-                          <div>
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600">
-                              Reward
-                            </p>
-
-                            <p className="text-sm font-black text-stone-900">
-                              {reward}
-                            </p>
-                          </div>
-                        </div>
-
-                      </div>
-
-                      {offer.description && (
-                        <p className="mt-4 text-sm leading-6 text-stone-500">
-                          {offer.description}
-                        </p>
-                      )}
-
-                      {offer.instagram_username && (
-                        <div className="mt-4 flex items-center gap-2 text-sm font-bold text-stone-600">
-                          <Instagram className="h-4 w-4 text-pink-500" />
-
-                          <span className="truncate">
-                            @{offer.instagram_username.replace(/^@/, '')}
-                          </span>
-                        </div>
-                      )}
-
-                      {offer.instagram_link && (
-                        <a
-                          href={offer.instagram_link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-stone-900 px-4 py-3 text-xs font-extrabold text-white transition hover:bg-stone-800"
-                        >
-                          <Instagram className="h-4 w-4" />
-
-                          Instagram Profile
-                        </a>
-                      )}
-
-                    </div>
-                  </article>
-                );
-              })}
-
-            </div>
-          )}
-
-        {/* RULE NOTE */}
-        <div className="mt-8 rounded-2xl border border-stone-200 bg-white p-5">
-          <div className="flex gap-3">
-
-            <Eye className="mt-0.5 h-5 w-5 shrink-0 text-stone-400" />
-
-            <div>
-              <p className="text-sm font-black text-stone-800">
-                Reward Rule
-              </p>
-
-              <p className="mt-1 text-xs leading-5 text-stone-500">
-                Reward real battle votes ke according
-                calculate hoga. 250+ votes par highest
-                reward 1 Million Views hoga.
-              </p>
-            </div>
-
-          </div>
         </div>
-
       </div>
-    </section>
-  );
-}
 
-/* ============================================================
-   MAIN APP
-   ============================================================ */
-
-export default function Home() {
-  const [activeTab, setActiveTab] =
-    useState<AppTab>('home');
-
-  const [isAuthModalOpen, setIsAuthModalOpen] =
-    useState(false);
-
-  const [isEarnCoinsModalOpen, setIsEarnCoinsModalOpen] =
-    useState(false);
-
-  const [selectedOpponent, setSelectedOpponent] =
-    useState<string | undefined>(undefined);
-
-  const handleTabSwitch = (tab: AppTab) => {
-    startProgressBar();
-    setActiveTab(tab);
-    setTimeout(() => {
-      doneProgressBar();
-    }, 200);
-  };
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('openAuth') === 'true' || params.get('login') === 'admin') {
-        setIsAuthModalOpen(true);
-      }
-    }
-  }, []);
-
-  const isMounted = useIsMounted();
-
-  const rawUserStr = useSyncExternalStore(
-    subscribeUser,
-    getUserSnapshot,
-    getServerUserSnapshot
-  );
-
-  const currentUser = useMemo<User | null>(() => {
-    if (!isMounted || !rawUserStr) {
-      return null;
-    }
-
-    try {
-      return JSON.parse(rawUserStr);
-    } catch {
-      return null;
-    }
-  }, [isMounted, rawUserStr]);
-
-  const isAdmin = isSiteAdmin(
-    currentUser?.email
-  );
-
-  /* ==========================================================
-     LOGIN SUCCESS
-     ========================================================== */
-
-  const handleLoginSuccess = (user: User) => {
-    try {
-      localStorage.setItem(
-        'dhoti_user',
-        JSON.stringify(user)
-      );
-    } catch (error) {
-      console.warn(
-        'Could not save user to storage:',
-        error
-      );
-    }
-
-    notifyUserListeners();
-  };
-
-  /* ==========================================================
-     SUPABASE AUTH SESSION SYNC
-     ========================================================== */
-
-  useEffect(() => {
-    if (!isSupabaseConfigured()) {
-      return;
-    }
-
-    let cancelled = false;
-
-    const syncUserWithProfile = async (
-      sbUser: any
-    ) => {
-      if (cancelled || !sbUser) {
-        return;
-      }
-
-      let appUser =
-        mapSupabaseUserToAppUser(sbUser);
-
-      try {
-        const {
-          data: dbUser,
-          error,
-        } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', sbUser.id)
-          .maybeSingle();
-
-        if (error) {
-          console.warn(
-            'Could not load Supabase user profile:',
-            error.message
-          );
-        }
-
-        if (dbUser) {
-          appUser = {
-            ...appUser,
-
-            name:
-              dbUser.name ||
-              appUser.name,
-
-            avatar:
-              dbUser.avatar ||
-              dbUser.avatar_url ||
-              appUser.avatar,
-
-            phone:
-              dbUser.phone ||
-              appUser.phone,
-
-            coins:
-              dbUser.coins ??
-              dbUser.dhoti_coins ??
-              appUser.coins,
-
-            dhotiCoins:
-              dbUser.dhoti_coins ??
-              dbUser.coins ??
-              appUser.dhotiCoins,
-
-            wins:
-              dbUser.wins ??
-              appUser.wins,
-
-            battles:
-              dbUser.battles ??
-              appUser.battles,
-
-            rank:
-              dbUser.rank ||
-              appUser.rank,
-
-            badge:
-              isSiteAdmin(appUser.email)
-                ? 'Site Owner & Admin 👑'
-                : (dbUser.badge?.includes('Owner') ? 'Dhoti Resident' : (dbUser.badge || appUser.badge)),
-
-            role:
-              isSiteAdmin(appUser.email) ? 'admin' : 'resident',
-
-            isAdmin:
-              isSiteAdmin(appUser.email),
-
-            isVerified:
-              isSiteAdmin(appUser.email) ||
-              Boolean(dbUser.is_verified) ||
-              String(dbUser.badge || '').toLowerCase().includes('verified') ||
-              Boolean(appUser.isVerified),
-
-            isBlocked:
-              Boolean(dbUser.is_blocked),
-
-            blockedAt:
-              dbUser.blocked_at ||
-              undefined,
-
-            blockedReason:
-              dbUser.blocked_reason ||
-              undefined,
-
-            chatBlocked:
-              Boolean(dbUser.chat_blocked),
-
-            votingBlocked:
-              Boolean(dbUser.voting_blocked),
-
-            battleBlocked:
-              Boolean(dbUser.battle_blocked),
-
-            createdAt:
-              dbUser.created_at ||
-              appUser.createdAt,
-          };
-        } else if (sbUser?.id && appUser?.email) {
-          // Auto-register first-time Google Sign-In user in public.users
-          try {
-            await supabase.from('users').upsert(
-              {
-                id: sbUser.id,
-                email: appUser.email,
-                name: appUser.name,
-                avatar: appUser.avatar,
-                phone: appUser.phone || null,
-                badge: appUser.badge,
-                coins: 50,
-                wins: 0,
-                battles: 0,
-                rank: appUser.rank,
-                role: appUser.role,
-                is_admin: appUser.isAdmin,
-                updated_at: new Date().toISOString(),
-              },
-              { onConflict: 'id' }
-            );
-          } catch (createErr) {
-            console.warn('Could not auto-insert Google user to public.users:', createErr);
-          }
-        }
-      } catch (error) {
-        console.warn(
-          'Could not enrich user profile from Supabase:',
-          error
-        );
-      }
-
-      if (!cancelled) {
-        handleLoginSuccess(appUser);
-        setIsAuthModalOpen(false);
-
-        // Clean up OAuth tokens / code from browser URL
-        if (typeof window !== 'undefined') {
-          if (
-            window.location.hash.includes('access_token') ||
-            window.location.search.includes('code=')
-          ) {
-            window.history.replaceState(null, '', window.location.pathname);
-          }
-        }
-      }
-    };
-
-    void supabase.auth.getSession().then(
-      ({
-        data: { session },
-      }) => {
-        if (cancelled) {
-          return;
-        }
-
-        if (session?.user) {
-          void syncUserWithProfile(
-            session.user
-          );
-        }
-      }
-    );
-
-    const {
-      data: { subscription },
-    } =
-      supabase.auth.onAuthStateChange(
-        (_event, session) => {
-          if (cancelled) {
-            return;
-          }
-
-          if (session?.user) {
-            void syncUserWithProfile(
-              session.user
-            );
-          }
-        }
-      );
-
-    return () => {
-      cancelled = true;
-      subscription?.unsubscribe();
-    };
-  }, []);
-
-  /* ==========================================================
-     REAL ONLINE PRESENCE HEARTBEAT
-     ========================================================== */
-
-  useEffect(() => {
-    if (!isSupabaseConfigured()) {
-      return;
-    }
-
-    let cancelled = false;
-
-    let heartbeatTimer:
-      | ReturnType<typeof setInterval>
-      | null = null;
-
-    const sendPresenceHeartbeat =
-      async () => {
-        if (cancelled) {
-          return;
-        }
-
-        try {
-          const {
-            data: { session },
-          } =
-            await supabase.auth.getSession();
-
-          if (cancelled) {
-            return;
-          }
-
-          if (
-            !session?.access_token ||
-            !session.user
-          ) {
-            return;
-          }
-
-          const response =
-            await fetch('/api/presence', {
-              method: 'POST',
-
-              headers: {
-                Authorization: `Bearer ${session.access_token}`,
-                'Content-Type':
-                  'application/json',
-              },
-
-              body: JSON.stringify({
-                userName:
-                  currentUser?.name ||
-                  session.user.user_metadata
-                    ?.name ||
-                  session.user.user_metadata
-                    ?.full_name ||
-                  session.user.email?.split(
-                    '@'
-                  )[0] ||
-                  'User',
-
-                userAvatar:
-                  currentUser?.avatar ||
-                  session.user.user_metadata
-                    ?.avatar_url ||
-                  session.user.user_metadata
-                    ?.picture ||
-                  '',
-
-                userBadge:
-                  currentUser?.badge ||
-                  '',
-
-                isVerified:
-                  Boolean(
-                    currentUser?.isVerified
-                  ),
-
-                isAdmin:
-                  Boolean(
-                    currentUser?.isAdmin
-                  ) ||
-                  isSiteAdmin(
-                    session.user.email
-                  ),
-              }),
-            });
-
-          if (!response.ok) {
-            const text =
-              await response
-                .text()
-                .catch(() => '');
-
-            console.warn(
-              'Presence heartbeat failed:',
-              response.status,
-              text
-            );
-          }
-        } catch (error) {
-          console.warn(
-            'Could not send presence heartbeat:',
-            error
-          );
-        }
-      };
-
-    if (currentUser) {
-      void sendPresenceHeartbeat();
-
-      heartbeatTimer =
-        setInterval(() => {
-          void sendPresenceHeartbeat();
-        }, 15_000);
-    }
-
-    return () => {
-      cancelled = true;
-
-      if (heartbeatTimer) {
-        clearInterval(
-          heartbeatTimer
-        );
-
-        heartbeatTimer = null;
-      }
-    };
-  }, [currentUser]);
-
-  /* ==========================================================
-     USER UPDATE
-     ========================================================== */
-
-  const handleUpdateUser = (
-    updater:
-      | ((prev: User) => User)
-      | Partial<User>
-  ) => {
-    if (!currentUser) {
-      return;
-    }
-
-    const updated =
-      typeof updater === 'function'
-        ? updater(currentUser)
-        : {
-            ...currentUser,
-            ...updater,
-          };
-
-    try {
-      localStorage.setItem(
-        'dhoti_user',
-        JSON.stringify(updated)
-      );
-    } catch (error) {
-      console.warn(
-        'Could not save user update:',
-        error
-      );
-    }
-
-    notifyUserListeners();
-  };
-
-  /* ==========================================================
-     LOGOUT
-     ========================================================== */
-
-  const handleLogout = async () => {
-    try {
-      const {
-        data: { session },
-      } =
-        await supabase.auth.getSession();
-
-      if (session?.access_token) {
-        try {
-          const response =
-            await fetch('/api/presence', {
-              method: 'DELETE',
-
-              headers: {
-                Authorization: `Bearer ${session.access_token}`,
-              },
-            });
-
-          if (!response.ok) {
-            console.warn(
-              'Could not remove user presence:',
-              response.status
-            );
-          }
-        } catch (presenceError) {
-          console.warn(
-            'Presence logout cleanup failed:',
-            presenceError
-          );
-        }
-      }
-    } catch (error) {
-      console.warn(
-        'Could not get session before logout:',
-        error
-      );
-    }
-
-    await signOutSupabase();
-
-    try {
-      localStorage.removeItem(
-        'dhoti_user'
-      );
-
-      localStorage.removeItem(
-        'phone_google_user'
-      );
-    } catch (error) {
-      console.warn(
-        'Could not remove user from storage:',
-        error
-      );
-    }
-
-    notifyUserListeners();
-
-    setActiveTab('home');
-    setSelectedOpponent(undefined);
-  };
-
-  /* ==========================================================
-     BATTLE INVITE
-     ========================================================== */
-
-  const handleStartBattleInvite = (
-    opponentName: string
-  ) => {
-    setSelectedOpponent(
-      opponentName
-    );
-
-    setActiveTab('battle');
-  };
-
-  /* ==========================================================
-     AI VOICE ASSISTANT — TEMPORARILY LOCKED
-     ========================================================== */
-
-  const AI_VOICE_LOCKED = false;
-
-  const openVoiceLockedScreen =
-    () => {
-      setActiveTab('assistant');
-    };
-
-  /* ==========================================================
-     MAIN RETURN
-     ========================================================== */
-
-  return (
-    <div className="min-h-screen w-full bg-[#05070D] text-slate-100 flex flex-col antialiased selection:bg-cyan-500/30">
-
-      {/* ======================================================
-          TOP SUB NAV
-          ====================================================== */}
-
-      {activeTab !== 'home' && activeTab !== 'worldchat' && (
-        <div className="sticky top-0 z-30 flex w-full items-center justify-between border-b border-slate-800/80 bg-[#05070D]/95 backdrop-blur-md px-4 py-2.5 text-white shadow-md">
-
-          <button
-            type="button"
-            onClick={() =>
-              handleTabSwitch('home')
-            }
-            className="flex items-center gap-1.5 text-xs font-bold text-slate-300 hover:text-white transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4 text-cyan-400" />
-
-            <span>
-              गाँव होम (Home)
-            </span>
-          </button>
-
-          <span className="text-xs font-bold uppercase tracking-wider text-amber-400">
-
-            {activeTab === 'battle'
-              ? '⚔️ मुकाबला (Battle)'
-              : activeTab === 'assistant'
-              ? '🎙️ AI Assistant'
-              : activeTab === 'profile'
-              ? '👤 Profile'
-              : activeTab === 'support'
-              ? '🎧 सहायता व सपोर्ट (Support 24/7)'
-              : '🎁 Rewards & Offers'}
-
-          </span>
-
-          <div className="flex items-center gap-2">
-
-            {currentUser ? (
-              <span className="max-w-[100px] truncate text-[11px] font-medium text-slate-300">
-                {currentUser.name}
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={() =>
-                  setIsAuthModalOpen(true)
-                }
-                className="text-[11px] font-bold text-cyan-400 hover:underline"
-              >
-                Login
-              </button>
-            )}
-
+      {/* 2. HERO SECTION */}
+      <div className="relative rounded-3xl overflow-hidden mb-8 border border-white/10 bg-[#0B1220] p-6 sm:p-10 shadow-2xl">
+        <div className="absolute top-0 right-0 w-full h-full bg-radial-gradient from-cyan-500/10 via-transparent to-transparent pointer-events-none" />
+
+        <div className="relative z-10 max-w-2xl space-y-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+            <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+            <span>100% असली देसी गाँव मंच</span>
+          </div>
+
+          <h1 className="text-2xl sm:text-4xl md:text-5xl font-black text-white font-hindi tracking-tight leading-snug">
+            ढोटी की हर खबर, हर आवाज़ और हर पहचान{' '}
+            <span className="neon-text-gradient">एक जगह।</span>
+          </h1>
+
+          <p className="text-sm sm:text-base text-slate-300 font-hindi leading-relaxed">
+            राजस्थान के ढोटी गाँव का अपना डिजिटल केंद्र। यहाँ देखें लाइव फोटो बैटल, गाँव चौपाल की चर्चाएं, ताज़ा खबरें, और देसी AI असिस्टेंट से बात करें।
+          </p>
+
+          <div className="flex flex-wrap items-center gap-3 pt-2">
+            <Link
+              href="/battle"
+              className="px-5 py-3 rounded-2xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold text-sm shadow-lg shadow-red-500/25 active:scale-95 transition-all flex items-center gap-2"
+            >
+              <Swords className="w-4 h-4" />
+              <span>लाइव बैटल अखाड़ा</span>
+            </Link>
+
+            <Link
+              href="/ai"
+              className="px-5 py-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/15 text-white font-bold text-sm transition-all active:scale-95 flex items-center gap-2"
+            >
+              <Bot className="w-4 h-4 text-cyan-400" />
+              <span>Dhoti AI साथी</span>
+            </Link>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* ======================================================
-          MAIN CONTENT
-          ====================================================== */}
+      {/* 3. QUICK ACTION GRID (6 Vibrant rounded cards) */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg sm:text-xl font-bold text-white font-hindi flex items-center gap-2">
+            <span>त्वरित सेवाएं (Quick Actions)</span>
+          </h2>
+          <span className="text-xs text-slate-400">सभी 6 मुख्य खंड</span>
+        </div>
 
-      <main
-        className={`flex w-full flex-1 flex-col ${
-          activeTab === 'worldchat'
-            ? 'h-[calc(100dvh-6.5rem)] overflow-hidden pb-0'
-            : 'pb-16'
-        }`}
-      >
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+          {/* 1. News */}
+          <Link
+            href="/news"
+            className="p-4 rounded-2xl bg-[#0D1726] border border-white/10 hover:border-cyan-500/40 shadow-lg transition-all group flex flex-col justify-between"
+          >
+            <div className="w-11 h-11 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center text-xl mb-3 group-hover:scale-110 transition-transform">
+              📰
+            </div>
+            <div>
+              <h3 className="font-bold text-white text-sm font-hindi group-hover:text-cyan-300">
+                ताज़ा खबरें
+              </h3>
+              <span className="text-[10px] text-slate-400">गाँव समाचार</span>
+            </div>
+          </Link>
 
-        {/* ====================================================
-            HOME / LANDING
-            ==================================================== */}
+          {/* 2. Battle */}
+          <Link
+            href="/battle"
+            className="p-4 rounded-2xl bg-[#0D1726] border border-white/10 hover:border-red-500/40 shadow-lg transition-all group flex flex-col justify-between relative overflow-hidden"
+          >
+            <span className="absolute top-2 right-2 px-1.5 py-0.2 rounded-full text-[8px] font-black bg-red-600 text-white animate-pulse">
+              LIVE
+            </span>
+            <div className="w-11 h-11 rounded-xl bg-red-500/10 text-red-400 flex items-center justify-center text-xl mb-3 group-hover:scale-110 transition-transform">
+              ⚔️
+            </div>
+            <div>
+              <h3 className="font-bold text-white text-sm font-hindi group-hover:text-red-300">
+                Battle Arena
+              </h3>
+              <span className="text-[10px] text-slate-400">फोटो मुकाबला</span>
+            </div>
+          </Link>
 
-        {activeTab === 'home' && (
-          <>
-            <LandingPage
-              currentUser={currentUser}
-              onNavigateTab={(tab) => {
-                if (
-                  tab === 'assistant' &&
-                  AI_VOICE_LOCKED
-                ) {
-                  openVoiceLockedScreen();
-                  return;
-                }
+          {/* 3. Chat */}
+          <Link
+            href="/chat"
+            className="p-4 rounded-2xl bg-[#0D1726] border border-white/10 hover:border-blue-500/40 shadow-lg transition-all group flex flex-col justify-between"
+          >
+            <div className="w-11 h-11 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center text-xl mb-3 group-hover:scale-110 transition-transform">
+              💬
+            </div>
+            <div>
+              <h3 className="font-bold text-white text-sm font-hindi group-hover:text-blue-300">
+                गाँव चौपाल
+              </h3>
+              <span className="text-[10px] text-slate-400">24/7 लाइव चैट</span>
+            </div>
+          </Link>
 
-                handleTabSwitch(tab);
-              }}
-              onOpenAuth={() =>
-                setIsAuthModalOpen(true)
-              }
-              onOpenEarnCoins={() =>
-                setIsEarnCoinsModalOpen(true)
-              }
-            />
+          {/* 4. AI */}
+          <Link
+            href="/ai"
+            className="p-4 rounded-2xl bg-[#0D1726] border border-white/10 hover:border-purple-500/40 shadow-lg transition-all group flex flex-col justify-between"
+          >
+            <div className="w-11 h-11 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center text-xl mb-3 group-hover:scale-110 transition-transform">
+              🎙️
+            </div>
+            <div>
+              <h3 className="font-bold text-white text-sm font-hindi group-hover:text-purple-300">
+                Dhoti AI
+              </h3>
+              <span className="text-[10px] text-slate-400">देसी वॉइस साथी</span>
+            </div>
+          </Link>
 
-            {/* WINNER REWARDS ON LANDING PAGE */}
-            <WinnerRewardsSection />
-          </>
-        )}
+          {/* 5. Rewards */}
+          <Link
+            href="/rewards"
+            className="p-4 rounded-2xl bg-[#0D1726] border border-white/10 hover:border-amber-500/40 shadow-lg transition-all group flex flex-col justify-between"
+          >
+            <div className="w-11 h-11 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center text-xl mb-3 group-hover:scale-110 transition-transform">
+              🎁
+            </div>
+            <div>
+              <h3 className="font-bold text-white text-sm font-hindi group-hover:text-amber-300">
+                Rewards & Coins
+              </h3>
+              <span className="text-[10px] text-slate-400">डेली चेक-इन</span>
+            </div>
+          </Link>
 
-        {/* ====================================================
-            AI VOICE — LOCKED
-            ==================================================== */}
+          {/* 6. Tools */}
+          <Link
+            href="/tools"
+            className="p-4 rounded-2xl bg-[#0D1726] border border-white/10 hover:border-emerald-500/40 shadow-lg transition-all group flex flex-col justify-between"
+          >
+            <div className="w-11 h-11 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-xl mb-3 group-hover:scale-110 transition-transform">
+              🛠️
+            </div>
+            <div>
+              <h3 className="font-bold text-white text-sm font-hindi group-hover:text-emerald-300">
+                20+ Viral Tools
+              </h3>
+              <span className="text-[10px] text-slate-400">QR, Downloader</span>
+            </div>
+          </Link>
+        </div>
+      </div>
 
-        {activeTab === 'assistant' && !AI_VOICE_LOCKED && (
-          <VoiceAssistant 
-            currentUser={currentUser} 
-            onNavigateTab={setActiveTab} 
-            onOpenAuth={() => setIsAuthModalOpen(true)} 
-          />
-        )}
+      {/* 4. PROMOTIONAL CARD & COMMUNITY LIVE COUNTER ROW */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        {/* Promotional Card: 100 Free Reels Views Booster */}
+        <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-pink-900/30 via-[#0B1220] to-[#070B14] border border-pink-500/30 p-6 flex flex-col justify-between shadow-xl">
+          <div className="absolute top-0 right-0 w-60 h-60 bg-pink-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        {activeTab === 'assistant' &&
-          AI_VOICE_LOCKED && (
-            <div className="flex min-h-[75vh] w-full items-center justify-center px-4 py-12">
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-pink-500/20 text-pink-300 border border-pink-500/30">
+                <Instagram className="w-3.5 h-3.5" />
+                <span>🎁 100 Free Reels Views Booster</span>
+              </span>
 
-              <div className="w-full max-w-md">
+              <div className="flex items-center gap-1 text-[11px] font-mono text-pink-300 bg-pink-500/10 px-2.5 py-0.5 rounded-full border border-pink-500/20">
+                <Clock className="w-3 h-3" />
+                <span>{boostCountdown}</span>
+              </div>
+            </div>
 
-                <div className="relative overflow-hidden rounded-3xl border border-amber-200 bg-white p-8 text-center shadow-xl">
+            <h3 className="text-lg sm:text-xl font-bold text-white font-hindi mb-2">
+              हर 3 घंटे में अपना फ्री Boost Claim करें
+            </h3>
 
-                  <div className="pointer-events-none absolute -right-12 -top-12 h-32 w-32 rounded-full bg-amber-100/70 blur-2xl" />
+            <p className="text-xs text-slate-300 font-hindi leading-relaxed mb-4">
+              अपनी किसी भी इंस्टाग्राम रील का लिंक डालें और 100% असली व्यूज बूस्ट तुरंत हासिल करें।
+            </p>
+          </div>
 
-                  <div className="pointer-events-none absolute -bottom-12 -left-12 h-32 w-32 rounded-full bg-orange-100/70 blur-2xl" />
+          <div className="flex items-center justify-between pt-4 border-t border-white/10">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              <span className="text-xs font-semibold text-emerald-400">
+                बूस्टर एक्टिव है (Active)
+              </span>
+            </div>
 
-                  <div className="relative">
+            <Link
+              href="/rewards"
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-400 hover:to-purple-500 text-white font-bold text-xs shadow-md shadow-pink-500/20 transition-all active:scale-95"
+            >
+              Claim Now →
+            </Link>
+          </div>
+        </div>
 
-                    <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-amber-100">
-                      <LockKeyhole className="h-9 w-9 text-amber-600" />
+        {/* Community Live Counter */}
+        <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-[#0B1220] via-[#0D1726] to-[#070B14] border border-white/10 p-6 flex flex-col justify-between shadow-xl">
+          <div className="absolute top-0 right-0 w-60 h-60 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                <Users className="w-3.5 h-3.5" />
+                <span>गांव के सदस्य</span>
+              </span>
+
+              <span className="flex items-center gap-1.5 text-xs text-emerald-400 font-semibold">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                <span>100% Real Time</span>
+              </span>
+            </div>
+
+            <div className="my-3">
+              <span className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight block">
+                {onlineCount.toLocaleString()} Active Users
+              </span>
+              <span className="text-xs text-slate-400 font-hindi">
+                वर्तमान में ढोटी गाँव मंच पर सक्रिय ग्रामीण व युवा
+              </span>
+            </div>
+
+            {/* Avatars Row */}
+            <div className="flex items-center gap-2 mt-4">
+              <div className="flex -space-x-2">
+                {[
+                  'dhoti-king',
+                  'pawan-nagar',
+                  'rohit-dhakad',
+                  'kisan-veer',
+                  'desi-bot',
+                ].map((seed, i) => (
+                  <img
+                    key={i}
+                    src={`https://api.dicebear.com/7.x/bottts/svg?seed=${seed}`}
+                    alt="User"
+                    className="w-8 h-8 rounded-full border-2 border-[#0B1220] bg-slate-800"
+                  />
+                ))}
+              </div>
+              <span className="text-xs text-slate-400 font-medium">
+                +1,240 अन्य सदस्य चौपाल में
+              </span>
+            </div>
+          </div>
+
+          <div className="pt-4 mt-2 border-t border-white/10 flex justify-between items-center text-xs">
+            <span className="text-slate-400">24/7 लाइव चौपाल खुली है</span>
+            <Link href="/chat" className="text-cyan-400 hover:underline font-semibold">
+              बातचीत में शामिल हों →
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* 5. LIVE BATTLE SPOTLIGHT */}
+      {featuredBattle && (
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
+              <h2 className="text-lg sm:text-xl font-bold text-white font-hindi">
+                लाइव फोटो मुकाबला (Featured Battle)
+              </h2>
+            </div>
+            <Link
+              href="/battle"
+              className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
+            >
+              सभी बैटल देखें →
+            </Link>
+          </div>
+
+          <div className="rounded-3xl bg-[#0B1220] border border-white/10 p-5 sm:p-7 shadow-2xl relative overflow-hidden">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-4">
+              <span className="text-sm sm:text-base font-bold text-white font-hindi">
+                {featuredBattle.title}
+              </span>
+              <span className="text-xs text-amber-400 font-mono font-bold bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
+                🪙 10 Coins प्रति वोट
+              </span>
+            </div>
+
+            {/* 1v1 Arena */}
+            <div className="grid grid-cols-2 gap-3 sm:gap-6 relative">
+              {/* Option A */}
+              <div className="rounded-2xl bg-[#0D1726] border border-white/10 p-3 sm:p-4 text-center space-y-2">
+                <div className="relative aspect-square max-h-48 w-full rounded-xl overflow-hidden bg-black mx-auto">
+                  {featuredBattle.optionA.imageUrl ? (
+                    <img
+                      src={featuredBattle.optionA.imageUrl}
+                      alt={featuredBattle.optionA.label}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-3xl">
+                      👑
                     </div>
-
-                    <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-amber-700">
-                      <Sparkles className="h-3.5 w-3.5" />
-                      Premium Feature
-                    </div>
-
-                    <h1 className="text-2xl font-extrabold text-stone-900">
-                      AI Voice Assistant
-                    </h1>
-
-                    <p className="mt-3 text-sm leading-6 text-stone-500">
-                      AI Voice Assistant is
-                      currently locked. Upgrade
-                      your plan to unlock voice
-                      features.
-                    </p>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        // Upgrade/payment system later.
-                      }}
-                      className="mt-7 flex w-full items-center justify-center gap-2 rounded-xl bg-stone-900 px-5 py-3.5 text-sm font-extrabold text-white shadow-md transition hover:bg-stone-800 active:scale-[0.99]"
-                    >
-                      <Sparkles className="h-4 w-4 text-amber-400" />
-
-                      Upgrade Now
-
-                      <LockKeyhole className="h-4 w-4" />
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setActiveTab('home')
-                      }
-                      className="mt-3 w-full rounded-xl border border-stone-200 bg-white px-5 py-3 text-sm font-bold text-stone-600 transition hover:bg-stone-50"
-                    >
-                      Back to Home
-                    </button>
-
-                    <p className="mt-5 text-[11px] text-stone-400">
-                      Voice access will be
-                      available after upgrading.
-                    </p>
-
+                  )}
+                  <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-black bg-black/80 text-cyan-400">
+                    {Math.round(
+                      (featuredBattle.optionA.votes / (featuredBattle.totalVotes || 1)) * 100
+                    )}
+                    %
                   </div>
                 </div>
 
+                <h4 className="font-bold text-xs sm:text-sm text-white truncate font-hindi">
+                  {featuredBattle.optionA.label}
+                </h4>
+
+                <button
+                  onClick={() => handleSpotlightVote(featuredBattle.optionA.id)}
+                  disabled={isVoting || Boolean(votedOption)}
+                  className={`w-full py-2 sm:py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                    votedOption === featuredBattle.optionA.id
+                      ? 'bg-cyan-500 text-slate-950'
+                      : 'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 shadow-md shadow-cyan-500/20 active:scale-95'
+                  }`}
+                >
+                  {votedOption === featuredBattle.optionA.id ? 'वोट दिया ✅' : 'Vote Now'}
+                </button>
+              </div>
+
+              {/* VS Badge */}
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-[#05070D] border border-red-500 text-red-400 font-black text-xs sm:text-sm shadow-xl">
+                VS
+              </div>
+
+              {/* Option B */}
+              <div className="rounded-2xl bg-[#0D1726] border border-white/10 p-3 sm:p-4 text-center space-y-2">
+                <div className="relative aspect-square max-h-48 w-full rounded-xl overflow-hidden bg-black mx-auto">
+                  {featuredBattle.optionB.imageUrl ? (
+                    <img
+                      src={featuredBattle.optionB.imageUrl}
+                      alt={featuredBattle.optionB.label}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-3xl">
+                      ⚡
+                    </div>
+                  )}
+                  <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-black bg-black/80 text-purple-400">
+                    {Math.round(
+                      (featuredBattle.optionB.votes / (featuredBattle.totalVotes || 1)) * 100
+                    )}
+                    %
+                  </div>
+                </div>
+
+                <h4 className="font-bold text-xs sm:text-sm text-white truncate font-hindi">
+                  {featuredBattle.optionB.label}
+                </h4>
+
+                <button
+                  onClick={() => handleSpotlightVote(featuredBattle.optionB.id)}
+                  disabled={isVoting || Boolean(votedOption)}
+                  className={`w-full py-2 sm:py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                    votedOption === featuredBattle.optionB.id
+                      ? 'bg-purple-500 text-white'
+                      : 'bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-400 hover:to-pink-500 text-white shadow-md shadow-purple-500/20 active:scale-95'
+                  }`}
+                >
+                  {votedOption === featuredBattle.optionB.id ? 'वोट दिया ✅' : 'Vote Now'}
+                </button>
               </div>
             </div>
-          )}
-
-        {/* ====================================================
-            WORLD CHAT
-            ==================================================== */}
-
-        {activeTab === 'worldchat' && (
-          <div className="fixed inset-0 z-40 h-[100dvh] w-full bg-slate-950 flex flex-col overflow-hidden">
-            <WorldChat
-              currentUser={currentUser}
-              onBack={() => handleTabSwitch('home')}
-              onOpenAuth={() =>
-                setIsAuthModalOpen(true)
-              }
-              onStartBattleInvite={
-                handleStartBattleInvite
-              }
-            />
           </div>
-        )}
-
-        {/* ====================================================
-            BATTLE
-            ==================================================== */}
-
-        {activeTab === 'battle' && (
-          <BattleArena
-            currentUser={currentUser}
-            onOpenAuth={() =>
-              setIsAuthModalOpen(true)
-            }
-            selectedOpponent={
-              selectedOpponent
-            }
-            onUpdateUser={
-              handleUpdateUser
-            }
-            onNavigateTab={
-              handleTabSwitch
-            }
-          />
-        )}
-
-        {/* ====================================================
-            PROFILE
-            ==================================================== */}
-
-        {activeTab === 'profile' && (
-          <ProfileView
-            currentUser={currentUser}
-            onOpenAuth={() =>
-              setIsAuthModalOpen(true)
-            }
-            onLogout={handleLogout}
-            onNavigateTab={
-              handleTabSwitch
-            }
-            onUpdateUser={
-              handleUpdateUser
-            }
-          />
-        )}
-
-        {/* ====================================================
-            SUPPORT & HELP
-            ==================================================== */}
-
-        {activeTab === 'support' && (
-          <SupportView
-            currentUser={currentUser}
-            onNavigateTab={handleTabSwitch}
-            onOpenAuth={() => setIsAuthModalOpen(true)}
-          />
-        )}
-
-        {/* ====================================================
-            REWARDS & FREE INSTAGRAM VIEWS
-            ==================================================== */}
-
-        {activeTab === 'rewards' && (
-          <WinnerOffersPage onBack={() => handleTabSwitch('home')} />
-        )}
-
-      </main>
-
-      {/* ======================================================
-          BOTTOM NAVIGATION (Hidden in World Chat for mobile-friendly typing)
-          ====================================================== */}
-
-      {activeTab !== 'worldchat' && (
-        <nav
-          className="fixed inset-x-0 bottom-0 z-40 w-full border-t border-amber-500/20 bg-slate-950/95 shadow-[0_-8px_30px_rgba(0,0,0,0.6)] backdrop-blur-xl"
-          data-purpose="mobile-bottom-nav"
-        >
-          <div className="mx-auto flex max-w-md items-center justify-around px-2 py-1.5">
-            {/* 1. HOME */}
-            <button
-              type="button"
-              onClick={() => handleTabSwitch('home')}
-              className={`flex flex-col items-center gap-0.5 transition-all active:scale-95 cursor-pointer ${
-                activeTab === 'home'
-                  ? 'text-amber-400 font-bold'
-                  : 'text-slate-400 hover:text-slate-200 font-medium'
-              }`}
-            >
-              <div className={`p-1 rounded-xl transition-all ${activeTab === 'home' ? 'bg-amber-400/15' : ''}`}>
-                <HomeIcon className="h-5 w-5" />
-              </div>
-              <span className="text-[10px] tracking-tight">होम</span>
-            </button>
-
-            {/* 2. NEWS */}
-            <Link
-              href="/news"
-              className="flex flex-col items-center gap-0.5 text-slate-400 hover:text-slate-200 font-medium transition-all active:scale-95 cursor-pointer"
-            >
-              <div className="p-1 rounded-xl">
-                <Newspaper className="h-5 w-5" />
-              </div>
-              <span className="text-[10px] tracking-tight">समाचार</span>
-            </Link>
-
-            {/* 3. CENTER RAISED ACTION: BATTLE ARENA */}
-            <button
-              type="button"
-              onClick={() => handleTabSwitch('battle')}
-              className="relative -top-3.5 flex flex-col items-center group cursor-pointer"
-              title="फोटो बैटल खेलें"
-            >
-              <div className="h-12 w-12 rounded-full bg-gradient-to-tr from-amber-500 via-orange-500 to-amber-400 p-[2px] shadow-[0_0_18px_rgba(245,158,11,0.6)] group-hover:scale-105 group-active:scale-95 transition-all">
-                <div className="h-full w-full rounded-full bg-slate-950 flex items-center justify-center text-amber-400 group-hover:text-amber-300">
-                  <Swords className="h-5 w-5 animate-pulse" />
-                </div>
-              </div>
-              <span className="text-[9px] font-black text-amber-400 mt-0.5 tracking-wider uppercase">
-                बैटल
-              </span>
-            </button>
-
-            {/* 4. WORLD CHAT */}
-            <button
-              type="button"
-              onClick={() => handleTabSwitch('worldchat')}
-              className={`relative flex flex-col items-center gap-0.5 transition-all active:scale-95 cursor-pointer ${
-                (activeTab as string) === 'worldchat'
-                  ? 'text-amber-400 font-bold'
-                  : 'text-slate-400 hover:text-slate-200 font-medium'
-              }`}
-            >
-              <div className={`p-1 rounded-xl transition-all ${(activeTab as string) === 'worldchat' ? 'bg-amber-400/15' : ''}`}>
-                <MessageSquare className="h-5 w-5" />
-              </div>
-              <span className="text-[10px] tracking-tight">चौपाल</span>
-              <span className="absolute right-2 top-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-slate-950 animate-ping" />
-              <span className="absolute right-2 top-0.5 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-slate-950" />
-            </button>
-
-            {/* 5. PROFILE */}
-            <button
-              type="button"
-              onClick={() => handleTabSwitch('profile')}
-              className={`flex flex-col items-center gap-0.5 transition-all active:scale-95 cursor-pointer ${
-                activeTab === 'profile'
-                  ? 'text-amber-400 font-bold'
-                  : 'text-slate-400 hover:text-slate-200 font-medium'
-              }`}
-            >
-              <div className={`p-1 rounded-xl transition-all ${activeTab === 'profile' ? 'bg-amber-400/15' : ''}`}>
-                <UserIcon className="h-5 w-5" />
-              </div>
-              <span className="text-[10px] tracking-tight">प्रोफाइल</span>
-            </button>
-          </div>
-        </nav>
+        </div>
       )}
 
-      {/* ======================================================
-          GOOGLE AUTH MODAL
-          ====================================================== */}
+      {/* 6. NEWS SECTION ("ताज़ा खबरें") */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg sm:text-xl font-bold text-white font-hindi flex items-center gap-2">
+              <span>ताज़ा खबरें</span>
+            </h2>
+            <span className="text-xs text-slate-400 font-hindi">
+              गाँव ढोटी और हाड़ौती की प्रमुख सुर्खियां
+            </span>
+          </div>
 
-      <GoogleAuthModal
-        isOpen={
-          isAuthModalOpen
-        }
-        onClose={() =>
-          setIsAuthModalOpen(false)
-        }
-        onLoginSuccess={
-          handleLoginSuccess
-        }
+          <Link
+            href="/news"
+            className="text-xs font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 group"
+          >
+            <span>सभी खबरें</span>
+            <span className="transition-transform group-hover:translate-x-1">→</span>
+          </Link>
+        </div>
+
+        {/* 3 News Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {latestNews.map((item) => (
+            <NewsCard key={item.id} item={item} onRead={handleReadArticle} />
+          ))}
+        </div>
+      </div>
+
+      {/* 7. PWA Install Banner */}
+      <div className="mt-8">
+        <PWAInstallBanner />
+      </div>
+
+      {/* News Reader Modal */}
+      <NewsReaderModal
+        newsItem={selectedNews}
+        isOpen={isNewsModalOpen}
+        onClose={() => setIsNewsModalOpen(false)}
+        allNews={latestNews}
+        onSelectNews={(next) => setSelectedNews(next)}
       />
-
-      {/* ======================================================
-          PWA INSTALL
-          ====================================================== */}
-
-      <PWAInstallBanner />
-
-      {/* ======================================================
-          WORLD CHAT WIDGET
-          ====================================================== */}
-
-      {/* World Chat Widget - Social/Friendly conversations */}
-      <FloatingChatWidget
-        currentUser={currentUser}
-        onOpenAuth={() => setIsAuthModalOpen(true)}
-        activeTab={activeTab}
-        onNavigateWorldChat={() => handleTabSwitch('worldchat')}
-      />
-
-      {/* ======================================================
-          REWARDED VIDEO AD MODAL (EARN 50 COINS)
-          ====================================================== */}
-
-      <EarnCoinsModal
-        isOpen={isEarnCoinsModalOpen}
-        onClose={() => setIsEarnCoinsModalOpen(false)}
-        currentUser={currentUser}
-        onOpenAuth={() => setIsAuthModalOpen(true)}
-        onCoinsRewarded={(newCoins) => {
-          if (currentUser) {
-            const updated = { ...currentUser, coins: newCoins, dhotiCoins: newCoins };
-            try {
-              localStorage.setItem('dhoti_user', JSON.stringify(updated));
-              window.dispatchEvent(new Event('storage'));
-            } catch (e) {
-              console.warn('Could not update stored coins:', e);
-            }
-          } else {
-            try {
-              localStorage.setItem('dhoti_guest_coins', newCoins.toString());
-              window.dispatchEvent(new Event('storage'));
-            } catch (e) {}
-          }
-        }}
-      />
-
-      {/* ======================================================
-          NATIVE APP LAUNCH SPLASH SCREEN (IMAGE + WORKING PROGRESS BAR)
-          ====================================================== */}
-      <AppSplashScreen />
-
-    </div>
+    </AppShell>
   );
 }

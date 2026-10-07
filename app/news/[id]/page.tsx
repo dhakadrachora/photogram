@@ -2,11 +2,12 @@ import React from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
-import { Newspaper, ArrowLeft, RefreshCw } from 'lucide-react';
+import { Newspaper, ArrowLeft } from 'lucide-react';
 import { createServerClient } from '@/lib/supabase';
 import { NewsItem } from '@/types';
 import { NewsArticleClient } from './NewsArticleClient';
 import { VIRAL_30_NEWS } from '@/lib/data/viral-news';
+import { AppShell } from '@/components/app/AppShell';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -39,7 +40,6 @@ async function getNewsItem(id: string): Promise<NewsItem | null> {
     console.error('Error fetching news server item from supabase:', e);
   }
 
-  // Fallback to local 30 viral news
   const fallback = VIRAL_30_NEWS.find((n) => n.id === id);
   return fallback || null;
 }
@@ -63,13 +63,13 @@ async function getAllNews(): Promise<NewsItem[]> {
         content: item.content,
         imageUrl: item.image_url || item.imageUrl || '',
         author: item.author || 'DHOTI AALE',
-        published: true,
+        published: item.published ?? true,
         createdAt: item.created_at ? new Date(item.created_at).getTime() : Date.now(),
         views: item.views || 0,
       }));
     }
-  } catch {
-    // ignore
+  } catch (e) {
+    console.error('Error fetching all news items from supabase:', e);
   }
 
   return VIRAL_30_NEWS.slice(0, 6);
@@ -81,20 +81,22 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   if (!item) {
     return {
-      title: 'समाचार | DHOTI AALE',
-      description: 'ढोटी ग्राम समाचार मंच',
+      title: 'समाचार उपलब्ध नहीं है | DHOTI AALE',
+      description: 'ढोटी गाँव का आधिकारिक डिजिटल समाचार पोर्टल।',
     };
   }
 
-  const cleanDescription = item.excerpt || item.content?.slice(0, 150) || 'ढोटी समाचार';
+  const cleanDescription = (item.excerpt || item.content || item.title)
+    .replace(/[#*`_]/g, '')
+    .slice(0, 160)
+    .trim();
+
   const ogImage = item.imageUrl || 'https://www.dhotiaale.online/app-logo.png';
 
   return {
-    title: `${item.title} | ढोटी समाचार`,
+    title: `${item.title} | DHOTI AALE`,
     description: cleanDescription,
-    alternates: {
-      canonical: `https://www.dhotiaale.online/news/${encodeURIComponent(item.id)}`,
-    },
+    authors: [{ name: item.author || 'DHOTI AALE Team' }],
     openGraph: {
       title: item.title,
       description: cleanDescription,
@@ -125,30 +127,32 @@ export default async function NewsDetailPage({ params }: PageProps) {
 
   if (!item) {
     return (
-      <div className="min-h-screen bg-stone-50 text-stone-800 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white p-8 rounded-3xl border border-stone-200 shadow-xl text-center space-y-4">
-          <div className="w-12 h-12 rounded-2xl bg-amber-100 text-[#8D2817] flex items-center justify-center mx-auto">
-            <Newspaper className="h-6 w-6" />
+      <AppShell>
+        <div className="flex items-center justify-center py-20 p-4">
+          <div className="max-w-md w-full bg-[#0D1726] p-8 rounded-3xl border border-white/10 shadow-xl text-center space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center mx-auto">
+              <Newspaper className="h-6 w-6" />
+            </div>
+            <h1 className="text-xl font-black text-white font-hindi">समाचार उपलब्ध नहीं है</h1>
+            <p className="text-xs text-slate-400 font-hindi">
+              यह समाचार हटाया जा चुका है या लिंक गलत है।
+            </p>
+            <Link
+              href="/news"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-cyan-500 text-slate-950 text-xs font-bold transition-all"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>सभी समाचार देखें</span>
+            </Link>
           </div>
-          <h1 className="text-xl font-black text-stone-900">समाचार उपलब्ध नहीं है</h1>
-          <p className="text-xs text-stone-500">
-            यह समाचार हटाया जा चुका है या लिंक गलत है।
-          </p>
-          <Link
-            href="/news"
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-stone-900 text-white text-xs font-bold hover:bg-stone-800 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span>सभी समाचार देखें (View All News)</span>
-          </Link>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-stone-50 text-stone-800 antialiased pb-16">
-      {/* Schema.org NewsArticle Structured Data for Google News & Search Ranking */}
+    <AppShell>
+      {/* Schema.org NewsArticle Structured Data */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
@@ -162,7 +166,7 @@ export default async function NewsDetailPage({ params }: PageProps) {
             dateModified: new Date(item.createdAt).toISOString(),
             author: {
               '@type': 'Person',
-              name: item.author || 'DHOTI AALE Editorial',
+              name: item.author || 'DHOTI AALE',
             },
             publisher: {
               '@type': 'Organization',
@@ -180,28 +184,19 @@ export default async function NewsDetailPage({ params }: PageProps) {
         }}
       />
 
-      {/* Top Bar */}
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-stone-200/90 shadow-xs">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+      <div className="max-w-4xl mx-auto pt-2 pb-12">
+        <div className="mb-4">
           <Link
             href="/news"
-            className="inline-flex items-center gap-2 text-xs font-bold text-stone-700 hover:text-[#8D2817] bg-stone-100 hover:bg-stone-200/80 px-3.5 py-2 rounded-xl transition-colors"
+            className="inline-flex items-center gap-2 text-xs font-bold text-slate-300 hover:text-cyan-400 bg-white/5 hover:bg-white/10 px-3.5 py-2 rounded-xl border border-white/10 transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
             <span>सभी समाचार (All News)</span>
           </Link>
-
-          <Link href="/" className="flex items-center gap-2">
-            <img src="/app-logo.png" alt="DHOTI AALE" className="w-7 h-7 rounded-lg object-cover" />
-            <span className="font-black text-stone-900 text-xs sm:text-sm">DHOTI AALE</span>
-          </Link>
         </div>
-      </header>
 
-      {/* Main Story Container */}
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8">
         <NewsArticleClient newsItem={item} relatedNews={allNews} />
-      </main>
-    </div>
+      </div>
+    </AppShell>
   );
 }

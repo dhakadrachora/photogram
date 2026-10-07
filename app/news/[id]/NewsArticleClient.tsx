@@ -15,15 +15,8 @@ import {
   Newspaper,
   X,
   ArrowRight,
-  Swords,
-  MessageSquare,
-  Bot,
-  Sparkles,
-  Trophy,
 } from 'lucide-react';
 import { NewsItem } from '@/types';
-import { AdBanner } from '@/components/AdBanner';
-import { PWAInstallButton } from '@/components/PWAInstallButton';
 
 interface NewsArticleClientProps {
   newsItem: NewsItem;
@@ -36,7 +29,6 @@ export function NewsArticleClient({ newsItem, relatedNews }: NewsArticleClientPr
   const [fontSizeLevel, setFontSizeLevel] = useState<1 | 2 | 3>(2);
   const [isImageLightboxOpen, setIsImageLightboxOpen] = useState(false);
   const [imageError, setImageError] = useState(false);
-  const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   useEffect(() => {
     return () => {
@@ -68,10 +60,10 @@ export function NewsArticleClient({ newsItem, relatedNews }: NewsArticleClientPr
         textArea.remove();
       }
       setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
+      setTimeout(() => setCopied(false), 2200);
     } catch {
       setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
+      setTimeout(() => setCopied(false), 2200);
     }
   };
 
@@ -82,14 +74,14 @@ export function NewsArticleClient({ newsItem, relatedNews }: NewsArticleClientPr
       .slice(0, 160)
       .trim();
 
-    const text = `📰 *${newsItem.title}*\n\n${cleanExcerpt}...\n\n👉 पूरी खबर यहाँ पढ़ें:\n${url}\n\n_DHOTI AALE_`;
+    const text = `📰 *${newsItem.title}*\n\n${cleanExcerpt}...\n\n👉 पूरी खबर यहाँ पढ़ें:\n${url}\n\n_DHOTI AALE - राजस्थान का डिजिटल मंच_`;
     const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
     window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
   };
 
   const toggleSpeech = () => {
     if (typeof window === 'undefined' || !window.speechSynthesis) {
-      alert('आपके डिवाइस में आवाज़ (Text-to-Speech) सपोर्ट उपलब्ध नहीं है।');
+      alert('आपके ब्राउज़र में आवाज़ (Text-to-Speech) सपोर्ट उपलब्ध नहीं है।');
       return;
     }
 
@@ -100,26 +92,16 @@ export function NewsArticleClient({ newsItem, relatedNews }: NewsArticleClientPr
     }
 
     window.speechSynthesis.cancel();
-
     const textToRead = `${newsItem.title}. ${newsItem.content || newsItem.excerpt || ''}`
       .replace(/[#*`_]/g, '')
-      .replace(/\n+/g, ' ');
+      .slice(0, 1000);
 
     const utterance = new SpeechSynthesisUtterance(textToRead);
     utterance.lang = 'hi-IN';
     utterance.rate = 0.95;
-
-    const voices = window.speechSynthesis.getVoices();
-    const hindiVoice = voices.find((v) => v.lang.includes('hi') || v.name.includes('Hindi'));
-    if (hindiVoice) {
-      utterance.voice = hindiVoice;
-    }
-
     utterance.onend = () => setIsSpeaking(false);
     utterance.onerror = () => setIsSpeaking(false);
-
-    speechRef.current = utterance;
-    window.speechSynthesis.speak(utterance);
+    speechSynthesis.speak(utterance);
     setIsSpeaking(true);
   };
 
@@ -129,7 +111,21 @@ export function NewsArticleClient({ newsItem, relatedNews }: NewsArticleClientPr
         month: 'long',
         year: 'numeric',
       })
-    : 'ताज़ा समाचार';
+    : 'ताज़ा खबर';
+
+  const renderBoldSpans = (text: string) => {
+    const parts = text.split(/(\*\*[^*]+\*\*)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return (
+          <strong key={i} className="font-bold text-cyan-300">
+            {part.slice(2, -2)}
+          </strong>
+        );
+      }
+      return part;
+    });
+  };
 
   const renderFormattedContent = (content: string) => {
     if (!content) return null;
@@ -145,7 +141,7 @@ export function NewsArticleClient({ newsItem, relatedNews }: NewsArticleClientPr
         return (
           <h2
             key={idx}
-            className="text-lg sm:text-xl font-black text-stone-900 mt-5 mb-2 pb-1 border-b border-stone-200"
+            className="text-lg sm:text-2xl font-black text-white mt-5 mb-2 pb-1 border-b border-white/10 font-hindi"
           >
             {trimmed.replace('# ', '')}
           </h2>
@@ -156,7 +152,7 @@ export function NewsArticleClient({ newsItem, relatedNews }: NewsArticleClientPr
         return (
           <h3
             key={idx}
-            className="text-base sm:text-lg font-bold text-stone-900 mt-4 mb-2 text-[#8D2817]"
+            className="text-base sm:text-xl font-bold text-cyan-400 mt-4 mb-2 font-hindi"
           >
             {trimmed.replace(/^###?\s+/, '')}
           </h3>
@@ -165,31 +161,17 @@ export function NewsArticleClient({ newsItem, relatedNews }: NewsArticleClientPr
 
       if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
         return (
-          <li key={idx} className="ml-5 list-disc text-stone-700 my-1 leading-relaxed">
+          <li key={idx} className="ml-5 list-disc text-slate-300 my-1 leading-relaxed">
             {renderBoldSpans(trimmed.replace(/^[-*]\s+/, ''))}
           </li>
         );
       }
 
       return (
-        <p key={idx} className="text-stone-700 leading-relaxed sm:leading-loose my-2.5">
+        <p key={idx} className="text-slate-300 leading-relaxed sm:leading-loose my-3">
           {renderBoldSpans(trimmed)}
         </p>
       );
-    });
-  };
-
-  const renderBoldSpans = (text: string) => {
-    const parts = text.split(/(\*\*[^*]+\*\*)/g);
-    return parts.map((part, i) => {
-      if (part.startsWith('**') && part.endsWith('**')) {
-        return (
-          <strong key={i} className="font-bold text-stone-900">
-            {part.slice(2, -2)}
-          </strong>
-        );
-      }
-      return part;
     });
   };
 
@@ -202,39 +184,45 @@ export function NewsArticleClient({ newsItem, relatedNews }: NewsArticleClientPr
   const otherArticles = relatedNews.filter((n) => n.id !== newsItem.id).slice(0, 3);
 
   return (
-    <article className="bg-white rounded-3xl border border-stone-200 shadow-xl overflow-hidden p-5 sm:p-8 space-y-6">
+    <article className="rounded-3xl bg-[#0B1220] border border-white/10 shadow-2xl overflow-hidden p-5 sm:p-8 space-y-6">
       {/* Category & Date Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-stone-100">
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-white/10">
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-orange-100 text-[#8D2817] border border-orange-200">
+          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
             <Newspaper className="h-3.5 w-3.5" />
             <span>{newsItem.category || 'गाँव समाचार'}</span>
           </span>
-          <span className="text-xs text-stone-400">•</span>
-          <span className="text-xs text-stone-500 font-medium">{formattedDate}</span>
+          <span className="text-xs text-slate-500">•</span>
+          <span className="text-xs text-slate-400 font-medium">{formattedDate}</span>
         </div>
 
         {/* Text Size & Audio Narration */}
         <div className="flex items-center gap-2">
-          <div className="flex items-center bg-stone-100 rounded-xl p-0.5 border border-stone-200 text-xs">
+          <div className="flex items-center bg-white/5 rounded-xl p-0.5 border border-white/10 text-xs">
             <button
               onClick={() => setFontSizeLevel(1)}
               title="छोटा अक्षर"
-              className={`px-2 py-1 font-bold rounded-lg ${fontSizeLevel === 1 ? 'bg-white shadow-xs' : 'text-stone-500'}`}
+              className={`px-2 py-1 rounded-lg transition-colors font-bold ${
+                fontSizeLevel === 1 ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-400 hover:text-white'
+              }`}
             >
               A-
             </button>
             <button
               onClick={() => setFontSizeLevel(2)}
               title="सामान्य अक्षर"
-              className={`px-2 py-1 font-bold rounded-lg ${fontSizeLevel === 2 ? 'bg-white shadow-xs' : 'text-stone-500'}`}
+              className={`px-2 py-1 rounded-lg transition-colors font-bold ${
+                fontSizeLevel === 2 ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-400 hover:text-white'
+              }`}
             >
               A
             </button>
             <button
               onClick={() => setFontSizeLevel(3)}
               title="बड़ा अक्षर"
-              className={`px-2 py-1 font-bold rounded-lg ${fontSizeLevel === 3 ? 'bg-white shadow-xs' : 'text-stone-500'}`}
+              className={`px-2 py-1 rounded-lg transition-colors font-bold ${
+                fontSizeLevel === 3 ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-400 hover:text-white'
+              }`}
             >
               A+
             </button>
@@ -242,195 +230,118 @@ export function NewsArticleClient({ newsItem, relatedNews }: NewsArticleClientPr
 
           <button
             onClick={toggleSpeech}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs ${
+            className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
               isSpeaking
-                ? 'bg-red-500 text-white animate-pulse'
-                : 'bg-amber-100 text-amber-900 hover:bg-amber-200 border border-amber-300'
+                ? 'bg-red-500/20 text-red-400 border border-red-500/40 animate-pulse'
+                : 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 border border-cyan-500/30'
             }`}
           >
-            {isSpeaking ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5 text-amber-700" />}
-            <span>{isSpeaking ? 'रोकें' : 'खबर सुनें'}</span>
+            {isSpeaking ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+            <span>{isSpeaking ? 'रोकें' : 'सुनें'}</span>
           </button>
         </div>
       </div>
 
-      {/* Main Headline */}
+      {/* Headline */}
       <div>
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-stone-900 leading-tight tracking-tight">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-white leading-tight tracking-tight font-hindi">
           {newsItem.title}
         </h1>
 
-        <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-stone-500">
-          <span className="flex items-center gap-1 font-medium text-stone-600">
-            <User className="h-3.5 w-3.5 text-amber-600" />
+        {/* Author & Readers Count */}
+        <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-slate-400">
+          <div className="flex items-center gap-1.5 text-slate-300 font-medium">
+            <User className="h-3.5 w-3.5 text-cyan-400" />
             <span>लेखक: {newsItem.author || 'DHOTI AALE'}</span>
-          </span>
-          <span className="flex items-center gap-1">
-            <Calendar className="h-3.5 w-3.5 text-stone-400" />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Calendar className="h-3.5 w-3.5 text-cyan-400" />
             <span>{formattedDate}</span>
-          </span>
-          <span className="flex items-center gap-1">
-            <Eye className="h-3.5 w-3.5 text-stone-400" />
-            <span>{newsItem.views || 1} पाठक</span>
-          </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Eye className="h-3.5 w-3.5 text-cyan-400" />
+            <span>{(newsItem.views || 48).toLocaleString()} पाठक</span>
+          </div>
         </div>
       </div>
 
-      {/* Featured News Image */}
-      {newsItem.imageUrl && !imageError ? (
-        <div className="relative group rounded-2xl sm:rounded-3xl overflow-hidden border border-stone-200 bg-stone-100 shadow-md">
+      {/* Featured Banner Image */}
+      {newsItem.imageUrl && !imageError && (
+        <div className="relative group rounded-3xl overflow-hidden border border-white/10 bg-[#070B14] shadow-xl">
           <img
             src={newsItem.imageUrl}
             alt={newsItem.title}
-            className="w-full max-h-[460px] object-cover transition-transform duration-300 group-hover:scale-[1.01]"
+            className="w-full max-h-[460px] object-cover transition-transform duration-500 group-hover:scale-[1.01]"
             onError={() => setImageError(true)}
           />
           <button
             onClick={() => setIsImageLightboxOpen(true)}
-            className="absolute bottom-3 right-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/70 hover:bg-black/85 text-white text-[11px] font-medium backdrop-blur-md transition-all shadow-md"
+            className="absolute bottom-4 right-4 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-black/80 hover:bg-black text-white text-xs font-semibold backdrop-blur-md transition-all shadow-md"
           >
-            <ZoomIn className="h-3.5 w-3.5" />
-            <span>बड़ी तस्वीर देखें (Zoom)</span>
+            <ZoomIn className="h-3.5 w-3.5 text-cyan-400" />
+            <span>बड़ी तस्वीर देखें</span>
           </button>
-        </div>
-      ) : (
-        <div className="rounded-2xl p-6 bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-stone-100 border border-amber-200/60 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-[#8D2817] flex items-center justify-center shrink-0 border border-amber-300">
-            <Newspaper className="h-6 w-6" />
-          </div>
-          <div>
-            <div className="text-xs font-bold text-[#8D2817] uppercase tracking-wider">
-              {newsItem.category || 'ढोटी समाचार'}
-            </div>
-            <div className="text-sm font-semibold text-stone-800">{newsItem.title}</div>
-          </div>
         </div>
       )}
 
-      {/* Share Bar */}
-      <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200 flex flex-wrap items-center justify-between gap-3 shadow-xs">
-        <div className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
-          <Share2 className="h-4 w-4 text-[#8D2817]" />
+      {/* Top Share Actions Bar */}
+      <div className="p-4 rounded-2xl bg-[#0D1726] border border-white/10 flex flex-wrap items-center justify-between gap-3 shadow-md">
+        <div className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+          <Share2 className="h-4 w-4 text-cyan-400" />
           <span>गाँव के व्हाट्सएप ग्रुप में शेयर करें:</span>
         </div>
 
         <div className="flex items-center gap-2">
-          {/* WhatsApp Share Button */}
           <button
             onClick={handleShareWhatsApp}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#25D366] hover:bg-[#20ba59] active:scale-95 text-white font-bold text-xs shadow-sm transition-all cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#25D366] hover:bg-[#20ba59] active:scale-95 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
           >
-            <svg className="h-4 w-4 fill-current" viewBox="0 0 24 24">
-              <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z" />
-            </svg>
-            <span>WhatsApp पर शेयर</span>
+            <span>WhatsApp पर शेयर करें</span>
           </button>
 
-          {/* Copy Link Button */}
           <button
             onClick={handleCopyLink}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-xs font-semibold transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-all ${
               copied
-                ? 'bg-emerald-50 text-emerald-800 border-emerald-300 font-bold'
-                : 'bg-white hover:bg-stone-100 text-stone-700 border-stone-200'
+                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/10'
             }`}
           >
-            {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
-            <span>{copied ? 'लिंक कॉपी हो गया!' : 'लिंक कॉपी करें'}</span>
+            {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+            <span>{copied ? 'लिंक कॉपी हो गया!' : 'लिंक कॉपी'}</span>
           </button>
         </div>
       </div>
 
-      {/* Excerpt Callout */}
+      {/* Excerpt Lead */}
       {newsItem.excerpt && (
-        <div className="p-4 rounded-2xl bg-amber-50/70 border-l-4 border-amber-500 text-stone-800 text-sm font-medium leading-relaxed italic">
+        <div className="p-4 sm:p-5 rounded-2xl bg-cyan-500/10 border-l-4 border-cyan-400 text-slate-200 text-sm sm:text-base font-medium leading-relaxed italic">
           {newsItem.excerpt}
         </div>
       )}
 
-      {/* Full Content */}
-      <div className={`prose max-w-none font-hindi ${getFontSizeClass()} text-stone-800`}>
+      {/* Main Body Content */}
+      <div className={`prose max-w-none font-hindi ${getFontSizeClass()} text-slate-200`}>
         {renderFormattedContent(newsItem.content || newsItem.excerpt || '')}
       </div>
 
-      {/* 1. ADVERTISEMENT BANNER */}
-      <AdBanner slot="9876543210" className="my-6 shadow-xs" label="विज्ञापन / Sponsored Partner" />
-
-      {/* 2. HIGH-CONVERSION APP FUNNEL BANNER */}
-      <div className="my-8 rounded-3xl bg-gradient-to-br from-slate-950 via-slate-900 to-amber-950 p-6 sm:p-8 text-white border border-amber-500/30 shadow-2xl relative overflow-hidden">
-        {/* Subtle decorative glow */}
-        <div className="absolute -right-16 -top-16 w-56 h-56 rounded-full bg-amber-500/15 blur-3xl pointer-events-none" />
-        <div className="absolute -left-16 -bottom-16 w-56 h-56 rounded-full bg-orange-600/15 blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="space-y-3 text-center md:text-left">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[11px] font-black uppercase tracking-wider">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>राजस्थान का #1 डिजिटल गाँव ऐप</span>
-            </div>
-
-            <h3 className="text-xl sm:text-2xl font-black text-white leading-tight">
-              DHOTI AALE ऐप डाउनलोड करें व जीतें <span className="text-amber-400">10 लाख Views</span>
-            </h3>
-
-            <p className="text-xs sm:text-sm text-slate-300 max-w-xl leading-relaxed">
-              गाँव चौपाल वर्ल्ड चैट (World Chat), लाइव फोटो बैटल (Photo Battles), और देसी DHOTI AI असिस्टेंट का आनंद लें। 100% फ्री एवं सुरक्षित।
-            </p>
-
-            {/* Quick App Feature Pills */}
-            <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 pt-1 text-[11px] font-bold text-slate-200">
-              <Link
-                href="/#battle"
-                className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-amber-300 transition-colors"
-              >
-                <Swords className="w-3.5 h-3.5" />
-                <span>लाइव बैटल खेलें</span>
-              </Link>
-
-              <Link
-                href="/#worldchat"
-                className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-sky-300 transition-colors"
-              >
-                <MessageSquare className="w-3.5 h-3.5" />
-                <span>24/7 गाँव चौपाल चैट</span>
-              </Link>
-
-              <Link
-                href="/#assistant"
-                className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-emerald-300 transition-colors"
-              >
-                <Bot className="w-3.5 h-3.5" />
-                <span>DHOTI AI से बात करें</span>
-              </Link>
-            </div>
-          </div>
-
-          <div className="shrink-0 flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-            <PWAInstallButton
-              variant="hero"
-              className="w-full sm:w-auto px-6 py-3 text-xs font-black shadow-lg shadow-amber-500/25"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Related News List */}
+      {/* Related News Stories */}
       {otherArticles.length > 0 && (
-        <div className="pt-8 border-t border-stone-200 space-y-4">
-          <h3 className="text-sm font-bold text-stone-500 uppercase tracking-wider">
-            अन्य मुख्य गाँव समाचार (Other Headlines)
+        <div className="pt-8 border-t border-white/10">
+          <h3 className="text-sm font-bold text-cyan-400 uppercase tracking-wider mb-4 font-hindi">
+            अन्य संबंधित समाचार (Related Stories)
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {otherArticles.map((rel) => (
               <Link
                 key={rel.id}
                 href={`/news/${encodeURIComponent(rel.id)}`}
-                className="p-3.5 rounded-2xl bg-stone-50 hover:bg-stone-100 border border-stone-200/80 transition-all hover:border-amber-400 block group"
+                className="p-4 rounded-2xl bg-[#0D1726] hover:bg-[#132238] border border-white/10 hover:border-cyan-500/40 transition-all group"
               >
-                <div className="text-[10px] font-bold text-[#8D2817] mb-1">
+                <span className="text-[10px] font-bold text-cyan-400 mb-1.5 block">
                   {rel.category}
-                </div>
-                <h4 className="text-xs font-bold text-stone-900 group-hover:text-[#8D2817] line-clamp-2 leading-snug">
+                </span>
+                <h4 className="text-xs sm:text-sm font-bold text-white group-hover:text-cyan-300 line-clamp-2 leading-snug">
                   {rel.title}
                 </h4>
               </Link>
@@ -442,13 +353,13 @@ export function NewsArticleClient({ newsItem, relatedNews }: NewsArticleClientPr
       {/* Lightbox Modal */}
       {isImageLightboxOpen && newsItem.imageUrl && (
         <div
-          className="fixed inset-0 z-60 bg-black/95 backdrop-blur-lg flex items-center justify-center p-4"
+          className="fixed inset-0 z-60 bg-black/95 backdrop-blur-lg flex items-center justify-center p-4 animate-in fade-in duration-200"
           onClick={() => setIsImageLightboxOpen(false)}
         >
           <div className="relative max-w-4xl max-h-[90vh] flex flex-col items-center">
             <button
               onClick={() => setIsImageLightboxOpen(false)}
-              className="absolute -top-10 right-0 p-2 text-white hover:text-stone-300 font-bold flex items-center gap-1 text-xs"
+              className="absolute -top-10 right-0 p-2 text-white hover:text-cyan-400 font-bold flex items-center gap-1 text-xs"
             >
               <X className="h-5 w-5" />
               <span>बंद करें</span>
@@ -462,21 +373,6 @@ export function NewsArticleClient({ newsItem, relatedNews }: NewsArticleClientPr
           </div>
         </div>
       )}
-
-      {/* 3. MOBILE FLOATING APP CTA BAR */}
-      <div className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-md border-t border-amber-500/40 p-2.5 flex items-center justify-between gap-2 shadow-2xl">
-        <PWAInstallButton
-          variant="pill"
-          className="flex-1 text-center py-2 text-xs font-bold"
-        />
-        <Link
-          href="/#battle"
-          className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md text-center"
-        >
-          <Swords className="w-3.5 h-3.5 shrink-0" />
-          <span>फोटो बैटल खेलें</span>
-        </Link>
-      </div>
     </article>
   );
 }

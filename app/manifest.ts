@@ -3,19 +3,19 @@ import type { MetadataRoute } from 'next';
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: '/',
-    name: 'DHOTI AALE - ढोटी की अपनी डिजिटल पहचान',
-    short_name: 'DHOTI AALE',
+    name: 'Dhoti Aale',
+    short_name: 'Dhoti Aale',
     description:
-      "राजस्थान का डिजिटल गाँव समुदाय | Rajasthan's Digital Village Community.",
+      'ढोटी गांव की खबरें, लोग, जानकारी और गतिविधियां एक जगह।',
     start_url: '/',
     scope: '/',
     display: 'standalone',
     orientation: 'portrait',
-    background_color: '#07080c',
-    theme_color: '#f59e0b',
+    background_color: '#05070D',
+    theme_color: '#05070D',
     lang: 'hi',
     dir: 'ltr',
-    categories: ['social', 'community', 'news'],
+    categories: ['social', 'community', 'news', 'entertainment'],
     icons: [
       {
         src: '/app-logo.png',

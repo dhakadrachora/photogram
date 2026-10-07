@@ -2,10 +2,11 @@ import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
 import { PostHogProvider } from '@/components/PostHogProvider';
 import { TopProgressBar } from '@/components/TopProgressBar';
+import { AuthProvider } from '@/components/providers/AuthProvider';
 import './globals.css';
 
 export const viewport: Viewport = {
-  themeColor: '#C25E29',
+  themeColor: '#05070D',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
@@ -277,7 +278,7 @@ export default function RootLayout({
         <meta name="author" content="DHOTI AALE Team" />
 
         {/* Google AdSense Verification Meta */}
-        
+        <meta name="google-adsense-account" content="ca-pub-2229349785904510" />
 
         {/* Schema.org Structured Data */}
         <script
@@ -290,11 +291,18 @@ export default function RootLayout({
       <body suppressHydrationWarning>
         <TopProgressBar />
         <PostHogProvider>
-          {children}
+          <AuthProvider>
+            {children}
+          </AuthProvider>
         </PostHogProvider>
 
         {/* Google AdSense Auto Ads - loaded safely after hydration */}
-        
+        <Script
+          id="google-adsense"
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2229349785904510"
+          strategy="afterInteractive"
+          crossOrigin="anonymous"
+        />
       </body>
     </html>
   );
