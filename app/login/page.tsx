@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, useTransition } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import {
@@ -12,17 +12,17 @@ import {
   Zap,
   ArrowLeft,
   KeyRound,
-  ShieldCheck,
+  XCircle,
+  Loader2,
 } from 'lucide-react';
 import Image from 'next/image';
-import Link from 'next/link';
 
 type AuthMode = 'login' | 'signup' | 'forgot';
 
 function LoginFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login, signup, resetPassword, updatePassword } = useAuth();
+  const { login, signup, resetPassword, updatePassword, checkUsernameAvailability } = useAuth();
 
   const initialMode = (searchParams.get('mode') as AuthMode) || 'login';
   const [mode, setMode] = useState<AuthMode>(initialMode);
@@ -33,6 +33,16 @@ function LoginFormContent() {
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  // Real-time Username availability state
+  const [usernameStatus, setUsernameStatus] = useState<{
+    checking: boolean;
+    available: boolean | null;
+    message?: string;
+  }>({
+    checking: false,
+    available: null,
+  });
 
   // Reset Password Specific Fields
   const [resetIdentifier, setResetIdentifier] = useState('');
@@ -53,7 +63,30 @@ function LoginFormContent() {
     }
   }, [searchParams]);
 
-  // Clear messages when mode changes
+  // Debounced real-time username availability check
+  useEffect(() => {
+    if (mode !== 'signup') return;
+    const cleanUser = username.trim().toLowerCase();
+
+    if (cleanUser.length < 3) {
+      setUsernameStatus({ checking: false, available: null });
+      return;
+    }
+
+    setUsernameStatus({ checking: true, available: null });
+    const timer = setTimeout(async () => {
+      const res = await checkUsernameAvailability(cleanUser);
+      setUsernameStatus({
+        checking: false,
+        available: res.available,
+        message: res.available ? 'Username available' : res.reason || 'Username already taken',
+      });
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [username, mode, checkUsernameAvailability]);
+
+  // Switch between Login, Signup, Forgot tabs
   const switchMode = (newMode: AuthMode) => {
     setError(null);
     setSuccessMsg(null);
@@ -65,6 +98,7 @@ function LoginFormContent() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSuccessMsg(null);
 
     if (!identifier.trim() || !password) {
       setError('Please enter your phone number, username, or email and password.');
@@ -76,7 +110,7 @@ function LoginFormContent() {
       const res = await login(identifier, password);
       if (res.success) {
         setSuccessMsg('Logged in successfully! Redirecting...');
-        setTimeout(() => router.push('/'), 500);
+        setTimeout(() => router.push('/'), 400);
       } else {
         setError(res.error || 'Sorry, your password was incorrect. Please double-check your password.');
       }
@@ -87,30 +121,37 @@ function LoginFormContent() {
     }
   };
 
-  // 2. Handle Signup (New Account Creation)
+  // 2. Handle Signup (Create New Account with Unique Username & Password)
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSuccessMsg(null);
 
+    const cleanUsername = username.trim().toLowerCase();
     if (!identifier.trim()) {
-      setError('Please provide a mobile number or email.');
+      setError('Please provide a mobile number or email address.');
       return;
     }
     if (!password || password.length < 6) {
       setError('Password must be at least 6 characters long.');
       return;
     }
-    if (!username.trim()) {
-      setError('Please choose a username.');
+    if (!cleanUsername || cleanUsername.length < 3) {
+      setError('Username must be at least 3 characters long.');
+      return;
+    }
+
+    if (usernameStatus.available === false) {
+      setError(usernameStatus.message || "This username isn't available. Please try another.");
       return;
     }
 
     setLoading(true);
     try {
-      const res = await signup(identifier, password, username, fullName || username);
+      const res = await signup(identifier, password, cleanUsername, fullName || cleanUsername);
       if (res.success) {
-        setSuccessMsg('Welcome to Photogram! Your account has been created.');
-        setTimeout(() => router.push('/'), 700);
+        setSuccessMsg(`Account created for @${cleanUsername}! Redirecting to Photogram...`);
+        setTimeout(() => router.push('/'), 500);
       } else {
         setError(res.error || 'Could not create account. Please try a different username.');
       }
@@ -125,6 +166,7 @@ function LoginFormContent() {
   const handleResetRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSuccessMsg(null);
 
     if (!resetIdentifier.trim()) {
       setError('Please enter your email, phone, or username.');
@@ -136,9 +178,7 @@ function LoginFormContent() {
       const res = await resetPassword(resetIdentifier);
       if (res.success) {
         setResetSent(true);
-        setSuccessMsg(
-          `We sent an email to ${resetIdentifier} with a link to get back into your account.`
-        );
+        setSuccessMsg(res.message || 'Account found! You can now set your new password below.');
       } else {
         setError(res.error || 'No account found with that email or username.');
       }
@@ -149,10 +189,11 @@ function LoginFormContent() {
     }
   };
 
-  // 4. Handle Direct Password Reset / Update
+  // 4. Handle Password Update
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSuccessMsg(null);
 
     if (!newPassword || newPassword.length < 6) {
       setError('New password must be at least 6 characters.');
@@ -167,8 +208,8 @@ function LoginFormContent() {
     try {
       const res = await updatePassword(newPassword);
       if (res.success) {
-        setSuccessMsg('Your password has been reset successfully! Redirecting...');
-        setTimeout(() => router.push('/'), 800);
+        setSuccessMsg('Your password has been updated successfully! Redirecting...');
+        setTimeout(() => router.push('/'), 700);
       } else {
         setError(res.error || 'Failed to update password.');
       }
@@ -179,17 +220,15 @@ function LoginFormContent() {
     }
   };
 
-  // 5. 1-Click Instant Demo Login
+  // 5. Instant Demo Login (Default testing user)
   const handleInstantDemoLogin = async () => {
     setLoading(true);
     setError(null);
-    await login('kabir.explores@photogramweb.online', 'demo123456');
+    await login('aryan.visuals', 'demo123456');
     router.push('/');
   };
 
-  // Validation helpers
   const isIdentifierValid = identifier.trim().length >= 3;
-  const isUsernameValid = username.trim().length >= 3 && /^[a-zA-Z0-9._]+$/.test(username.trim());
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col justify-between items-center px-4 py-8 select-none">
@@ -214,7 +253,7 @@ function LoginFormContent() {
                   </span>
                   <p className="text-base font-bold mt-2.5">1:1 Photogram Web Experience</p>
                   <p className="text-[11px] text-neutral-300 mt-0.5">
-                    Fast Cloudinary Photos • Supabase Realtime • Complete Auth
+                    Unique Accounts • Persistent Auth • Instant Password Recovery
                   </p>
                 </div>
               </div>
@@ -331,7 +370,7 @@ function LoginFormContent() {
                 </>
               )}
 
-              {/* MODE 2: SIGN UP */}
+              {/* MODE 2: SIGN UP (CREATE NEW ACCOUNT WITH UNIQUE USERNAME) */}
               {mode === 'signup' && (
                 <>
                   <h1 className="text-4xl font-normal tracking-tight text-white mb-3 font-serif italic select-none">
@@ -386,7 +425,7 @@ function LoginFormContent() {
                         className="w-full bg-[#121212] border border-[#262626] text-xs text-white px-2.5 py-2.5 rounded-sm outline-none focus:border-neutral-500 placeholder:text-neutral-500"
                       />
                       {isIdentifierValid && (
-                        <CheckCircle2 className="w-4 h-4 text-neutral-500 absolute right-2.5 top-1/2 -translate-y-1/2" />
+                        <CheckCircle2 className="w-4 h-4 text-green-500 absolute right-2.5 top-1/2 -translate-y-1/2" />
                       )}
                     </div>
 
@@ -394,7 +433,7 @@ function LoginFormContent() {
                     <div className="relative">
                       <input
                         type={showPassword ? 'text' : 'password'}
-                        placeholder="Password"
+                        placeholder="Password (min 6 chars)"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         className="w-full bg-[#121212] border border-[#262626] text-xs text-white pl-2.5 pr-12 py-2.5 rounded-sm outline-none focus:border-neutral-500 placeholder:text-neutral-500"
@@ -421,19 +460,42 @@ function LoginFormContent() {
                       />
                     </div>
 
-                    {/* Username */}
+                    {/* Username with Real-time Unique Availability Checker */}
                     <div className="relative">
                       <input
                         type="text"
                         placeholder="Username"
                         value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        className="w-full bg-[#121212] border border-[#262626] text-xs text-white px-2.5 py-2.5 rounded-sm outline-none focus:border-neutral-500 placeholder:text-neutral-500"
+                        onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/\s+/g, ''))}
+                        className={`w-full bg-[#121212] border text-xs text-white pl-2.5 pr-8 py-2.5 rounded-sm outline-none placeholder:text-neutral-500 transition-colors ${
+                          usernameStatus.available === true
+                            ? 'border-green-600 focus:border-green-500'
+                            : usernameStatus.available === false
+                            ? 'border-red-600 focus:border-red-500'
+                            : 'border-[#262626] focus:border-neutral-500'
+                        }`}
                       />
-                      {isUsernameValid && (
-                        <CheckCircle2 className="w-4 h-4 text-neutral-500 absolute right-2.5 top-1/2 -translate-y-1/2" />
-                      )}
+                      <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                        {usernameStatus.checking ? (
+                          <Loader2 className="w-4 h-4 text-neutral-400 animate-spin" />
+                        ) : usernameStatus.available === true ? (
+                          <CheckCircle2 className="w-4 h-4 text-green-500" />
+                        ) : usernameStatus.available === false ? (
+                          <XCircle className="w-4 h-4 text-red-500" />
+                        ) : null}
+                      </div>
                     </div>
+
+                    {/* Availability Status Message */}
+                    {usernameStatus.message && (
+                      <p
+                        className={`text-[11px] font-medium px-1 ${
+                          usernameStatus.available === true ? 'text-green-400' : 'text-red-400'
+                        }`}
+                      >
+                        {usernameStatus.message}
+                      </p>
+                    )}
 
                     {/* Disclaimers */}
                     <p className="text-[10px] text-neutral-500 text-center leading-relaxed pt-1">
@@ -451,7 +513,14 @@ function LoginFormContent() {
                     {/* Submit Button */}
                     <button
                       type="submit"
-                      disabled={loading || !identifier.trim() || !password || !username.trim()}
+                      disabled={
+                        loading ||
+                        !identifier.trim() ||
+                        !password ||
+                        password.length < 6 ||
+                        !username.trim() ||
+                        usernameStatus.available === false
+                      }
                       className="w-full py-2 bg-[#0095f6] hover:bg-[#1877f2] disabled:opacity-40 disabled:hover:bg-[#0095f6] text-white text-xs font-semibold rounded-lg transition-colors mt-2"
                     >
                       {loading ? 'Creating account...' : 'Sign up'}
@@ -502,7 +571,7 @@ function LoginFormContent() {
                         disabled={loading || !resetIdentifier.trim()}
                         className="w-full py-2 bg-[#0095f6] hover:bg-[#1877f2] disabled:opacity-40 disabled:hover:bg-[#0095f6] text-white text-xs font-semibold rounded-lg transition-colors"
                       >
-                        {loading ? 'Sending link...' : 'Send login link'}
+                        {loading ? 'Searching account...' : 'Send login link'}
                       </button>
                     </form>
                   ) : (
@@ -510,7 +579,7 @@ function LoginFormContent() {
                     <form onSubmit={handleUpdatePassword} className="w-full space-y-2.5 mt-1 border-t border-[#262626] pt-3">
                       <p className="text-xs font-semibold text-[#0095f6] flex items-center gap-1.5">
                         <KeyRound className="w-3.5 h-3.5" />
-                        <span>Set New Password Immediately:</span>
+                        <span>Enter New Password:</span>
                       </p>
 
                       <div className="relative">
@@ -540,7 +609,7 @@ function LoginFormContent() {
 
                       <button
                         type="submit"
-                        disabled={loading || !newPassword || newPassword !== confirmPassword}
+                        disabled={loading || !newPassword || newPassword !== confirmPassword || newPassword.length < 6}
                         className="w-full py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90 disabled:opacity-40 text-white text-xs font-bold rounded-lg transition-all"
                       >
                         {loading ? 'Updating Password...' : 'Save Password & Log in'}
@@ -658,8 +727,9 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-black flex items-center justify-center text-neutral-500 text-sm">
-          Loading Photogram...
+        <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white select-none">
+          <h1 className="text-3xl font-serif italic mb-4">Photogram</h1>
+          <div className="w-5 h-5 border-2 border-neutral-700 border-t-white rounded-full animate-spin" />
         </div>
       }
     >

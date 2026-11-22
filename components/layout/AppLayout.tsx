@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
-import { usePathname } from 'next/navigation';
+import React, { useState, useEffect } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 import { DesktopSidebar } from './DesktopSidebar';
 import { MobileTopNav } from './MobileTopNav';
 import { MobileBottomNav } from './MobileBottomNav';
@@ -15,13 +16,34 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   const pathname = usePathname() || '';
+  const router = useRouter();
+  const { user, isLoading } = useAuth();
+
   const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/accounts');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
+  // Authentication Guard: If not logged in and not on auth page, redirect to /login
+  useEffect(() => {
+    if (!isLoading && !user && !isAuthPage) {
+      router.replace('/login');
+    }
+  }, [user, isLoading, isAuthPage, router]);
+
+  // Auth pages (login, signup, reset) render without the main app chrome
   if (isAuthPage) {
     return <div className="min-h-screen bg-black text-white">{children}</div>;
+  }
+
+  // Splash loading screen while verifying persistent session
+  if (isLoading || (!user && !isAuthPage)) {
+    return (
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white select-none">
+        <h1 className="text-3xl font-serif italic mb-4">Photogram</h1>
+        <div className="w-5 h-5 border-2 border-neutral-700 border-t-white rounded-full animate-spin" />
+      </div>
+    );
   }
 
   return (
@@ -62,3 +84,5 @@ export function AppLayout({ children }: AppLayoutProps) {
     </div>
   );
 }
+
+export default AppLayout;
