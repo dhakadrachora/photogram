@@ -169,15 +169,28 @@ export function StoryViewerModal({
           </div>
         </div>
 
-        {/* Story Media (Image) */}
+        {/* Story Media (Image or Video) */}
         <div className="relative w-full h-full bg-black flex items-center justify-center">
-          <Image
-            src={currentStory.media_url}
-            alt={currentStory.caption || 'Story'}
-            fill
-            priority
-            className="object-cover"
-          />
+          {currentStory.media_url?.includes('.mp4') ||
+          currentStory.media_url?.startsWith('data:video') ||
+          (currentStory as any).media_type === 'video' ? (
+            <video
+              src={currentStory.media_url}
+              autoPlay
+              playsInline
+              loop
+              muted
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <Image
+              src={currentStory.media_url}
+              alt={currentStory.caption || 'Story'}
+              fill
+              priority
+              className="object-cover"
+            />
+          )}
 
           {/* Left/Right Tap Areas */}
           <div

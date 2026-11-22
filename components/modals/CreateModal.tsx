@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import {
   X,
@@ -14,11 +14,13 @@ import {
   Film,
   AlertCircle,
   ShieldCheck,
+  Lock,
 } from 'lucide-react';
 import { uploadToCloudinary, validateFreeTierMedia, FREE_TIER_LIMITS } from '@/lib/cloudinary';
 import { usePosts } from '@/context/PostsContext';
 import { useAuth } from '@/context/AuthContext';
 import { PostMedia } from '@/lib/types';
+import { getUploadPermissions, UploadPermissions } from '@/lib/uploadPermissions';
 
 interface CreateModalProps {
   isOpen: boolean;
@@ -30,6 +32,7 @@ export function CreateModal({ isOpen, onClose }: CreateModalProps) {
   const { createPost } = usePosts();
   const { user, updateProfile } = useAuth();
 
+  const [permissions, setPermissions] = useState<UploadPermissions>(getUploadPermissions());
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<{ url: string; isVideo: boolean }[]>([]);
   const [activePreviewIdx, setActivePreviewIdx] = useState(0);
@@ -40,6 +43,16 @@ export function CreateModal({ isOpen, onClose }: CreateModalProps) {
   const [isDone, setIsDone] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Sync upload permissions in real time
+  useEffect(() => {
+    setPermissions(getUploadPermissions());
+    const handlePermChange = (e: any) => {
+      if (e?.detail) setPermissions(e.detail);
+    };
+    window.addEventListener('photogram_permissions_changed', handlePermChange);
+    return () => window.removeEventListener('photogram_permissions_changed', handlePermChange);
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const processFiles = (filesList: FileList | null) => {
@@ -47,11 +60,34 @@ export function CreateModal({ isOpen, onClose }: CreateModalProps) {
     setErrorMessage(null);
 
     const filesArray = Array.from(filesList);
-    // Validate each file against Free Tier limits
+
+    // 1. Check Video Post Temporary Restriction
+    const containsVideo = filesArray.some((f) => f.type.startsWith('video'));
+    if (containsVideo && !permissions.allow_video_posts) {
+      setErrorMessage(
+        'Video post uploads are temporarily paused by admin settings. Photos and carousel uploads are active.'
+      );
+      return;
+    }
+
+    // 2. Check Carousel Upload Permission
+    if (filesArray.length > 1 && !permissions.allow_carousel_images) {
+      setErrorMessage('Multiple image / carousel upload is currently disabled by admin.');
+      return;
+    }
+
+    // 3. Validate each file against Free Tier limits and permissions
     for (const f of filesArray) {
-      const check = validateFreeTierMedia(f);
+      const isVid = f.type.startsWith('video');
+      const cat = isVid
+        ? 'allow_video_posts'
+        : filesArray.length > 1
+        ? 'allow_carousel_images'
+        : 'allow_image_posts';
+
+      const check = validateFreeTierMedia(f, cat);
       if (!check.valid) {
-        setErrorMessage(check.error || 'File exceeds Free Tier limits.');
+        setErrorMessage(check.error || 'File exceeds upload policy or Free Tier limits.');
         return;
       }
     }
@@ -164,11 +200,20 @@ export function CreateModal({ isOpen, onClose }: CreateModalProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-700 bg-neutral-900">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-white">Create new post or reel</span>
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-              <ShieldCheck className="w-3 h-3" />
-              Free Tier Safe
+            <span className="text-sm font-semibold text-white">
+              {permissions.allow_video_posts ? 'Create new post or reel' : 'Create new post'}
             </span>
+            {!permissions.allow_video_posts ? (
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                <Lock className="w-3 h-3" />
+                Photos Only
+              </span>
+            ) : (
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                <ShieldCheck className="w-3 h-3" />
+                Free Tier Safe
+              </span>
+            )}
           </div>
           <button
             onClick={onClose}
@@ -209,13 +254,17 @@ export function CreateModal({ isOpen, onClose }: CreateModalProps) {
               </div>
 
               <h4 className="text-sm font-semibold text-white mb-1">
-                Drag photos or videos here
+                {permissions.allow_video_posts ? 'Drag photos or videos here' : 'Drag photos here'}
               </h4>
               <p className="text-xs text-neutral-400 mb-2 max-w-xs leading-relaxed">
-                Supports single or multiple carousel images (JPG, PNG, WebP) and MP4 videos
+                {permissions.allow_video_posts
+                  ? 'Supports single or multiple carousel images (JPG, PNG, WebP) and MP4 videos'
+                  : 'Supports single photo and multiple carousel images (JPG, PNG, WebP)'}
               </p>
               <span className="text-[10px] text-neutral-500 mb-4">
-                Cloudinary Free Tier Guard: Max 10MB per image, 50MB per video
+                {permissions.allow_video_posts
+                  ? 'Cloudinary Free Tier Guard: Max 10MB per image, 50MB per video'
+                  : 'Cloudinary Free Tier Guard: Max 10MB per image • Video uploads paused by admin'}
               </span>
 
               <button
@@ -228,8 +277,8 @@ export function CreateModal({ isOpen, onClose }: CreateModalProps) {
               <input
                 ref={fileInputRef}
                 type="file"
-                multiple
-                accept="image/*,video/*"
+                multiple={permissions.allow_carousel_images}
+                accept={permissions.allow_video_posts ? 'image/*,video/*' : 'image/*'}
                 onChange={handleFileChange}
                 className="hidden"
               />

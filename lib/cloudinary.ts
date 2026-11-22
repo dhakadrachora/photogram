@@ -8,6 +8,8 @@
  * - Storage usage tracking in localStorage.
  */
 
+import { checkUploadPermission, UploadCategory } from '@/lib/uploadPermissions';
+
 export interface CloudinaryUploadResult {
   secure_url: string;
   public_id: string;
@@ -32,10 +34,21 @@ export const FREE_TIER_LIMITS = {
 };
 
 /**
- * Validates file against strict Free Tier limits before upload.
- * Prevents any accidental oversized file from uploading.
+ * Validates file against strict Free Tier limits and upload permissions before upload.
+ * Prevents any accidental oversized file from uploading or prohibited category.
  */
-export function validateFreeTierMedia(file: File): { valid: boolean; error?: string } {
+export function validateFreeTierMedia(
+  file: File,
+  category?: UploadCategory
+): { valid: boolean; error?: string } {
+  // 1. Check upload permission if category provided
+  if (category) {
+    const permCheck = checkUploadPermission(category, file);
+    if (!permCheck.allowed) {
+      return { valid: false, error: permCheck.reason };
+    }
+  }
+
   const isVideo = file.type.startsWith('video');
 
   if (isVideo) {
@@ -145,12 +158,13 @@ export function getVideoThumbnailUrl(videoUrl: string): string {
  */
 export async function uploadToCloudinary(
   file: File,
-  onProgress?: (progressPercent: number) => void
+  onProgress?: (progressPercent: number) => void,
+  category?: UploadCategory
 ): Promise<CloudinaryUploadResult> {
-  // Pre-upload Free Tier Quota Guard Check
-  const validation = validateFreeTierMedia(file);
+  // Pre-upload Free Tier Quota Guard & Permission Check
+  const validation = validateFreeTierMedia(file, category);
   if (!validation.valid) {
-    throw new Error(validation.error || 'File exceeds Free Tier limits.');
+    throw new Error(validation.error || 'File exceeds Free Tier limits or is restricted.');
   }
 
   const isVideo = file.type.startsWith('video');

@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import { uploadToCloudinary } from '@/lib/cloudinary';
+import { getUploadPermissions, checkUploadPermission } from '@/lib/uploadPermissions';
 
 const SUGGESTED_CREATORS = [
   {
@@ -280,13 +281,26 @@ export default function DirectPage() {
     const file = e.target.files?.[0];
     if (!file || !activeConvId) return;
 
+    const isVid = file.type.startsWith('video');
+    const cat = isVid ? 'allow_chat_videos' : 'allow_chat_images';
+
+    const check = checkUploadPermission(cat, file);
+    if (!check.allowed) {
+      alert(check.reason || 'This upload is not allowed.');
+      if (chatMediaInputRef.current) chatMediaInputRef.current.value = '';
+      return;
+    }
+
     try {
-      const res = await uploadToCloudinary(file);
+      const res = await uploadToCloudinary(file, undefined, cat);
       if (res?.secure_url) {
-        handleSendMessage('📷 Photo', res.secure_url);
+        handleSendMessage(isVid ? '📹 Video' : '📷 Photo', res.secure_url);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Chat media upload error:', err);
+      alert(err?.message || 'Chat media upload failed.');
+    } finally {
+      if (chatMediaInputRef.current) chatMediaInputRef.current.value = '';
     }
   };
 

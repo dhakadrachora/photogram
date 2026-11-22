@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Story } from '@/lib/types';
 import { StoryViewerModal } from '@/components/instagram/StoryViewerModal';
 import { uploadToCloudinary } from '@/lib/cloudinary';
+import { checkUploadPermission } from '@/lib/uploadPermissions';
 
 const CREATOR_STORIES: Story[] = [
   {
@@ -110,10 +111,20 @@ export function StoriesBar() {
     }
   }, [user]);
 
-  // Handle uploading user's new 24h story
+  // Handle uploading user's new 24h story (Photo or Video Stories permitted)
   const handleStoryFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
+
+    const isVid = file.type.startsWith('video');
+    const cat = isVid ? 'allow_video_stories' : 'allow_photo_stories';
+
+    const check = checkUploadPermission(cat, file);
+    if (!check.allowed) {
+      alert(check.reason || 'Story upload is currently disabled.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
 
     setIsUploadingStory(true);
     const reader = new FileReader();
@@ -121,7 +132,7 @@ export function StoriesBar() {
       let mediaUrl = reader.result as string;
 
       try {
-        const res = await uploadToCloudinary(file);
+        const res = await uploadToCloudinary(file, undefined, cat);
         if (res?.secure_url) {
           mediaUrl = res.secure_url;
         }
@@ -138,7 +149,7 @@ export function StoriesBar() {
           is_verified: !!user.is_verified,
         },
         media_url: mediaUrl,
-        caption: 'My 24-hour visual story ✨',
+        caption: isVid ? 'Visual video story ✨' : 'My 24-hour visual story ✨',
         created_at: new Date().toISOString(),
         expires_at: new Date(Date.now() + 86400000).toISOString(), // 24 hours from now
       };
@@ -147,6 +158,7 @@ export function StoriesBar() {
       const userKey = user.id || user.username;
       localStorage.setItem(`photogram_story_${userKey}`, JSON.stringify(newStory));
       setIsUploadingStory(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     };
     reader.readAsDataURL(file);
   };
@@ -162,7 +174,7 @@ export function StoriesBar() {
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,video/*"
         onChange={handleStoryFileChange}
         className="hidden"
       />

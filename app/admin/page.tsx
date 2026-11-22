@@ -22,12 +22,89 @@ import {
   Cloud,
   HardDrive,
   Zap,
+  Video,
+  Film,
+  Camera,
+  Layers,
+  MessageSquare,
+  Sliders,
+  RotateCcw,
 } from 'lucide-react';
 import { useAuth, StoredAccount } from '@/context/AuthContext';
 import { usePosts } from '@/context/PostsContext';
 import { getStorageUsageStats, FREE_TIER_LIMITS } from '@/lib/cloudinary';
+import {
+  getUploadPermissions,
+  updateUploadPermission,
+  resetUploadPermissions,
+  UploadPermissions,
+  UploadCategory,
+  DEFAULT_UPLOAD_PERMISSIONS,
+} from '@/lib/uploadPermissions';
 
 const ADMIN_PASSKEY = 'photogram@2026';
+
+const PERMISSION_ITEMS: {
+  key: UploadCategory;
+  title: string;
+  desc: string;
+  emoji: string;
+}[] = [
+  {
+    key: 'allow_profile_photos',
+    title: 'Profile Photo Uploads',
+    desc: 'Change avatar in Edit Profile modal',
+    emoji: '👤',
+  },
+  {
+    key: 'allow_image_posts',
+    title: 'Single Image Posts',
+    desc: 'Standard single photo post upload',
+    emoji: '🖼️',
+  },
+  {
+    key: 'allow_carousel_images',
+    title: 'Multiple Image Posts',
+    desc: 'Multi-photo carousel slider post',
+    emoji: '🗂️',
+  },
+  {
+    key: 'allow_photo_stories',
+    title: 'Photo Stories',
+    desc: '24-hour expiring photo stories',
+    emoji: '🌅',
+  },
+  {
+    key: 'allow_video_stories',
+    title: 'Video Stories',
+    desc: '24-hour expiring video stories (Enabled)',
+    emoji: '🎬',
+  },
+  {
+    key: 'allow_chat_images',
+    title: 'Chat Image Sharing',
+    desc: 'Photo attachments in direct messages',
+    emoji: '💬',
+  },
+  {
+    key: 'allow_video_posts',
+    title: 'Normal Video Posts',
+    desc: 'Feed video post upload (Disabled by default)',
+    emoji: '📹',
+  },
+  {
+    key: 'allow_reels_uploads',
+    title: 'Reels Video Uploads',
+    desc: '9:16 vertical reels upload (Disabled by default)',
+    emoji: '🎞️',
+  },
+  {
+    key: 'allow_chat_videos',
+    title: 'Chat Video Attachments',
+    desc: 'Video attachments in DMs (Disabled by default)',
+    emoji: '🎥',
+  },
+];
 
 export default function AdminPage() {
   const { user, updateProfile } = useAuth();
@@ -40,6 +117,9 @@ export default function AdminPage() {
   const [registeredAccounts, setRegisteredAccounts] = useState<StoredAccount[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
+  const [uploadPermissions, setUploadPermissions] = useState<UploadPermissions>(
+    getUploadPermissions()
+  );
   const [storageStats, setStorageStats] = useState({
     totalBytes: 0,
     totalMb: 0,
@@ -70,6 +150,24 @@ export default function AdminPage() {
       setRegisteredAccounts([]);
     }
     setStorageStats(getStorageUsageStats());
+    setUploadPermissions(getUploadPermissions());
+  };
+
+  const handleToggleUploadPermission = (category: UploadCategory) => {
+    const nextVal = !uploadPermissions[category];
+    const updated = updateUploadPermission(category, nextVal);
+    setUploadPermissions({ ...updated });
+    setSuccessNotice(
+      `Permission updated: ${category} is now ${nextVal ? 'ENABLED' : 'DISABLED (RESTRICTED)'}.`
+    );
+    setTimeout(() => setSuccessNotice(null), 3500);
+  };
+
+  const handleResetUploadPermissions = () => {
+    const defaults = resetUploadPermissions();
+    setUploadPermissions({ ...defaults });
+    setSuccessNotice('Upload permissions reset to default temporary restrictions.');
+    setTimeout(() => setSuccessNotice(null), 3500);
   };
 
   const handleAdminLogin = (e: React.FormEvent) => {
@@ -364,6 +462,106 @@ export default function AdminPage() {
               Client rejects &gt;10MB photos and &gt;50MB videos before upload. Zero overage risk.
             </p>
           </div>
+        </div>
+      </div>
+
+      {/* Upload Permissions & Temporary Video Restrictions (Reversible Admin Controls) */}
+      <div className="border border-neutral-800 rounded-2xl bg-neutral-950 p-5 md:p-6 mb-6 shadow-xl space-y-5">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-neutral-800">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+              <Sliders className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                <span>Upload Permissions &amp; Video Restrictions</span>
+                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  REVERSIBLE SWITCHES
+                </span>
+              </h3>
+              <p className="text-[11px] text-neutral-400">
+                Independent ON/OFF controls for each category. Prohibited video uploads are disabled by default.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleResetUploadPermissions}
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 text-neutral-300 flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Reset all toggles to default temporary restrictions"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Reset to Defaults</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Info Banner */}
+        <div className="p-3.5 rounded-xl bg-neutral-900/60 border border-neutral-800 text-xs text-neutral-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>
+              <strong>Temporary Restriction Policy:</strong> Video Stories &amp; Photos are <strong>ENABLED</strong>. Normal Video Posts, Reels, and Chat Videos are <strong>DISABLED</strong> by default.
+            </span>
+          </div>
+          <span className="text-[10px] text-neutral-400 bg-neutral-800 px-2.5 py-1 rounded-full shrink-0">
+            Reversible anytime
+          </span>
+        </div>
+
+        {/* 9 Category Switch Tiles */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
+          {PERMISSION_ITEMS.map((item) => {
+            const isEnabled = uploadPermissions[item.key];
+            return (
+              <div
+                key={item.key}
+                className={`p-3.5 rounded-xl border transition-all ${
+                  isEnabled
+                    ? 'bg-neutral-900/80 border-neutral-700/80'
+                    : 'bg-neutral-900/40 border-amber-900/40'
+                } flex flex-col justify-between gap-3`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2.5">
+                    <span className="text-xl shrink-0 mt-0.5">{item.emoji}</span>
+                    <div>
+                      <h4 className="text-xs font-bold text-white leading-tight">{item.title}</h4>
+                      <p className="text-[10px] text-neutral-400 mt-1 leading-normal">{item.desc}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-neutral-800/80">
+                  <span
+                    className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                      isEnabled
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                    }`}
+                  >
+                    {isEnabled ? 'ENABLED' : 'DISABLED (RESTRICTED)'}
+                  </span>
+
+                  {/* Accessible iOS / Instagram-style Toggle Switch */}
+                  <button
+                    onClick={() => handleToggleUploadPermission(item.key)}
+                    className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer ${
+                      isEnabled ? 'bg-[#0095f6]' : 'bg-neutral-700'
+                    }`}
+                    aria-label={`Toggle ${item.title}`}
+                  >
+                    <span
+                      className={`inline-block w-4 h-4 bg-white rounded-full transition-transform transform ${
+                        isEnabled ? 'translate-x-5' : 'translate-x-1'
+                      } mt-1`}
+                    />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 

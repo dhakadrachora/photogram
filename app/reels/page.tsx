@@ -17,9 +17,14 @@ import {
   MoreVertical,
   X,
   Send,
+  Camera,
+  Lock,
+  AlertCircle,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { Reel } from '@/lib/types';
+import { getUploadPermissions, UploadPermissions, checkUploadPermission } from '@/lib/uploadPermissions';
+import { uploadToCloudinary } from '@/lib/cloudinary';
 
 interface ExtendedReel extends Reel {
   music_title?: string;
@@ -88,6 +93,7 @@ const SAMPLE_REELS: ExtendedReel[] = [
 
 export default function ReelsPage() {
   const { user } = useAuth();
+  const [permissions, setPermissions] = useState<UploadPermissions>(getUploadPermissions());
   const [reels, setReels] = useState<ExtendedReel[]>(SAMPLE_REELS);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [isMuted, setIsMuted] = useState(true);
@@ -96,9 +102,69 @@ export default function ReelsPage() {
   const [activeCommentsReel, setActiveCommentsReel] = useState<ExtendedReel | null>(null);
   const [commentText, setCommentText] = useState('');
   const [commentsMap, setCommentsMap] = useState<Record<string, string[]>>({});
+  const [uploadNotice, setUploadNotice] = useState<string | null>(null);
 
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
+  const reelInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync permissions
+  useEffect(() => {
+    setPermissions(getUploadPermissions());
+    const handlePermChange = (e: any) => {
+      if (e?.detail) setPermissions(e.detail);
+    };
+    window.addEventListener('photogram_permissions_changed', handlePermChange);
+    return () => window.removeEventListener('photogram_permissions_changed', handlePermChange);
+  }, []);
+
+  const handleReelUploadClick = () => {
+    if (!permissions.allow_reels_uploads) {
+      setUploadNotice(
+        'Reels video uploads are temporarily paused by admin settings. All existing reels remain playable.'
+      );
+      setTimeout(() => setUploadNotice(null), 4000);
+      return;
+    }
+    reelInputRef.current?.click();
+  };
+
+  const handleReelFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const check = checkUploadPermission('allow_reels_uploads', file);
+    if (!check.allowed) {
+      setUploadNotice(check.reason || 'Reels upload disabled.');
+      setTimeout(() => setUploadNotice(null), 4000);
+      return;
+    }
+
+    try {
+      const res = await uploadToCloudinary(file, undefined, 'allow_reels_uploads');
+      if (res?.secure_url) {
+        const newReel: ExtendedReel = {
+          id: `reel_${Date.now()}`,
+          user_id: user?.id || 'usr_me',
+          user: user || ({} as any),
+          video_url: res.secure_url,
+          caption: 'New visual reel ✨',
+          likes_count: 1,
+          comments_count: 0,
+          has_liked: true,
+          has_saved: false,
+          created_at: new Date().toISOString(),
+        };
+        setReels((prev) => [newReel, ...prev]);
+        setCurrentIdx(0);
+        setUploadNotice('Reel uploaded successfully!');
+        setTimeout(() => setUploadNotice(null), 3000);
+      }
+    } catch (err: any) {
+      setUploadNotice(err?.message || 'Failed to upload reel.');
+      setTimeout(() => setUploadNotice(null), 4000);
+    }
+  };
 
   // Play current video and pause others
   useEffect(() => {
@@ -246,6 +312,42 @@ export default function ReelsPage() {
               >
                 {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
               </button>
+
+              {/* Top Reel Upload / Restriction Action */}
+              <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
+                <input
+                  ref={reelInputRef}
+                  type="file"
+                  accept="video/mp4,video/*"
+                  onChange={handleReelFileSelected}
+                  className="hidden"
+                />
+                <button
+                  onClick={handleReelUploadClick}
+                  className="p-2.5 rounded-full bg-black/50 backdrop-blur-md text-white hover:bg-black/70 transition-colors cursor-pointer"
+                  title={
+                    permissions.allow_reels_uploads
+                      ? 'Upload Reel Video'
+                      : 'Reel uploads temporarily paused'
+                  }
+                >
+                  <Camera className="w-5 h-5" />
+                </button>
+                {!permissions.allow_reels_uploads && (
+                  <span className="text-[10px] font-semibold bg-black/60 backdrop-blur-md text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <Lock className="w-2.5 h-2.5" />
+                    Upload Paused
+                  </span>
+                )}
+              </div>
+
+              {/* Upload Restriction Notice Banner */}
+              {uploadNotice && (
+                <div className="absolute top-16 left-4 right-4 z-30 p-2.5 bg-neutral-900/90 border border-amber-500/40 text-amber-200 text-xs rounded-xl shadow-xl backdrop-blur-md flex items-center gap-2 animate-in fade-in">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" />
+                  <span>{uploadNotice}</span>
+                </div>
+              )}
 
               {/* Right Action Icons Column */}
               <div className="absolute right-3 bottom-20 flex flex-col items-center gap-5 z-20 text-white">
