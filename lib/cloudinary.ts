@@ -9,6 +9,7 @@
  */
 
 import { checkUploadPermission, UploadCategory } from '@/lib/uploadPermissions';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 export interface CloudinaryUploadResult {
   secure_url: string;
@@ -169,6 +170,45 @@ export async function uploadToCloudinary(
 
   const isVideo = file.type.startsWith('video');
   const resourceType = isVideo ? 'video' : 'image';
+
+  // 1. Try Supabase Storage first (Integrated, 100% Free, Zero Config needed)
+  if (isSupabaseConfigured()) {
+    try {
+      if (onProgress) onProgress(20);
+      const fileExt = file.name.split('.').pop() || (isVideo ? 'mp4' : 'jpg');
+      const cleanFileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
+      const filePath = `${category || 'general'}/${cleanFileName}`;
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('media')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false,
+        });
+
+      if (!uploadError && uploadData) {
+        if (onProgress) onProgress(100);
+        const { data: publicUrlData } = supabase.storage
+          .from('media')
+          .getPublicUrl(filePath);
+
+        if (publicUrlData?.publicUrl) {
+          trackMediaUploadUsage(file.size);
+          return {
+            secure_url: publicUrlData.publicUrl,
+            public_id: filePath,
+            resource_type: resourceType,
+            format: fileExt,
+            width: 1080,
+            height: 1080,
+            bytes: file.size,
+          };
+        }
+      }
+    } catch (e) {
+      console.warn('Supabase Storage direct upload fallback:', e);
+    }
+  }
 
   // Demo fallback
   if (CLOUD_NAME === 'demo' || !UPLOAD_PRESET || UPLOAD_PRESET === 'insta_unsigned') {
