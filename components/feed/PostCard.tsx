@@ -19,10 +19,7 @@ export function PostCard({ post }: PostCardProps) {
   const { user } = useAuth();
   const [activeMediaIdx, setActiveMediaIdx] = useState(0);
   const [commentText, setCommentText] = useState('');
-  const [commentsList, setCommentsList] = useState<string[]>([
-    'Amazing photo composition! 📸',
-    'Love the vibe! ✨',
-  ]);
+  const [commentsList, setCommentsList] = useState<string[]>([]);
   const [showHeartPop, setShowHeartPop] = useState(false);
   const [lastTap, setLastTap] = useState(0);
   const [showAllComments, setShowAllComments] = useState(false);
@@ -114,7 +111,7 @@ export function PostCard({ post }: PostCardProps) {
             {commentsList.map((c, i) => (
               <p key={i} className="text-[11px] text-neutral-300">
                 <span className="font-semibold text-white mr-1.5">
-                  {user?.username || 'aryan.visuals'}
+                  {user?.username || 'user'}
                 </span>
                 {c}
               </p>
