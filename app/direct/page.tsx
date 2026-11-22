@@ -69,6 +69,9 @@ export default function DirectPage() {
   const [messagesHistory, setMessagesHistory] = useState<Record<string, Message[]>>({});
   const [isNewMessageModalOpen, setIsNewMessageModalOpen] = useState(false);
   const [contactSearch, setContactSearch] = useState('');
+  const [userNote, setUserNote] = useState<string>('');
+  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
+  const [noteInput, setNoteInput] = useState('');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -98,6 +101,13 @@ export default function DirectPage() {
         setMessagesHistory(JSON.parse(savedMsgs));
       } else {
         setMessagesHistory({});
+      }
+
+      const savedNote = localStorage.getItem(`photogram_note_${userKey}`);
+      if (savedNote) {
+        setUserNote(savedNote);
+      } else {
+        setUserNote('');
       }
     } catch (e) {
       setConversations([]);
@@ -300,11 +310,28 @@ export default function DirectPage() {
           </button>
         </div>
 
-        {/* Note bubble */}
+        {/* Note bubble with 24h Interactive Note */}
         <div className="p-3 border-b border-neutral-800 flex items-center gap-4 overflow-x-auto no-scrollbar">
-          <div className="flex flex-col items-center shrink-0">
+          <div
+            onClick={() => {
+              setNoteInput(userNote);
+              setIsNoteModalOpen(true);
+            }}
+            className="flex flex-col items-center shrink-0 cursor-pointer group"
+          >
             <div className="relative">
-              <div className="w-12 h-12 rounded-full overflow-hidden border border-neutral-700 bg-neutral-900">
+              {/* Floating Note Thought Bubble */}
+              {userNote ? (
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-neutral-800 border border-neutral-700 text-[10px] px-2 py-0.5 rounded-xl text-white shadow-lg whitespace-nowrap max-w-[85px] truncate z-10 animate-in fade-in">
+                  {userNote}
+                </div>
+              ) : (
+                <div className="absolute -top-1 -right-1 bg-neutral-800 border border-neutral-700 text-[10px] px-1.5 py-0.5 rounded-full text-neutral-300">
+                  💭
+                </div>
+              )}
+
+              <div className="w-12 h-12 rounded-full overflow-hidden border border-neutral-700 bg-neutral-900 group-hover:scale-105 transition-transform">
                 <Image
                   src={user?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
                   alt="Your note"
@@ -313,11 +340,10 @@ export default function DirectPage() {
                   className="object-cover"
                 />
               </div>
-              <div className="absolute -top-1 -right-1 bg-neutral-800 border border-neutral-700 text-[10px] px-1.5 py-0.5 rounded-full text-neutral-300">
-                💭
-              </div>
             </div>
-            <span className="text-[10px] text-neutral-400 mt-1">Your note</span>
+            <span className="text-[10px] text-neutral-400 mt-1">
+              {userNote ? 'Your note' : 'Share a thought'}
+            </span>
           </div>
 
           {conversations.map((c) => (
@@ -654,6 +680,89 @@ export default function DirectPage() {
                   </button>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 24-Hour Note Editor Modal */}
+      {isNoteModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in"
+          onClick={() => setIsNoteModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm bg-[#262626] border border-neutral-700 rounded-2xl p-5 shadow-2xl text-white"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-700">
+              <h3 className="font-semibold text-sm">New Note</h3>
+              <button
+                onClick={() => setIsNoteModalOpen(false)}
+                className="p-1 rounded-full text-neutral-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="py-4 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="relative w-12 h-12 rounded-full overflow-hidden bg-neutral-800 border border-neutral-700 shrink-0">
+                  <Image
+                    src={user?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
+                    alt="User"
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    maxLength={60}
+                    placeholder="Share a thought (up to 60 chars)..."
+                    value={noteInput}
+                    onChange={(e) => setNoteInput(e.target.value)}
+                    autoFocus
+                    className="w-full bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-[#0095f6]"
+                  />
+                  <div className="flex justify-between text-[10px] text-neutral-500 mt-1 px-1">
+                    <span>Visible for 24 hours to followers</span>
+                    <span>{noteInput.length}/60</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2 border-t border-neutral-700">
+              {userNote && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUserNote('');
+                    setIsNoteModalOpen(false);
+                    if (user) {
+                      localStorage.removeItem(`photogram_note_${user.id || user.username}`);
+                    }
+                  }}
+                  className="px-3 py-1.5 rounded-xl border border-rose-500/30 text-rose-400 text-xs font-semibold hover:bg-rose-500/10 cursor-pointer"
+                >
+                  Delete note
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setUserNote(noteInput.trim());
+                  setIsNoteModalOpen(false);
+                  if (user) {
+                    localStorage.setItem(`photogram_note_${user.id || user.username}`, noteInput.trim());
+                  }
+                }}
+                disabled={!noteInput.trim()}
+                className="flex-1 py-1.5 rounded-xl bg-[#0095f6] hover:bg-[#1877f2] disabled:opacity-40 text-white text-xs font-semibold cursor-pointer"
+              >
+                Share
+              </button>
             </div>
           </div>
         </div>

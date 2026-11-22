@@ -6,6 +6,7 @@ import {
   Home,
   Search,
   Compass,
+  Film,
   MessageCircle,
   Heart,
   PlusSquare,
@@ -40,6 +41,7 @@ export function DesktopSidebar({
           <SidebarItem label="Home" href="/" icon={Home} isActive={pathname === '/'} />
           <SidebarItem label="Search" action={onOpenSearch} icon={Search} />
           <SidebarItem label="Explore" href="/explore" icon={Compass} isActive={pathname === '/explore'} />
+          <SidebarItem label="Reels" href="/reels" icon={Film} isActive={pathname === '/reels'} />
           <SidebarItem
             label="Messages"
             href="/direct"

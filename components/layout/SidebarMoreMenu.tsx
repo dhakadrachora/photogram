@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Moon, Sun, Bookmark, Settings, LogOut } from 'lucide-react';
+import { Moon, Sun, Bookmark, Settings, LogOut, Shield } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 
@@ -43,12 +43,21 @@ export function SidebarMoreMenu({ isOpen, onClose }: SidebarMoreMenuProps) {
       </button>
 
       <Link
-        href="/profile"
+        href="/settings"
         onClick={onClose}
         className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-white dark:text-white light:text-black hover:bg-white/10 dark:hover:bg-white/10 light:hover:bg-black/5 transition-colors"
       >
         <Settings className="w-4 h-4" />
         <span>Settings</span>
+      </Link>
+
+      <Link
+        href="/admin"
+        onClick={onClose}
+        className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-sky-400 hover:bg-sky-500/10 transition-colors"
+      >
+        <Shield className="w-4 h-4" />
+        <span>Admin Panel</span>
       </Link>
 
       <div className="h-[1px] bg-white/10 dark:bg-white/10 light:bg-black/10 my-1" />

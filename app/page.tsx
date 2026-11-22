@@ -3,6 +3,7 @@
 import React from 'react';
 import { usePosts } from '@/context/PostsContext';
 import { PostCard } from '@/components/feed/PostCard';
+import { StoriesBar } from '@/components/feed/StoriesBar';
 import { SuggestionsSidebar } from '@/components/feed/SuggestionsSidebar';
 import { CheckCircle2, Sparkles, Image as ImageIcon } from 'lucide-react';
 
@@ -13,6 +14,9 @@ export default function HomePage() {
     <div className="flex justify-center w-full max-w-5xl mx-auto px-0 sm:px-4 py-4 md:py-8">
       {/* Center Feed Column */}
       <div className="w-full max-w-[470px] sm:max-w-[500px] flex flex-col items-center">
+        {/* Horizontal Stories Tray */}
+        <StoriesBar />
+
         {/* Posts Stream */}
         <div className="w-full space-y-4">
           {posts.length > 0 ? (

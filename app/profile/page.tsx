@@ -5,6 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { usePosts } from '@/context/PostsContext';
 import { EditProfileModal } from '@/components/modals/EditProfileModal';
 import { CreateModal } from '@/components/modals/CreateModal';
+import Link from 'next/link';
 import {
   Grid3X3,
   Bookmark,
@@ -18,6 +19,7 @@ import {
   UserCheck,
   UserPlus,
   X,
+  Film,
 } from 'lucide-react';
 import Image from 'next/image';
 import { uploadToCloudinary } from '@/lib/cloudinary';
@@ -28,7 +30,7 @@ export default function ProfilePage() {
   const { posts, savedPosts } = usePosts();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [activeTab, setActiveTab] = useState<'posts' | 'saved'>('posts');
+  const [activeTab, setActiveTab] = useState<'posts' | 'saved' | 'reels'>('posts');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isFollowingModalOpen, setIsFollowingModalOpen] = useState(false);
@@ -157,6 +159,14 @@ export default function ProfilePage() {
               {copiedLink ? <Check className="w-3.5 h-3.5 text-green-400" /> : null}
               <span>{copiedLink ? 'Copied' : 'Share profile'}</span>
             </button>
+
+            <Link
+              href="/settings"
+              className="p-1.5 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg transition-colors flex items-center justify-center cursor-pointer"
+              title="Settings"
+            >
+              <Settings className="w-4 h-4" />
+            </Link>
           </div>
 
           {/* Stats Row */}
@@ -212,7 +222,7 @@ export default function ProfilePage() {
       <div className="flex justify-center border-b border-neutral-800">
         <button
           onClick={() => setActiveTab('posts')}
-          className={`flex items-center gap-2 py-3 px-8 text-xs font-semibold tracking-wider transition-colors border-t -mt-[1px] cursor-pointer ${
+          className={`flex items-center gap-2 py-3 px-6 md:px-8 text-xs font-semibold tracking-wider transition-colors border-t -mt-[1px] cursor-pointer ${
             activeTab === 'posts'
               ? 'border-white text-white'
               : 'border-transparent text-neutral-500 hover:text-neutral-300'
@@ -223,8 +233,20 @@ export default function ProfilePage() {
         </button>
 
         <button
+          onClick={() => setActiveTab('reels')}
+          className={`flex items-center gap-2 py-3 px-6 md:px-8 text-xs font-semibold tracking-wider transition-colors border-t -mt-[1px] cursor-pointer ${
+            activeTab === 'reels'
+              ? 'border-white text-white'
+              : 'border-transparent text-neutral-500 hover:text-neutral-300'
+          }`}
+        >
+          <Film className="w-4 h-4" />
+          <span>REELS</span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('saved')}
-          className={`flex items-center gap-2 py-3 px-8 text-xs font-semibold tracking-wider transition-colors border-t -mt-[1px] cursor-pointer ${
+          className={`flex items-center gap-2 py-3 px-6 md:px-8 text-xs font-semibold tracking-wider transition-colors border-t -mt-[1px] cursor-pointer ${
             activeTab === 'saved'
               ? 'border-white text-white'
               : 'border-transparent text-neutral-500 hover:text-neutral-300'
@@ -235,8 +257,24 @@ export default function ProfilePage() {
         </button>
       </div>
 
-      {/* Posts Grid OR Official Instagram Empty State */}
-      {displayedPosts.length > 0 ? (
+      {/* Posts Grid OR Reels OR Official Empty State */}
+      {activeTab === 'reels' ? (
+        <div className="py-20 flex flex-col items-center justify-center text-center px-4">
+          <div className="w-16 h-16 rounded-full border-2 border-white flex items-center justify-center mb-4">
+            <Film className="w-8 h-8 text-white stroke-[1.5]" />
+          </div>
+          <h3 className="text-2xl font-bold text-white mb-2">Capture and share Reels</h3>
+          <p className="text-xs text-neutral-400 max-w-sm mb-5 leading-relaxed">
+            Create 9:16 vertical video reels with music and effects to express your creativity.
+          </p>
+          <Link
+            href="/reels"
+            className="text-xs font-semibold px-4 py-2 bg-[#0095f6] hover:bg-[#1877f2] text-white rounded-lg transition-colors cursor-pointer"
+          >
+            Watch trending Reels
+          </Link>
+        </div>
+      ) : displayedPosts.length > 0 ? (
         <div className="grid grid-cols-3 gap-1 md:gap-7 mt-4">
           {displayedPosts.map((post) => (
             <div

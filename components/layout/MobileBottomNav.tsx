@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { Home, Compass, PlusSquare, MessageCircle } from 'lucide-react';
+import { Home, Compass, Film, PlusSquare, MessageCircle } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 interface MobileBottomNavProps {
@@ -35,7 +35,16 @@ export function MobileBottomNav({ onOpenCreate }: MobileBottomNavProps) {
         />
       </Link>
 
-      {/* 3. Create (+) Button */}
+      {/* 3. Reels */}
+      <Link href="/reels" className="p-2 text-white dark:text-white light:text-black">
+        <Film
+          className={`w-6 h-6 ${
+            pathname === '/reels' ? 'stroke-[2.8]' : 'stroke-[1.8] opacity-70'
+          }`}
+        />
+      </Link>
+
+      {/* 4. Create (+) Button */}
       <button
         onClick={onOpenCreate}
         className="p-1.5 rounded-xl text-white dark:text-white light:text-black active:scale-90 transition-transform cursor-pointer"
@@ -44,7 +53,7 @@ export function MobileBottomNav({ onOpenCreate }: MobileBottomNavProps) {
         <PlusSquare className="w-7 h-7 stroke-[1.8]" />
       </button>
 
-      {/* 4. Messages (Direct) */}
+      {/* 5. Messages (Direct) */}
       <Link href="/direct" className="p-2 text-white dark:text-white light:text-black">
         <MessageCircle
           className={`w-6 h-6 ${
