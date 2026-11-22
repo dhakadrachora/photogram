@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { usePosts } from '@/context/PostsContext';
-import { Search, Heart, MessageCircle, Copy, X } from 'lucide-react';
+import { Search, Heart, MessageCircle, Copy, X, BadgeCheck } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { FormattedText } from '@/components/common/FormattedText';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 const EXPLORE_TAGS = [
   'For you',
@@ -30,6 +31,47 @@ export default function ExplorePage() {
     comments: number;
     caption: string;
   } | null>(null);
+
+  const [matchedCreators, setMatchedCreators] = useState<
+    Array<{ id?: string; username: string; full_name: string; avatar_url: string; is_verified?: boolean }>
+  >([]);
+  const [suggestedCreators, setSuggestedCreators] = useState<
+    Array<{ id?: string; username: string; full_name: string; avatar_url: string; is_verified?: boolean }>
+  >([]);
+
+  // (b) Fetch real suggested creators on mount
+  useEffect(() => {
+    if (isSupabaseConfigured()) {
+      supabase
+        .from('profiles')
+        .select('id, username, full_name, avatar_url, is_verified')
+        .order('created_at', { ascending: false })
+        .limit(10)
+        .then(({ data }) => {
+          if (data) setSuggestedCreators(data);
+        });
+    }
+  }, []);
+
+  // (b) Direct Live Supabase ILIKE Search on Query Change
+  useEffect(() => {
+    const clean = searchQuery.trim().replace(/^@/, '').replace(/^#/, '').toLowerCase();
+    if (!clean) {
+      setMatchedCreators([]);
+      return;
+    }
+
+    if (isSupabaseConfigured()) {
+      supabase
+        .from('profiles')
+        .select('id, username, full_name, avatar_url, is_verified')
+        .or(`username.ilike.%${clean}%,full_name.ilike.%${clean}%`)
+        .limit(12)
+        .then(({ data }) => {
+          if (data) setMatchedCreators(data);
+        });
+    }
+  }, [searchQuery]);
 
   // Read URL query parameter (?q=hashtag or username) on mount
   useEffect(() => {
@@ -114,6 +156,41 @@ export default function ExplorePage() {
           </button>
         ))}
       </div>
+
+      {/* Real-time Matching Creators (Direct from Supabase Profiles) */}
+      {searchQuery.trim() && matchedCreators.length > 0 && (
+        <div className="mb-6 bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4">
+          <span className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wider block mb-3 px-1">
+            Matching Creators ({matchedCreators.length})
+          </span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+            {matchedCreators.map((creator) => (
+              <Link
+                key={creator.username}
+                href={`/profile/${creator.username}`}
+                className="flex items-center gap-3 p-2.5 rounded-xl bg-neutral-950/80 border border-neutral-800 hover:border-neutral-700 transition-colors group cursor-pointer"
+              >
+                <div className="relative w-10 h-10 rounded-full overflow-hidden bg-neutral-800 shrink-0">
+                  {creator.avatar_url ? (
+                    <Image src={creator.avatar_url} alt={creator.username} fill className="object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-neutral-800 text-white font-semibold text-xs">
+                      {creator.username[0]?.toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <div className="text-xs truncate">
+                  <div className="font-semibold text-white flex items-center gap-1 group-hover:underline">
+                    <span>{creator.username}</span>
+                    {creator.is_verified && <span className="text-[#0095f6] text-[10px]">●</span>}
+                  </div>
+                  <p className="text-[11px] text-neutral-400 truncate">{creator.full_name || 'Photogram Creator'}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 3-Column Explore Grid */}
       <div className="grid grid-cols-3 gap-1 md:gap-4">

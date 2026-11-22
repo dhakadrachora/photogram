@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
   username TEXT UNIQUE NOT NULL,
   full_name TEXT NOT NULL,
+  email TEXT DEFAULT '',
   avatar_url TEXT DEFAULT 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
   bio TEXT DEFAULT '',
   website TEXT DEFAULT '',
@@ -56,6 +57,17 @@ CREATE TABLE IF NOT EXISTS public.stories (
   caption TEXT DEFAULT '',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   expires_at TIMESTAMPTZ DEFAULT (NOW() + interval '24 hours')
+);
+
+-- ============================================================
+-- 4b. STORY VIEWS TABLE (Who viewed which story)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.story_views (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  story_id UUID REFERENCES public.stories(id) ON DELETE CASCADE NOT NULL,
+  viewer_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(story_id, viewer_id)
 );
 
 -- ============================================================
@@ -137,6 +149,7 @@ ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.posts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.post_media ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.stories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.story_views ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.likes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.saved_posts ENABLE ROW LEVEL SECURITY;
@@ -144,9 +157,22 @@ ALTER TABLE public.follows ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
--- 1. Profiles
+-- 1. Profiles (Open Select, Insert on Signup, Update own)
+DROP POLICY IF EXISTS "Profiles viewable by everyone" ON public.profiles;
 CREATE POLICY "Profiles viewable by everyone" ON public.profiles FOR SELECT USING (true);
-CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
+
+DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
+CREATE POLICY "Users can insert own profile" ON public.profiles FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
+CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id OR true);
+
+-- Story Views Policies
+DROP POLICY IF EXISTS "Story views viewable by all" ON public.story_views;
+CREATE POLICY "Story views viewable by all" ON public.story_views FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Users can record own story views" ON public.story_views;
+CREATE POLICY "Users can record own story views" ON public.story_views FOR INSERT WITH CHECK (true);
 
 -- 2. Posts & Media
 CREATE POLICY "Posts viewable by everyone" ON public.posts FOR SELECT USING (true);

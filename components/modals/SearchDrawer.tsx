@@ -17,84 +17,129 @@ export function SearchDrawer({ isOpen, onClose }: SearchDrawerProps) {
   const { posts } = usePosts();
   const { user } = useAuth();
   const [query, setQuery] = useState('');
-  const [registeredAccounts, setRegisteredAccounts] = useState<StoredAccount[]>([]);
-  const [dbAccounts, setDbAccounts] = useState<
-    Array<{ username: string; full_name: string; avatar_url: string; is_verified?: boolean }>
+  const [liveDbAccounts, setLiveDbAccounts] = useState<
+    Array<{ id?: string; username: string; full_name: string; avatar_url: string; is_verified?: boolean }>
+  >([]);
+  const [liveSearchResults, setLiveSearchResults] = useState<
+    Array<{ id?: string; username: string; full_name: string; avatar_url: string; is_verified?: boolean }>
   >([]);
 
+  // (b) Load all real registered profiles from Supabase on open
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('photogram_registered_accounts');
-      if (raw) setRegisteredAccounts(JSON.parse(raw));
-    } catch {}
+    if (!isOpen) return;
 
-    // Fetch real registered profiles from Supabase
-    if (isSupabaseConfigured()) {
-      supabase
-        .from('profiles')
-        .select('username, full_name, avatar_url, is_verified')
-        .limit(25)
-        .then(({ data }) => {
-          if (data) {
-            setDbAccounts(
-              data.map((p) => ({
-                username: p.username,
-                full_name: p.full_name || '',
-                avatar_url: p.avatar_url || '',
-                is_verified: !!p.is_verified,
-              }))
+    const fetchRealProfiles = async () => {
+      const localList: Array<{ username: string; full_name: string; avatar_url: string; is_verified?: boolean }> = [];
+      try {
+        const raw = localStorage.getItem('photogram_registered_accounts');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          parsed.forEach((a: any) => {
+            if (a.username) {
+              localList.push({
+                username: a.username,
+                full_name: a.full_name || a.username,
+                avatar_url: a.avatar_url || '',
+                is_verified: !!a.is_verified,
+              });
+            }
+          });
+        }
+      } catch { }
+
+      if (isSupabaseConfigured()) {
+        try {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('id, username, full_name, avatar_url, is_verified')
+            .order('created_at', { ascending: false })
+            .limit(50);
+
+          if (!error && data) {
+            const combined = [...data, ...localList].filter(
+              (v, idx, arr) =>
+                arr.findIndex((t) => t.username.toLowerCase() === v.username.toLowerCase()) === idx
             );
+            setLiveDbAccounts(combined);
+            return;
           }
-        });
-    }
+        } catch (e) {
+          console.warn('Live profiles fetch note:', e);
+        }
+      }
+
+      setLiveDbAccounts(localList);
+    };
+
+    fetchRealProfiles();
   }, [isOpen]);
+
+  // (b) Real-time Supabase live search on query change
+  useEffect(() => {
+    const clean = query.trim().replace(/^@/, '').toLowerCase();
+    if (!clean) {
+      setLiveSearchResults([]);
+      return;
+    }
+
+    let isSubscribed = true;
+    const timer = setTimeout(async () => {
+      // 1. Local matches from loaded accounts
+      const localMatches = liveDbAccounts.filter(
+        (a) =>
+          a.username.toLowerCase().includes(clean) ||
+          a.full_name?.toLowerCase().includes(clean)
+      );
+
+      // 2. Direct Supabase live ILIKE query
+      if (isSupabaseConfigured()) {
+        try {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('id, username, full_name, avatar_url, is_verified')
+            .or(`username.ilike.%${clean}%,full_name.ilike.%${clean}%`)
+            .limit(25);
+
+          if (!error && data && isSubscribed) {
+            const merged = [...data, ...localMatches].filter(
+              (v, idx, arr) =>
+                arr.findIndex((t) => t.username.toLowerCase() === v.username.toLowerCase()) === idx
+            );
+            setLiveSearchResults(merged);
+            return;
+          }
+        } catch (e) {
+          console.warn('Live search query note:', e);
+        }
+      }
+
+      if (isSubscribed) {
+        setLiveSearchResults(localMatches);
+      }
+    }, 150);
+
+    return () => {
+      isSubscribed = false;
+      clearTimeout(timer);
+    };
+  }, [query, liveDbAccounts]);
 
   if (!isOpen) return null;
 
-  // Real creators & registered accounts only - Zero fake accounts
-  const allAccounts = [
-    ...(user
-      ? [
-          {
-            username: user.username,
-            full_name: user.full_name,
-            avatar_url: user.avatar_url,
-            is_verified: user.is_verified,
-          },
-        ]
-      : []),
-    ...registeredAccounts.map((a) => ({
-      username: a.username,
-      full_name: a.full_name,
-      avatar_url: a.avatar_url,
-      is_verified: a.is_verified,
-    })),
-    ...dbAccounts,
-  ].filter(
-    (v, idx, arr) =>
-      arr.findIndex((t) => t.username.toLowerCase() === v.username.toLowerCase()) === idx
-  );
-
-  const matchedUsers = query.trim()
-    ? allAccounts.filter(
-        (a) =>
-          a.username.toLowerCase().includes(query.toLowerCase()) ||
-          a.full_name?.toLowerCase().includes(query.toLowerCase())
-      )
-    : [];
+  const matchedUsers = query.trim() ? liveSearchResults : [];
 
   const matchedPosts = query.trim()
     ? posts.filter(
-        (p) =>
-          p.user?.username?.toLowerCase().includes(query.toLowerCase()) ||
-          p.caption?.toLowerCase().includes(query.toLowerCase()) ||
-          (p.location || '').toLowerCase().includes(query.toLowerCase())
-      )
+      (p) =>
+        p.user?.username?.toLowerCase().includes(query.toLowerCase()) ||
+        p.caption?.toLowerCase().includes(query.toLowerCase()) ||
+        (p.location || '').toLowerCase().includes(query.toLowerCase())
+    )
     : [];
 
-  const suggestedAccounts = allAccounts
+  const suggestedAccounts = liveDbAccounts
     .filter((a) => a.username.toLowerCase() !== user?.username?.toLowerCase())
-    .slice(0, 5);
+    .slice(0, 10);
 
   return (
     <div
@@ -248,7 +293,7 @@ export function SearchDrawer({ isOpen, onClose }: SearchDrawerProps) {
                 suggestedAccounts.map((s) => (
                   <Link
                     key={s.username}
-                    href="/profile"
+                    href={`/profile/${s.username}`}
                     onClick={onClose}
                     className="flex items-center gap-3 py-2.5 px-2 rounded-xl hover:bg-neutral-900 transition-colors"
                   >

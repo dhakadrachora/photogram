@@ -136,7 +136,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const fetchSupabaseProfile = async (uid: string) => {
+  const fetchSupabaseProfile = async (uid: string): Promise<Profile | null> => {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -146,10 +146,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!error && data) {
         setUser(data);
         localStorage.setItem('photogram_active_session', JSON.stringify(data));
+        return data as Profile;
       }
     } catch (err) {
       console.warn('Could not fetch Supabase profile:', err);
     }
+    return null;
   };
 
   // 1. Real-time Unique Username Checker (Purely Real Accounts)
@@ -240,8 +242,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const chosenAvatar = REAL_AVATARS[Math.floor(Math.random() * REAL_AVATARS.length)];
     // Early Creator Privilege: First 500 users get free verified badge & founding status
     const isEarlyCreator = accounts.length < 500;
+    let finalUserId = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const authEmail = identifier.includes('@')
+      ? identifier
+      : `${cleanUsername}@photogramweb.online`;
+
+    // (a) Direct Supabase Auth & public.profiles Upsert (Never rely solely on trigger)
+    if (isSupabaseConfigured()) {
+      try {
+        const { data: authData, error: authErr } = await supabase.auth.signUp({
+          email: authEmail,
+          password: pass,
+          options: {
+            data: {
+              username: cleanUsername,
+              full_name: name.trim() || cleanUsername,
+              avatar_url: chosenAvatar,
+              is_verified: isEarlyCreator,
+            },
+          },
+        });
+
+        if (authData?.user?.id) {
+          finalUserId = authData.user.id;
+        }
+
+        // Direct explicit upsert to public.profiles table
+        const profilePayload: any = {
+          id: finalUserId,
+          username: cleanUsername,
+          full_name: name.trim() || cleanUsername,
+          email: authEmail,
+          avatar_url: chosenAvatar,
+          bio: isEarlyCreator
+            ? `🎖️ Founding Member #${accounts.length + 1} • Early Creator 📸✨`
+            : 'Photogram creator 📸✨',
+          is_verified: isEarlyCreator,
+          updated_at: new Date().toISOString(),
+        };
+
+        const { error: upsertErr } = await supabase
+          .from('profiles')
+          .upsert(profilePayload, { onConflict: 'id' });
+
+        if (upsertErr) {
+          console.warn('Profile direct upsert retry without email:', upsertErr.message);
+          delete profilePayload.email;
+          await supabase.from('profiles').upsert(profilePayload, { onConflict: 'id' });
+        }
+      } catch (e) {
+        console.warn('Supabase signup fallback:', e);
+      }
+    }
+
     const newAccount: StoredAccount = {
-      id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      id: finalUserId,
       email: identifier,
       username: cleanUsername,
       full_name: name.trim() || cleanUsername,
@@ -261,30 +316,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     accounts.push(newAccount);
     saveStoredAccounts(accounts);
 
-    // Always ensure Supabase Auth registration
-    if (isSupabaseConfigured()) {
-      const authEmail = identifier.includes('@')
-        ? identifier
-        : `${cleanUsername}@photogramweb.online`;
-
-      try {
-        await supabase.auth.signUp({
-          email: authEmail,
-          password: pass,
-          options: {
-            data: {
-              username: cleanUsername,
-              full_name: newAccount.full_name,
-              avatar_url: chosenAvatar,
-              is_verified: isEarlyCreator,
-            },
-          },
-        });
-      } catch (e) {
-        console.warn('Supabase signup fallback:', e);
-      }
-    }
-
     // Set real profile & active session
     const profile: Profile = {
       id: newAccount.id,
@@ -301,6 +332,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(profile);
     localStorage.setItem('photogram_active_session', JSON.stringify(profile));
     localStorage.setItem('insta_current_user', JSON.stringify(profile));
+    if (typeof document !== 'undefined') {
+      document.cookie = `photogram_session=${encodeURIComponent(
+        JSON.stringify({ id: newAccount.id, email: authEmail, username: cleanUsername })
+      )}; path=/; max-age=2592000; SameSite=Lax`;
+    }
     setIsLoading(false);
     return { success: true };
   };
@@ -321,32 +357,86 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         acc.email.toLowerCase() === identifier
     );
 
-    // Resolve target email for Supabase Auth
+    // Resolve target email: Check profiles table first if username entered
     let emailToAuth = identifier.includes('@') ? identifier : '';
-    if (!emailToAuth && matched?.email && matched.email.includes('@')) {
-      emailToAuth = matched.email;
-    }
-    if (!emailToAuth) {
-      emailToAuth = `${matched?.username || identifier}@photogramweb.online`;
-    }
+    let dbProfile: any = null;
 
-    // Try Supabase Auth first
-    if (isSupabaseConfigured() && emailToAuth) {
+    if (isSupabaseConfigured()) {
       try {
-        const { data, error } = await supabase.auth.signInWithPassword({
+        if (!emailToAuth) {
+          const { data: prof } = await supabase
+            .from('profiles')
+            .select('*')
+            .ilike('username', identifier)
+            .maybeSingle();
+
+          if (prof) {
+            dbProfile = prof;
+            if (prof.email && prof.email.includes('@')) {
+              emailToAuth = prof.email;
+            } else {
+              emailToAuth = `${prof.username}@photogramweb.online`;
+            }
+          }
+        }
+
+        if (!emailToAuth && matched?.email && matched.email.includes('@')) {
+          emailToAuth = matched.email;
+        }
+        if (!emailToAuth) {
+          emailToAuth = `${matched?.username || identifier}@photogramweb.online`;
+        }
+
+        // Try Supabase Auth
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
           email: emailToAuth,
           password: pass,
         });
 
-        if (!error && data?.user) {
-          await fetchSupabaseProfile(data.user.id);
-          setIsLoading(false);
-          // Set persistent cookie
+        if (!authError && authData?.user) {
+          let userProfile: Profile | null = null;
+          if (dbProfile) {
+            userProfile = {
+              id: dbProfile.id,
+              username: dbProfile.username,
+              full_name: dbProfile.full_name || dbProfile.username,
+              avatar_url: dbProfile.avatar_url,
+              bio: dbProfile.bio || '',
+              posts_count: dbProfile.posts_count || 0,
+              followers_count: dbProfile.followers_count || 0,
+              following_count: dbProfile.following_count || 0,
+              is_verified: !!dbProfile.is_verified,
+            };
+          } else {
+            userProfile = await fetchSupabaseProfile(authData.user.id);
+          }
+
+          if (!userProfile) {
+            userProfile = {
+              id: authData.user.id,
+              username: authData.user.user_metadata?.username || emailToAuth.split('@')[0],
+              full_name: authData.user.user_metadata?.full_name || emailToAuth.split('@')[0],
+              avatar_url: authData.user.user_metadata?.avatar_url || '',
+              bio: '',
+              posts_count: 0,
+              followers_count: 0,
+              following_count: 0,
+              is_verified: false,
+            };
+          }
+
+          setUser(userProfile);
+          localStorage.setItem('photogram_active_session', JSON.stringify(userProfile));
+          localStorage.setItem('insta_current_user', JSON.stringify(userProfile));
+
+          // Set persistent session cookie
           if (typeof document !== 'undefined') {
             document.cookie = `photogram_session=${encodeURIComponent(
-              JSON.stringify({ id: data.user.id, email: emailToAuth })
+              JSON.stringify({ id: authData.user.id, email: emailToAuth, username: userProfile.username })
             )}; path=/; max-age=2592000; SameSite=Lax`;
           }
+
+          setIsLoading(false);
           return { success: true };
         }
       } catch (e) {

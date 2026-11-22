@@ -108,91 +108,100 @@ export default function DirectPage() {
     fetchRealContacts();
   }, [user?.username, isNewMessageModalOpen]);
 
-  // Direct Message Navigation: Auto-select/create conversation from URL (?user=...&username=...)
+  // Direct Message Navigation: Auto-select/create conversation from URL (?user=... or ?username=...)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
     const targetUserId = params.get('user');
-    const targetUsername = params.get('username');
+    let targetUsername = params.get('username');
 
-    if (!targetUsername) return;
+    if (!targetUsername && !targetUserId) return;
 
-    const existing = conversations.find(
-      (c) => c.user.username.toLowerCase() === targetUsername.toLowerCase()
-    );
-
-    if (existing) {
-      setActiveConvId(existing.id);
-    } else {
-      const convId = `conv_${targetUserId || targetUsername}`;
-      const initialMsg: Message = {
-        id: `msg_init_${Date.now()}`,
-        sender_id: user?.id || 'usr_me',
-        receiver_id: targetUserId || `usr_${targetUsername}`,
-        text: '👋',
-        created_at: new Date().toISOString(),
-        is_read: true,
-      };
-      const newConv: Conversation = {
-        id: convId,
-        user: {
-          id: targetUserId || `usr_${targetUsername}`,
-          username: targetUsername,
-          full_name: targetUsername,
-          avatar_url: '',
-          is_verified: false,
-          bio: '',
-          posts_count: 0,
-          followers_count: 0,
-          following_count: 0,
-        },
-        last_message: initialMsg,
-        unread_count: 0,
+    const setupConversation = async () => {
+      let resolvedUser = {
+        id: targetUserId || '',
+        username: targetUsername || '',
+        full_name: targetUsername || 'User',
+        avatar_url: '',
+        is_verified: false,
+        bio: '',
       };
 
       if (isSupabaseConfigured()) {
-        supabase
-          .from('profiles')
-          .select('id, username, full_name, avatar_url, is_verified, bio')
-          .eq('username', targetUsername)
-          .single()
-          .then(({ data }) => {
-            if (data) {
-              setConversations((prev) =>
-                prev.map((c) =>
-                  c.id === convId
-                    ? {
-                        ...c,
-                        user: {
-                          ...c.user,
-                          id: data.id,
-                          username: data.username,
-                          full_name: data.full_name || data.username,
-                          avatar_url: data.avatar_url || '',
-                          is_verified: !!data.is_verified,
-                          bio: data.bio || '',
-                        },
-                      }
-                    : c
-                )
-              );
-            }
-          });
+        try {
+          let query = supabase.from('profiles').select('id, username, full_name, avatar_url, is_verified, bio');
+          if (targetUsername) {
+            query = query.ilike('username', targetUsername);
+          } else if (targetUserId) {
+            query = query.eq('id', targetUserId);
+          }
+          const { data } = await query.maybeSingle();
+          if (data) {
+            resolvedUser = {
+              id: data.id,
+              username: data.username,
+              full_name: data.full_name || data.username,
+              avatar_url: data.avatar_url || '',
+              is_verified: !!data.is_verified,
+              bio: data.bio || '',
+            };
+            targetUsername = data.username;
+          }
+        } catch {}
       }
 
-      setConversations((prev) => {
-        if (prev.some((c) => c.id === convId)) return prev;
-        const updated = [newConv, ...prev];
-        if (user) {
-          const userKey = user.id || user.username;
-          try {
-            localStorage.setItem(`photogram_conversations_${userKey}`, JSON.stringify(updated));
-          } catch {}
-        }
-        return updated;
-      });
-      setActiveConvId(convId);
-    }
+      const lookupName = targetUsername || resolvedUser.username;
+      const existing = conversations.find(
+        (c) =>
+          (lookupName && c.user.username.toLowerCase() === lookupName.toLowerCase()) ||
+          (targetUserId && c.user.id === targetUserId)
+      );
+
+      if (existing) {
+        setActiveConvId(existing.id);
+      } else {
+        const convId = `conv_${resolvedUser.id || lookupName}`;
+        const initialMsg: Message = {
+          id: `msg_init_${Date.now()}`,
+          sender_id: user?.id || 'usr_me',
+          receiver_id: resolvedUser.id,
+          text: '👋',
+          created_at: new Date().toISOString(),
+          is_read: true,
+        };
+        const newConv: Conversation = {
+          id: convId,
+          user: {
+            id: resolvedUser.id || `usr_${lookupName}`,
+            username: lookupName || 'user',
+            full_name: resolvedUser.full_name,
+            avatar_url: resolvedUser.avatar_url,
+            is_verified: resolvedUser.is_verified,
+            bio: resolvedUser.bio,
+            posts_count: 0,
+            followers_count: 0,
+            following_count: 0,
+          },
+          last_message: initialMsg,
+          unread_count: 0,
+        };
+
+        setConversations((prev) => {
+          if (prev.some((c) => c.id === convId)) return prev;
+          const updated = [newConv, ...prev];
+          if (user) {
+            const userKey = user.id || user.username;
+            try {
+              localStorage.setItem(`photogram_conversations_${userKey}`, JSON.stringify(updated));
+            } catch {}
+          }
+          return updated;
+        });
+        setActiveConvId(convId);
+      }
+    };
+
+    setupConversation();
   }, [conversations, user]);
 
   // Load real conversations and messages history for the current user
@@ -484,51 +493,6 @@ export default function DirectPage() {
     );
     persistConversations(nextConvs);
     setMessageText('');
-
-    // Realistic auto-reply after 1.5 seconds from the creator
-    const creatorName = activeConv?.user.full_name || activeConv?.user.username || 'Friend';
-    setTimeout(() => {
-      const replyMsg: Message = {
-        id: `reply_${Date.now()}`,
-        sender_id: activeConv?.user.id || '',
-        receiver_id: user?.id || 'usr_me',
-        text: `Hey! Thanks for reaching out! Loved seeing your profile. ✨ Keep creating! 📸`,
-        created_at: new Date().toISOString(),
-        is_read: true,
-      };
-
-      setMessagesHistory((prev) => {
-        const updated = {
-          ...prev,
-          [activeConvId]: [...(prev[activeConvId] || []), replyMsg],
-        };
-        if (user) {
-          const userKey = user.id || user.username;
-          try {
-            localStorage.setItem(`photogram_messages_${userKey}`, JSON.stringify(updated));
-          } catch (e) {}
-        }
-        return updated;
-      });
-
-      setConversations((prev) => {
-        const updated = prev.map((c) =>
-          c.id === activeConvId
-            ? {
-                ...c,
-                last_message: replyMsg,
-              }
-            : c
-        );
-        if (user) {
-          const userKey = user.id || user.username;
-          try {
-            localStorage.setItem(`photogram_conversations_${userKey}`, JSON.stringify(updated));
-          } catch (e) {}
-        }
-        return updated;
-      });
-    }, 1500);
   };
 
   const handleSendHeart = () => {

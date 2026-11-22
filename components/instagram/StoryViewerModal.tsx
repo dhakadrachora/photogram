@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { X, ChevronLeft, ChevronRight, Pause, Play, Heart, Send, Eye, BadgeCheck } from 'lucide-react';
 import { Story } from '@/lib/types';
 import { useAuth } from '@/context/AuthContext';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 export interface StoryViewerModalProps {
   isOpen: boolean;
@@ -66,6 +67,46 @@ export function StoryViewerModal({
 
     if (isAuthor) {
       setViewers(list);
+
+      // Also query live Supabase story_views table
+      if (isSupabaseConfigured()) {
+        supabase
+          .from('story_views')
+          .select(`
+            id,
+            created_at,
+            profiles (
+              id,
+              username,
+              full_name,
+              avatar_url,
+              is_verified
+            )
+          `)
+          .eq('story_id', storyId)
+          .order('created_at', { ascending: false })
+          .then(({ data, error }) => {
+            if (!error && data && data.length > 0) {
+              const dbViewers = data.map((row: any) => {
+                const prof = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+                return {
+                  id: prof?.id || row.id,
+                  username: prof?.username || 'user',
+                  full_name: prof?.full_name || prof?.username || 'User',
+                  avatar_url: prof?.avatar_url || '',
+                  is_verified: !!prof?.is_verified,
+                  viewed_at: row.created_at,
+                };
+              });
+
+              const merged = [...dbViewers, ...list].filter(
+                (v, idx, arr) =>
+                  arr.findIndex((t) => t.username.toLowerCase() === v.username.toLowerCase()) === idx
+              );
+              setViewers(merged);
+            }
+          });
+      }
     } else if (user) {
       const alreadyRecorded = list.some(
         (v) => v.username?.toLowerCase() === user.username.toLowerCase()
@@ -83,6 +124,18 @@ export function StoryViewerModal({
         try {
           localStorage.setItem(storageKey, JSON.stringify(updated));
         } catch {}
+
+        // Record to live Supabase story_views
+        if (isSupabaseConfigured() && user.id && user.id !== 'usr_me') {
+          Promise.resolve(
+            supabase
+              .from('story_views')
+              .insert({
+                story_id: storyId,
+                viewer_id: user.id,
+              })
+          ).catch(() => {});
+        }
       }
     }
   }, [currentStory?.id, isAuthor, user]);

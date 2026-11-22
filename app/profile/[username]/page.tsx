@@ -512,6 +512,8 @@ export default function UserProfilePage() {
                       alt={post.caption || 'Post'}
                       fill
                       priority
+                      loading="eager"
+                      sizes="(max-width: 768px) 33vw, 290px"
                       className="object-cover transition-transform duration-300 group-hover:scale-105"
                     />
                   )}
