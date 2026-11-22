@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { DesktopSidebar } from './DesktopSidebar';
 import { MobileTopNav } from './MobileTopNav';
 import { MobileBottomNav } from './MobileBottomNav';
@@ -13,9 +14,15 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ children }: AppLayoutProps) {
+  const pathname = usePathname() || '';
+  const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/accounts');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  if (isAuthPage) {
+    return <div className="min-h-screen bg-black text-white">{children}</div>;
+  }
 
   return (
     <div className="min-h-screen bg-[#000000] dark:bg-[#000000] light:bg-[#ffffff] text-white dark:text-white light:text-[#262626] font-sans antialiased transition-colors">
