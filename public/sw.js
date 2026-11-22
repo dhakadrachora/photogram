@@ -1,34 +1,40 @@
 // ============================================================
-// PHOTOGRAM (photogramweb.online) - PRODUCTION SERVICE WORKER
+// PHOTOGRAM (photogramweb.online) - PWA SERVICE WORKER
+// Fully Compliant with PWABuilder Offline & Service Worker Standards
 // ============================================================
 
-const CACHE_NAME = 'photogram-pwa-v1';
+const CACHE_NAME = 'photogram-pwa-v2';
+const OFFLINE_URL = '/offline.html';
 
-// Static assets to precache for offline shell
+// Assets cached on install to guarantee offline support for PWABuilder
 const PRECACHE_ASSETS = [
   '/',
+  OFFLINE_URL,
   '/manifest.json',
   '/favicon.ico',
   '/icon-192.png',
   '/icon-512.png',
   '/icon-maskable-512.png',
+  '/apple-touch-icon.png',
 ];
 
-// Install: precache essential shell assets and skip waiting
+// 1. INSTALL EVENT
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(CACHE_NAME)
-      .then((cache) => cache.addAll(PRECACHE_ASSETS))
+      .then((cache) => {
+        return cache.addAll(PRECACHE_ASSETS);
+      })
       .then(() => self.skipWaiting())
       .catch((err) => {
-        console.warn('[Photogram SW] Precache notice:', err);
+        console.warn('[Photogram SW] Install precache warning:', err);
         return self.skipWaiting();
       })
   );
 });
 
-// Activate: clean up old versions of cache and claim clients
+// 2. ACTIVATE EVENT
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
@@ -47,18 +53,19 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch: Stale-While-Revalidate for static assets, Network-First for API/Supabase/HTML
+// 3. FETCH EVENT - PWABuilder Offline Logic & Live Data Safety
 self.addEventListener('fetch', (event) => {
   const request = event.request;
 
-  // Only handle GET requests
+  // Handle only GET HTTP/HTTPS requests
   if (request.method !== 'GET' || !request.url.startsWith('http')) {
     return;
   }
 
   const url = new URL(request.url);
 
-  // Never intercept or cache Supabase API, Cloudinary uploads, Auth endpoints, or WebSocket upgrades
+  // CRITICAL: Never intercept or cache Supabase, Auth, API, or Cloudinary uploads
+  // Keeps all real-time posts, DMs, likes, comments, and sessions live!
   if (
     url.hostname.includes('supabase.co') ||
     url.hostname.includes('cloudinary.com') ||
@@ -68,15 +75,29 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Next.js hashed static assets (_next/static/*) -> Cache First with Network Fallback
+  // A. Navigation requests (HTML pages) -> Network-First with Offline Fallback
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request).catch(() => {
+        return caches.open(CACHE_NAME).then((cache) => {
+          return cache.match(OFFLINE_URL);
+        });
+      })
+    );
+    return;
+  }
+
+  // B. Next.js hashed static chunks (_next/static/*) -> Cache-First
   if (url.pathname.startsWith('/_next/static/')) {
     event.respondWith(
       caches.match(request).then((cachedResponse) => {
-        if (cachedResponse) return cachedResponse;
+        if (cachedResponse) {
+          return cachedResponse;
+        }
         return fetch(request).then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
-            const clone = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+            const copy = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
           }
           return networkResponse;
         });
@@ -85,24 +106,14 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // HTML Navigation -> Network First with Offline Fallback
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request).catch(() => {
-        return caches.match('/') || caches.match(request);
-      })
-    );
-    return;
-  }
-
-  // Other assets (images, icons, styles) -> Stale While Revalidate
+  // C. Other assets (images, fonts, styles) -> Stale-While-Revalidate
   event.respondWith(
     caches.match(request).then((cachedResponse) => {
       const fetchPromise = fetch(request)
         .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
-            const clone = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+            const copy = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
           }
           return networkResponse;
         })
@@ -113,7 +124,7 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Message listener for skipWaiting
+// 4. MESSAGE EVENT
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
