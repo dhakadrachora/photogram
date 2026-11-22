@@ -6,7 +6,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: '/',
-        disallow: ['/direct/*', '/api/*'],
+        disallow: ['/admin', '/admin/*', '/direct/*', '/api/*'],
       },
     ],
     sitemap: 'https://photogramweb.online/sitemap.xml',
