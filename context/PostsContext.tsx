@@ -23,12 +23,14 @@ const PostsContext = createContext<PostsContextType>({
 });
 
 const getActiveUser = () => {
-  if (typeof window === 'undefined') return CURRENT_USER;
+  if (typeof window === 'undefined') return null;
   try {
-    const stored = localStorage.getItem('insta_current_user');
-    return stored ? JSON.parse(stored) : CURRENT_USER;
+    const stored =
+      localStorage.getItem('photogram_active_session') ||
+      localStorage.getItem('insta_current_user');
+    return stored ? JSON.parse(stored) : null;
   } catch (e) {
-    return CURRENT_USER;
+    return null;
   }
 };
 
@@ -67,6 +69,7 @@ export function PostsProvider({ children }: { children: React.ReactNode }) {
   const addComment = (postId: string, text: string) => {
     if (!text.trim()) return;
     const user = getActiveUser();
+    if (!user) return;
     const newComment: Comment = {
       id: `c_${Date.now()}`,
       post_id: postId,
@@ -74,7 +77,7 @@ export function PostsProvider({ children }: { children: React.ReactNode }) {
       user: {
         username: user.username,
         avatar_url: user.avatar_url,
-        is_verified: user.is_verified,
+        is_verified: !!user.is_verified,
       },
       text: text.trim(),
       created_at: new Date().toISOString(),

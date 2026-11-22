@@ -19,77 +19,19 @@ export interface StoredAccount {
   created_at: string;
 }
 
-export const DEFAULT_ACCOUNTS: StoredAccount[] = [
-  {
-    id: 'usr_aryan',
-    email: 'aryan@visuals.studio',
-    username: 'aryan.visuals',
-    full_name: 'Aryan Sharma',
-    password: 'demo123456',
-    avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
-    bio: 'Visual Storyteller & Expedition Photographer 📸\nCapturing light, architecture & silent moments ✨\nSony A7IV • Inquiries: aryan@visuals.studio',
-    posts_count: 6,
-    followers_count: 48250,
-    following_count: 318,
-    is_verified: true,
-    created_at: '2026-01-01T00:00:00.000Z',
-  },
-  {
-    id: 'usr_kabir',
-    email: 'kabir@explores.com',
-    username: 'kabir.explores',
-    full_name: 'Kabir Mehta',
-    password: 'demo123456',
-    avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80',
-    bio: 'Alpine Explorer & Storyteller 🏔️✨',
-    posts_count: 12,
-    followers_count: 24500,
-    following_count: 190,
-    is_verified: true,
-    created_at: '2026-01-01T00:00:00.000Z',
-  },
-  {
-    id: 'usr_ananya',
-    email: 'ananya@lens.com',
-    username: 'ananya.lens',
-    full_name: 'Ananya Roy',
-    password: 'demo123456',
-    avatar_url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=300&auto=format&fit=crop&q=80',
-    bio: 'Lifestyle & Architecture frames 🍋✨',
-    posts_count: 8,
-    followers_count: 18900,
-    following_count: 240,
-    is_verified: true,
-    created_at: '2026-01-01T00:00:00.000Z',
-  },
-  {
-    id: 'usr_rohan',
-    email: 'rohan@raw.com',
-    username: 'rohan.raw',
-    full_name: 'Rohan Sen',
-    password: 'demo123456',
-    avatar_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&auto=format&fit=crop&q=80',
-    bio: 'Street & Monochrome moments 🖤📷',
-    posts_count: 4,
-    followers_count: 9200,
-    following_count: 154,
-    is_verified: true,
-    created_at: '2026-01-01T00:00:00.000Z',
-  },
-  {
-    id: 'usr_zoya',
-    email: 'zoya@spaces.com',
-    username: 'zoya.spaces',
-    full_name: 'Zoya Khan',
-    password: 'demo123456',
-    avatar_url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=300&auto=format&fit=crop&q=80',
-    bio: 'Minimalist Architecture & Concrete Forms 🏛️',
-    posts_count: 15,
-    followers_count: 31200,
-    following_count: 410,
-    is_verified: true,
-    created_at: '2026-01-01T00:00:00.000Z',
-  },
+// System-reserved handles that cannot be registered by users
+export const RESERVED_USERNAMES = [
+  'admin',
+  'administrator',
+  'photogram',
+  'instagram',
+  'meta',
+  'support',
+  'help',
+  'official',
+  'security',
+  'root',
+  'system',
 ];
 
 const REAL_AVATARS = [
@@ -130,33 +72,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Helper: Read persistent registered accounts
+  // Helper: Read persistent real registered accounts
   const getStoredAccounts = (): StoredAccount[] => {
-    if (typeof window === 'undefined') return DEFAULT_ACCOUNTS;
+    if (typeof window === 'undefined') return [];
     try {
       const raw = localStorage.getItem('photogram_registered_accounts');
-      if (!raw) {
-        localStorage.setItem('photogram_registered_accounts', JSON.stringify(DEFAULT_ACCOUNTS));
-        return DEFAULT_ACCOUNTS;
-      }
+      if (!raw) return [];
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
-      }
-      return DEFAULT_ACCOUNTS;
+      return Array.isArray(parsed) ? parsed : [];
     } catch (e) {
-      return DEFAULT_ACCOUNTS;
+      return [];
     }
   };
 
-  // Helper: Save persistent registered accounts
+  // Helper: Save persistent real registered accounts
   const saveStoredAccounts = (accounts: StoredAccount[]) => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('photogram_registered_accounts', JSON.stringify(accounts));
     }
   };
 
-  // On Mount: Check persistent active session
+  // On Mount: Check persistent active session for real logged-in user
   useEffect(() => {
     try {
       const activeSession =
@@ -191,7 +127,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (session?.user) {
           fetchSupabaseProfile(session.user.id);
         } else if (!session) {
-          // If signed out of supabase and no local session
           const localSess = localStorage.getItem('photogram_active_session');
           if (!localSess) setUser(null);
         }
@@ -217,7 +152,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // 1. Real-time Unique Username Checker
+  // 1. Real-time Unique Username Checker (Purely Real Accounts)
   const checkUsernameAvailability = async (rawUsername: string): Promise<{ available: boolean; reason?: string }> => {
     const clean = rawUsername.trim().toLowerCase();
     if (!clean) {
@@ -230,11 +165,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { available: false, reason: 'Usernames can only use letters, numbers, underscores and periods.' };
     }
 
-    // Check against registered accounts (including demo users)
+    // Check system reserved names
+    if (RESERVED_USERNAMES.includes(clean)) {
+      return { available: false, reason: `Username @${clean} is reserved. Please choose another.` };
+    }
+
+    // Check against real registered accounts
     const accounts = getStoredAccounts();
     const existsLocal = accounts.some((acc) => acc.username.toLowerCase() === clean);
     if (existsLocal) {
-      return { available: false, reason: `Username @${clean} is not available. Please try another.` };
+      return { available: false, reason: `Username @${clean} is already taken. Please try another.` };
     }
 
     // Check Supabase if configured
@@ -246,7 +186,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .eq('username', clean)
           .maybeSingle();
         if (data?.username) {
-          return { available: false, reason: `Username @${clean} is already registered on Photogram.` };
+          return { available: false, reason: `Username @${clean} is already taken. Please try another.` };
         }
       } catch (e) {}
     }
@@ -254,7 +194,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { available: true };
   };
 
-  // 2. Sign Up (Create New Account)
+  // 2. Sign Up (Create Real Account with Unique Username & Password)
   const signup = async (
     emailOrPhone: string,
     pass: string,
@@ -301,7 +241,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       created_at: new Date().toISOString(),
     };
 
-    // Save to persistent registry
+    // Save to real accounts registry
     accounts.push(newAccount);
     saveStoredAccounts(accounts);
 
@@ -324,7 +264,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    // Construct profile and establish persistent login session
+    // Set real profile & active session
     const profile: Profile = {
       id: newAccount.id,
       username: newAccount.username,
@@ -344,7 +284,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: true };
   };
 
-  // 3. Log In (Authenticate with saved accounts)
+  // 3. Log In (Authenticate ONLY against real registered accounts)
   const login = async (
     identifierRaw: string,
     pass: string
@@ -367,7 +307,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (e) {}
     }
 
-    // Authenticate against stored accounts registry
+    // Authenticate against real stored accounts
     const accounts = getStoredAccounts();
     const matched = accounts.find(
       (acc) =>
@@ -391,7 +331,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
     }
 
-    // Successful authentication
+    // Successful authentication of real user
     const profile: Profile = {
       id: matched.id,
       username: matched.username,
@@ -430,7 +370,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // 5. Forgot Password (Account Lookup)
+  // 5. Forgot Password (Look up real account)
   const resetPassword = async (
     emailOrUsername: string
   ): Promise<{ success: boolean; message?: string; error?: string }> => {
@@ -467,7 +407,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   };
 
-  // 6. Update Password (Save new password & Log In)
+  // 6. Update Password (Update real password in account)
   const updatePassword = async (
     newPassword: string
   ): Promise<{ success: boolean; error?: string }> => {

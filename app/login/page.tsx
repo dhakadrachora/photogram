@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense, useTransition } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import {
@@ -9,7 +9,6 @@ import {
   AlertCircle,
   Eye,
   EyeOff,
-  Zap,
   ArrowLeft,
   KeyRound,
   XCircle,
@@ -94,7 +93,7 @@ function LoginFormContent() {
     setMode(newMode);
   };
 
-  // 1. Handle Login
+  // 1. Handle Real Login
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -123,7 +122,7 @@ function LoginFormContent() {
     }
   };
 
-  // 2. Handle Signup (Create New Account with Unique Username & Password)
+  // 2. Handle Real Sign Up (Create Real Account)
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -152,7 +151,7 @@ function LoginFormContent() {
     try {
       const res = await signup(identifier, password, cleanUsername, fullName || cleanUsername);
       if (res.success) {
-        setSuccessMsg(`Account created for @${cleanUsername}! Redirecting to Photogram...`);
+        setSuccessMsg(`Welcome @${cleanUsername}! Account created successfully.`);
         setTimeout(() => {
           window.location.href = '/';
         }, 400);
@@ -166,7 +165,7 @@ function LoginFormContent() {
     }
   };
 
-  // 3. Handle Forgot Password Request
+  // 3. Handle Real Forgot Password Request
   const handleResetRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -187,13 +186,13 @@ function LoginFormContent() {
         setError(res.error || 'No account found with that email or username.');
       }
     } catch (err: any) {
-      setError(err?.message || 'Error sending login link.');
+      setError(err?.message || 'Error finding account.');
     } finally {
       setLoading(false);
     }
   };
 
-  // 4. Handle Password Update
+  // 4. Handle Real Password Update
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -213,7 +212,9 @@ function LoginFormContent() {
       const res = await updatePassword(newPassword);
       if (res.success) {
         setSuccessMsg('Your password has been updated successfully! Redirecting...');
-        setTimeout(() => router.push('/'), 700);
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 500);
       } else {
         setError(res.error || 'Failed to update password.');
       }
@@ -221,16 +222,6 @@ function LoginFormContent() {
       setError(err?.message || 'Error updating password.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  // 5. Instant Demo Login (Default testing user)
-  const handleInstantDemoLogin = async () => {
-    setLoading(true);
-    setError(null);
-    const res = await login('aryan.visuals', 'demo123456');
-    if (res.success) {
-      window.location.href = '/';
     }
   };
 
@@ -247,7 +238,7 @@ function LoginFormContent() {
               <div className="w-full h-full rounded-[34px] overflow-hidden relative">
                 <Image
                   src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80"
-                  alt="Photogram Phone Demo"
+                  alt="Photogram Phone Preview"
                   fill
                   priority
                   className="object-cover"
@@ -257,9 +248,9 @@ function LoginFormContent() {
                   <span className="text-[11px] font-semibold px-2.5 py-1 bg-[#0095f6] rounded-full shadow">
                     Live on photogramweb.online
                   </span>
-                  <p className="text-base font-bold mt-2.5">1:1 Photogram Web Experience</p>
+                  <p className="text-base font-bold mt-2.5">1:1 Photogram Experience</p>
                   <p className="text-[11px] text-neutral-300 mt-0.5">
-                    Unique Accounts • Persistent Auth • Instant Password Recovery
+                    Real User Accounts • Secure Auth • Instant Password Recovery
                   </p>
                 </div>
               </div>
@@ -342,27 +333,16 @@ function LoginFormContent() {
                     <div className="flex-1 h-[1px] bg-[#262626]" />
                   </div>
 
-                  {/* Facebook / Google Social Login */}
+                  {/* Facebook / Social Login */}
                   <button
                     type="button"
-                    onClick={handleInstantDemoLogin}
+                    onClick={() => setError('Please log in with your registered username or email.')}
                     className="w-full flex items-center justify-center gap-2 text-xs font-semibold text-[#0095f6] hover:text-[#1877f2] transition-colors py-1.5"
                   >
                     <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
                       <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
                     </svg>
                     <span>Log in with Facebook</span>
-                  </button>
-
-                  {/* 1-Click Demo Login Banner */}
-                  <button
-                    type="button"
-                    onClick={handleInstantDemoLogin}
-                    disabled={loading}
-                    className="w-full mt-3 py-1.5 px-3 bg-gradient-to-r from-amber-500 via-rose-500 to-purple-600 hover:opacity-95 text-white text-[11px] font-bold rounded-md shadow flex items-center justify-center gap-1.5 transition-all"
-                  >
-                    <Zap className="w-3.5 h-3.5 fill-white" />
-                    <span>⚡ Instant 1-Click Demo Login</span>
                   </button>
 
                   {/* Forgot Password Link */}
@@ -376,7 +356,7 @@ function LoginFormContent() {
                 </>
               )}
 
-              {/* MODE 2: SIGN UP (CREATE NEW ACCOUNT WITH UNIQUE USERNAME) */}
+              {/* MODE 2: SIGN UP (CREATE REAL NEW ACCOUNT) */}
               {mode === 'signup' && (
                 <>
                   <h1 className="text-4xl font-normal tracking-tight text-white mb-3 font-serif italic select-none">
@@ -386,25 +366,6 @@ function LoginFormContent() {
                   <p className="text-sm font-semibold text-neutral-400 text-center mb-4 leading-snug">
                     Sign up to see photos and visual stories from your friends.
                   </p>
-
-                  {/* Facebook Signup Button */}
-                  <button
-                    type="button"
-                    onClick={handleInstantDemoLogin}
-                    className="w-full py-1.5 bg-[#0095f6] hover:bg-[#1877f2] text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-2 mb-3"
-                  >
-                    <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24">
-                      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-                    </svg>
-                    <span>Log in with Facebook</span>
-                  </button>
-
-                  {/* OR Divider */}
-                  <div className="w-full flex items-center mb-3">
-                    <div className="flex-1 h-[1px] bg-[#262626]" />
-                    <span className="px-4 text-[12px] font-semibold text-neutral-500">OR</span>
-                    <div className="flex-1 h-[1px] bg-[#262626]" />
-                  </div>
 
                   {error && (
                     <div className="w-full bg-red-950/40 border border-red-800 text-red-300 text-xs p-2.5 rounded-sm mb-3 flex items-center gap-2">
@@ -682,7 +643,7 @@ function LoginFormContent() {
               )}
             </div>
 
-            {/* App Download Links Placeholder */}
+            {/* App Store Links */}
             <div className="pt-2 text-center text-xs text-neutral-400">
               <p className="mb-2.5">Get the app.</p>
               <div className="flex items-center justify-center gap-2">
