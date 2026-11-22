@@ -231,26 +231,47 @@ function LoginFormContent() {
     <div className="min-h-screen bg-black text-white flex flex-col justify-between items-center px-4 py-8 select-none">
       <div className="flex-1 flex items-center justify-center w-full">
         <div className="flex items-center justify-center gap-8 w-full max-w-4xl">
-          {/* Left Side: Mock Phone Preview (Desktop only) */}
+          {/* Left Side: Mock Phone Preview with Official App Icon (Desktop only) */}
           <div className="hidden lg:block relative w-[380px] h-[580px] shrink-0">
             <div className="w-full h-full rounded-[44px] border-4 border-[#262626] bg-neutral-950 p-3 shadow-2xl relative overflow-hidden">
               <div className="absolute top-4 left-1/2 -translate-x-1/2 w-28 h-4 bg-[#262626] rounded-full z-20" />
-              <div className="w-full h-full rounded-[34px] overflow-hidden relative">
-                <Image
-                  src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80"
-                  alt="Photogram Phone Preview"
-                  fill
-                  priority
-                  className="object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/30" />
-                <div className="absolute bottom-6 left-4 right-4 text-white">
-                  <span className="text-[11px] font-semibold px-2.5 py-1 bg-[#0095f6] rounded-full shadow">
+              <div className="w-full h-full rounded-[34px] overflow-hidden relative bg-gradient-to-b from-neutral-900 via-black to-neutral-950 flex flex-col items-center justify-between p-6">
+                {/* Status Bar */}
+                <div className="w-full flex items-center justify-between text-[11px] text-neutral-400 font-semibold px-2 pt-2 z-10">
+                  <span>9:41</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
+                    <span>5G</span>
+                  </div>
+                </div>
+
+                {/* Centered Glowing Official App Icon */}
+                <div className="flex flex-col items-center justify-center my-auto z-10">
+                  <div className="relative group">
+                    <div className="absolute -inset-6 bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] rounded-3xl blur-2xl opacity-50 group-hover:opacity-80 transition-opacity" />
+                    <div className="relative w-44 h-44 rounded-[36px] overflow-hidden shadow-2xl ring-2 ring-white/20">
+                      <Image
+                        src="/app-logo.png"
+                        alt="Photogram App Icon"
+                        width={176}
+                        height={176}
+                        priority
+                        className="object-cover w-full h-full"
+                      />
+                    </div>
+                  </div>
+                  <h3 className="font-serif italic text-3xl font-normal text-white mt-6">Photogram</h3>
+                  <p className="text-xs text-neutral-400 mt-1 tracking-wide">Capture • Share • Connect</p>
+                </div>
+
+                {/* Bottom App Card */}
+                <div className="w-full bg-neutral-900/80 backdrop-blur-md border border-white/10 rounded-2xl p-3.5 text-white text-center z-10">
+                  <span className="text-[10px] font-semibold tracking-wide uppercase px-2.5 py-0.5 bg-[#0095f6] rounded-full">
                     Live on photogramweb.online
                   </span>
-                  <p className="text-base font-bold mt-2.5">1:1 Photogram Experience</p>
-                  <p className="text-[11px] text-neutral-300 mt-0.5">
-                    Real User Accounts • Secure Auth • Instant Password Recovery
+                  <p className="text-sm font-bold mt-2">Pure Visual Web</p>
+                  <p className="text-[11px] text-neutral-400 mt-0.5">
+                    Real Accounts • Zero Bots • Instant Direct Chat
                   </p>
                 </div>
               </div>
@@ -264,10 +285,22 @@ function LoginFormContent() {
               {/* MODE 1: LOGIN */}
               {mode === 'login' && (
                 <>
-                  {/* Instagram-style Logo */}
-                  <h1 className="text-4xl font-normal tracking-tight text-white mb-8 font-serif italic select-none">
-                    Photogram
-                  </h1>
+                  {/* App Icon + Title */}
+                  <div className="flex flex-col items-center gap-2 mb-6">
+                    <div className="w-14 h-14 rounded-2xl overflow-hidden shadow-lg ring-1 ring-white/20">
+                      <Image
+                        src="/app-logo.png"
+                        alt="Photogram"
+                        width={56}
+                        height={56}
+                        priority
+                        className="object-cover w-full h-full"
+                      />
+                    </div>
+                    <h1 className="text-3xl font-normal tracking-tight text-white font-serif italic select-none">
+                      Photogram
+                    </h1>
+                  </div>
 
                   {/* Feedback Messages */}
                   {error && (
@@ -340,9 +373,21 @@ function LoginFormContent() {
               {/* MODE 2: SIGN UP (CREATE REAL NEW ACCOUNT) */}
               {mode === 'signup' && (
                 <>
-                  <h1 className="text-4xl font-normal tracking-tight text-white mb-3 font-serif italic select-none">
-                    Photogram
-                  </h1>
+                  {/* App Icon + Title */}
+                  <div className="flex flex-col items-center gap-2 mb-3">
+                    <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-lg ring-1 ring-white/20">
+                      <Image
+                        src="/app-logo.png"
+                        alt="Photogram"
+                        width={48}
+                        height={48}
+                        className="object-cover w-full h-full"
+                      />
+                    </div>
+                    <h1 className="text-3xl font-normal tracking-tight text-white font-serif italic select-none">
+                      Photogram
+                    </h1>
+                  </div>
 
                   <p className="text-sm font-semibold text-neutral-400 text-center mb-4 leading-snug">
                     Sign up to see photos and visual stories from your friends.

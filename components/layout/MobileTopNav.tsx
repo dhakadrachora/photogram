@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Heart, MessageCircle, Moon, Sun } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -14,9 +15,19 @@ export function MobileTopNav({ onOpenNotifications }: MobileTopNavProps) {
 
   return (
     <header className="sticky top-0 z-30 md:hidden w-full h-14 bg-[#000000]/95 dark:bg-[#000000]/95 light:bg-[#ffffff]/95 backdrop-blur-md border-b border-[#262626] dark:border-[#262626] light:border-[#dbdbdb] px-4 flex items-center justify-between transition-colors">
-      {/* Brand Name */}
-      <Link href="/" className="font-serif font-black text-2xl tracking-tight text-white dark:text-white light:text-black">
-        Photogram
+      {/* Brand Name & App Icon */}
+      <Link href="/" className="flex items-center gap-2.5 font-serif font-black text-2xl tracking-tight text-white dark:text-white light:text-black select-none">
+        <div className="w-7 h-7 rounded-lg overflow-hidden shadow ring-1 ring-white/10 shrink-0">
+          <Image
+            src="/app-logo.png"
+            alt="Photogram"
+            width={28}
+            height={28}
+            priority
+            className="object-cover w-full h-full"
+          />
+        </div>
+        <span>Photogram</span>
       </Link>
 
       {/* Right Action Icons */}
