@@ -45,9 +45,8 @@ export function DesktopSidebar({
             href="/direct"
             icon={MessageCircle}
             isActive={pathname.startsWith('/direct')}
-            badge={2}
           />
-          <SidebarItem label="Notifications" action={onOpenNotifications} icon={Heart} hasNotification />
+          <SidebarItem label="Notifications" action={onOpenNotifications} icon={Heart} />
           <SidebarItem label="Create" action={onOpenCreate} icon={PlusSquare} />
           <SidebarItem label="Profile" href="/profile" isProfile isActive={pathname === '/profile'} user={user} />
         </nav>

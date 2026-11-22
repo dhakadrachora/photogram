@@ -36,7 +36,6 @@ export function MobileTopNav({ onOpenNotifications }: MobileTopNavProps) {
           className="relative p-1.5 rounded-full text-white dark:text-white light:text-black hover:bg-white/10 dark:hover:bg-white/10 light:hover:bg-black/5 transition-colors"
         >
           <Heart className="w-6 h-6 stroke-[1.8]" />
-          <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#ff3040] ring-2 ring-black dark:ring-black light:ring-white" />
         </button>
 
         {/* Messenger Direct Link */}
@@ -45,9 +44,6 @@ export function MobileTopNav({ onOpenNotifications }: MobileTopNavProps) {
           className="relative p-1.5 rounded-full text-white dark:text-white light:text-black hover:bg-white/10 dark:hover:bg-white/10 light:hover:bg-black/5 transition-colors"
         >
           <MessageCircle className="w-6 h-6 stroke-[1.8]" />
-          <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-[#ff3040] text-white ring-2 ring-black">
-            2
-          </span>
         </Link>
       </div>
     </header>

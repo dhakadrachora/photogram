@@ -1,23 +1,23 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 
-const REAL_SUGGESTIONS = [
+export const REAL_SUGGESTIONS = [
   {
     username: 'kabir.explores',
     name: 'Kabir Mehta',
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80',
-    relation: 'Followed by ananya.lens + 12 others',
+    relation: 'Suggested for you',
     is_verified: true,
   },
   {
     username: 'ananya.lens',
     name: 'Ananya Roy',
     avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80',
-    relation: 'Suggested for you',
+    relation: 'Popular creator in Photography',
     is_verified: true,
   },
   {
@@ -31,24 +31,51 @@ const REAL_SUGGESTIONS = [
     username: 'rohan.raw',
     name: 'Rohan Sen',
     avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&auto=format&fit=crop&q=80',
-    relation: 'Followed by kabir.explores',
+    relation: 'Suggested for you',
     is_verified: true,
   },
   {
     username: 'vikram.aerials',
     name: 'Vikram Aditya',
     avatar: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=120&auto=format&fit=crop&q=80',
-    relation: 'New to Instagram',
+    relation: 'New to Photogram',
     is_verified: true,
   },
 ];
 
 export function SuggestionsSidebar() {
-  const { user } = useAuth();
+  const { user, updateProfile } = useAuth();
   const [followingMap, setFollowingMap] = useState<Record<string, boolean>>({});
 
+  useEffect(() => {
+    if (!user) return;
+    try {
+      const userKey = user.id || user.username;
+      const stored = localStorage.getItem(`photogram_following_${userKey}`);
+      if (stored) {
+        setFollowingMap(JSON.parse(stored));
+      } else {
+        setFollowingMap({});
+      }
+    } catch (e) {
+      setFollowingMap({});
+    }
+  }, [user]);
+
   const toggleFollow = (username: string) => {
-    setFollowingMap((prev) => ({ ...prev, [username]: !prev[username] }));
+    if (!user) return;
+    const isFollowed = !!followingMap[username];
+    const newFollowingMap = { ...followingMap, [username]: !isFollowed };
+    setFollowingMap(newFollowingMap);
+
+    const userKey = user.id || user.username;
+    try {
+      localStorage.setItem(`photogram_following_${userKey}`, JSON.stringify(newFollowingMap));
+    } catch (e) {}
+
+    // Calculate real following count based on active follows
+    const activeFollowsCount = Object.values(newFollowingMap).filter(Boolean).length;
+    updateProfile({ following_count: activeFollowsCount });
   };
 
   return (
@@ -76,7 +103,7 @@ export function SuggestionsSidebar() {
         </Link>
         <Link
           href="/login"
-          className="text-xs font-semibold text-[#0095f6] hover:text-sky-400"
+          className="text-xs font-semibold text-[#0095f6] hover:text-sky-400 cursor-pointer"
         >
           Switch
         </Link>
@@ -93,7 +120,7 @@ export function SuggestionsSidebar() {
 
         <div className="space-y-3.5">
           {REAL_SUGGESTIONS.map((item) => {
-            const isFollowed = followingMap[item.username];
+            const isFollowed = !!followingMap[item.username];
             return (
               <div key={item.username} className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -124,8 +151,8 @@ export function SuggestionsSidebar() {
                   onClick={() => toggleFollow(item.username)}
                   className={`text-xs font-semibold transition-all cursor-pointer ${
                     isFollowed
-                      ? 'text-neutral-500 hover:text-neutral-400'
-                      : 'text-[#0095f6] hover:text-white'
+                      ? 'text-neutral-400 hover:text-neutral-300'
+                      : 'text-[#0095f6] hover:text-sky-400'
                   }`}
                 >
                   {isFollowed ? 'Following' : 'Follow'}

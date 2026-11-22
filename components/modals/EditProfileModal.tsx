@@ -1,67 +1,92 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import Image from 'next/image';
-import { X, Loader2 } from 'lucide-react';
+import { X, Upload, Camera, Check } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { uploadToCloudinary } from '@/lib/cloudinary';
 
 interface EditProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-const PRESET_AVATARS = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=300&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=300&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=300&auto=format&fit=crop&q=80',
-];
-
 export function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
   const { user, updateProfile } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [username, setUsername] = useState(user?.username || '');
   const [name, setName] = useState(user?.full_name || '');
   const [bio, setBio] = useState(user?.bio || '');
   const [website, setWebsite] = useState(user?.website || '');
   const [avatarUrl, setAvatarUrl] = useState(user?.avatar_url || '');
+  const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   if (!isOpen) return null;
 
+  // Real DP Upload from User's Device / Gallery
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      // Fast FileReader preview + persistent base64 / Cloudinary upload
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const dataUrl = reader.result as string;
+        setAvatarUrl(dataUrl);
+
+        // Also upload to Cloudinary in background if available
+        try {
+          const res = await uploadToCloudinary(file);
+          if (res?.secure_url) {
+            setAvatarUrl(res.secure_url);
+            updateProfile({ avatar_url: res.secure_url });
+          } else {
+            updateProfile({ avatar_url: dataUrl });
+          }
+        } catch {
+          updateProfile({ avatar_url: dataUrl });
+        }
+        setIsUploading(false);
+      };
+      reader.readAsDataURL(file);
+    } catch {
+      setIsUploading(false);
+    }
+  };
+
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
+    updateProfile({
+      username: username.toLowerCase().trim(),
+      full_name: name.trim(),
+      bio,
+      website,
+      avatar_url: avatarUrl,
+    });
+    setIsSaving(false);
+    setSaveSuccess(true);
     setTimeout(() => {
-      updateProfile({
-        username: username.toLowerCase().trim(),
-        full_name: name.trim(),
-        bio,
-        website,
-        avatar_url: avatarUrl,
-      });
-      setIsSaving(false);
-      setSaveSuccess(true);
-      setTimeout(() => {
-        setSaveSuccess(false);
-        onClose();
-      }, 800);
-    }, 400);
+      setSaveSuccess(false);
+      onClose();
+    }, 600);
   };
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in select-none"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md bg-[#262626] dark:bg-[#262626] light:bg-[#ffffff] border border-neutral-700 dark:border-neutral-700 light:border-[#dbdbdb] rounded-2xl p-6 shadow-2xl text-white dark:text-white light:text-black relative"
+        className="w-full max-w-md bg-[#262626] border border-neutral-700 rounded-2xl p-6 shadow-2xl text-white relative max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between pb-4 border-b border-white/10 dark:border-white/10 light:border-black/10">
+        <div className="flex items-center justify-between pb-4 border-b border-white/10">
           <h3 className="font-semibold text-base">Edit Profile</h3>
           <button
             onClick={onClose}
@@ -72,35 +97,66 @@ export function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
         </div>
 
         {saveSuccess && (
-          <div className="mt-3 p-3 rounded-xl bg-green-500/20 border border-green-500/30 text-green-400 text-xs font-semibold">
-            Profile updated successfully! ✨
+          <div className="mt-3 p-3 rounded-xl bg-green-500/20 border border-green-500/30 text-green-400 text-xs font-semibold flex items-center gap-2">
+            <Check className="w-4 h-4" />
+            <span>Profile updated successfully! ✨</span>
           </div>
         )}
 
         <form onSubmit={handleSave} className="mt-4 space-y-4">
-          {/* Avatar Switcher */}
-          <div>
-            <label className="block text-xs font-semibold text-neutral-400 mb-2">
-              Select Avatar
-            </label>
-            <div className="flex items-center gap-3 overflow-x-auto py-1">
-              {PRESET_AVATARS.map((url, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setAvatarUrl(url)}
-                  className={`relative w-12 h-12 rounded-full overflow-hidden border-2 transition-all cursor-pointer ${
-                    avatarUrl === url
-                      ? 'border-[#0095f6] scale-110'
-                      : 'border-transparent opacity-60 hover:opacity-100'
-                  }`}
-                >
-                  <Image src={url} alt="preset" fill className="object-cover" />
-                </button>
-              ))}
+          {/* Avatar & Photo Upload Section */}
+          <div className="flex items-center gap-4 bg-neutral-900/60 p-3.5 rounded-xl border border-neutral-800">
+            <div className="relative w-16 h-16 rounded-full overflow-hidden bg-neutral-800 border-2 border-neutral-700 shrink-0">
+              {avatarUrl ? (
+                <Image src={avatarUrl} alt="Avatar" fill className="object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-neutral-400">
+                  <Camera className="w-6 h-6" />
+                </div>
+              )}
+              {isUploading && (
+                <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+            </div>
+
+            <div className="flex-1 space-y-1">
+              <p className="text-xs font-semibold text-white">Profile Photo (DP)</p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="px-3 py-1.5 bg-[#0095f6] hover:bg-[#1877f2] disabled:opacity-50 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>{isUploading ? 'Uploading...' : 'Upload New Photo'}</span>
+              </button>
             </div>
           </div>
 
+          {/* Name Field */}
+          <div>
+            <label className="block text-xs font-semibold text-neutral-400 mb-1">
+              Name
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Your full name"
+              className="w-full px-3 py-2 bg-neutral-900 border border-neutral-700 rounded-lg text-xs text-white outline-none focus:border-[#0095f6]"
+            />
+          </div>
+
+          {/* Username Field */}
           <div>
             <label className="block text-xs font-semibold text-neutral-400 mb-1">
               Username
@@ -108,61 +164,55 @@ export function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
             <input
               type="text"
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-3.5 py-2 rounded-xl bg-white/5 dark:bg-white/5 light:bg-black/5 border border-white/10 dark:border-white/10 light:border-black/10 text-xs focus:outline-none focus:border-[#0095f6]"
-              required
+              onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/\s+/g, ''))}
+              placeholder="username"
+              className="w-full px-3 py-2 bg-neutral-900 border border-neutral-700 rounded-lg text-xs text-white outline-none focus:border-[#0095f6]"
             />
           </div>
 
+          {/* Bio Field */}
           <div>
             <label className="block text-xs font-semibold text-neutral-400 mb-1">
-              Full Name
+              Bio
             </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-3.5 py-2 rounded-xl bg-white/5 dark:bg-white/5 light:bg-black/5 border border-white/10 dark:border-white/10 light:border-black/10 text-xs focus:outline-none focus:border-[#0095f6]"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-neutral-400 mb-1">Bio</label>
             <textarea
               rows={3}
               value={bio}
               onChange={(e) => setBio(e.target.value)}
-              className="w-full px-3.5 py-2 rounded-xl bg-white/5 dark:bg-white/5 light:bg-black/5 border border-white/10 dark:border-white/10 light:border-black/10 text-xs focus:outline-none focus:border-[#0095f6] resize-none"
+              placeholder="Write a bio..."
+              className="w-full px-3 py-2 bg-neutral-900 border border-neutral-700 rounded-lg text-xs text-white outline-none focus:border-[#0095f6] resize-none"
             />
           </div>
 
+          {/* Website Field */}
           <div>
             <label className="block text-xs font-semibold text-neutral-400 mb-1">
               Website
             </label>
             <input
-              type="url"
+              type="text"
               value={website}
               onChange={(e) => setWebsite(e.target.value)}
-              className="w-full px-3.5 py-2 rounded-xl bg-white/5 dark:bg-white/5 light:bg-black/5 border border-white/10 dark:border-white/10 light:border-black/10 text-xs focus:outline-none focus:border-[#0095f6]"
+              placeholder="https://yourwebsite.com"
+              className="w-full px-3 py-2 bg-neutral-900 border border-neutral-700 rounded-lg text-xs text-white outline-none focus:border-[#0095f6]"
             />
           </div>
 
-          <div className="pt-2 flex gap-2">
+          {/* Action Buttons */}
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2 rounded-xl bg-white/10 dark:bg-white/10 light:bg-black/10 text-xs font-semibold cursor-pointer"
+              className="px-4 py-2 text-xs font-semibold text-neutral-300 hover:text-white"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={isSaving}
-              className="flex-1 py-2 rounded-xl bg-[#0095f6] hover:bg-sky-500 text-white text-xs font-semibold shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+              disabled={isSaving || isUploading}
+              className="px-5 py-2 bg-[#0095f6] hover:bg-[#1877f2] disabled:opacity-50 text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer"
             >
-              {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Profile'}
+              {isSaving ? 'Saving...' : 'Save Profile'}
             </button>
           </div>
         </form>

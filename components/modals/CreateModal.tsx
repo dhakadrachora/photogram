@@ -22,7 +22,7 @@ interface CreateModalProps {
 export function CreateModal({ isOpen, onClose }: CreateModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { createPost } = usePosts();
-  const { user } = useAuth();
+  const { user, updateProfile } = useAuth();
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -85,6 +85,7 @@ export function CreateModal({ isOpen, onClose }: CreateModalProps) {
           },
         ],
       });
+      updateProfile({ posts_count: (user?.posts_count ?? 0) + 1 });
 
       setIsDone(true);
       setTimeout(() => {
