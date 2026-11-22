@@ -20,11 +20,14 @@ import {
   Camera,
   Lock,
   AlertCircle,
+  Plus,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { usePosts } from '@/context/PostsContext';
 import { Reel } from '@/lib/types';
 import { getUploadPermissions, UploadPermissions, checkUploadPermission } from '@/lib/uploadPermissions';
 import { uploadToCloudinary } from '@/lib/cloudinary';
+import { CreateModal, parseVideoUrl } from '@/components/modals/CreateModal';
 
 interface ExtendedReel extends Reel {
   music_title?: string;
@@ -93,8 +96,40 @@ const SAMPLE_REELS: ExtendedReel[] = [
 
 export default function ReelsPage() {
   const { user } = useAuth();
+  const { posts } = usePosts();
   const [permissions, setPermissions] = useState<UploadPermissions>(getUploadPermissions());
+  const [isCreateReelOpen, setIsCreateReelOpen] = useState(false);
+
+  // Combine live video posts with curated sample reels (Zero Storage)
+  const combinedReels: ExtendedReel[] = React.useMemo(() => {
+    const userVideoReels: ExtendedReel[] = [];
+    posts.forEach((p) => {
+      const vid = p.media.find((m) => m.media_type === 'video');
+      if (vid) {
+        userVideoReels.push({
+          id: p.id,
+          user_id: p.user_id,
+          user: p.user,
+          video_url: vid.media_url,
+          caption: p.caption,
+          likes_count: p.likes_count,
+          comments_count: p.comments_count,
+          has_liked: p.has_liked,
+          has_saved: p.has_saved,
+          created_at: p.created_at,
+          music_title: `Original Audio • ${p.user?.username || 'Creator'}`,
+        });
+      }
+    });
+    return [...userVideoReels, ...SAMPLE_REELS];
+  }, [posts]);
+
   const [reels, setReels] = useState<ExtendedReel[]>(SAMPLE_REELS);
+
+  useEffect(() => {
+    setReels(combinedReels);
+  }, [combinedReels]);
+
   const [currentIdx, setCurrentIdx] = useState(0);
   const [isMuted, setIsMuted] = useState(true);
   const [isPlaying, setIsPlaying] = useState(true);
@@ -284,18 +319,29 @@ export default function ReelsPage() {
 
           return (
             <div key={reel.id} className="relative w-full h-full bg-black">
-              {/* Video Element */}
-              <video
-                ref={(el) => {
-                  videoRefs.current[idx] = el;
-                }}
-                src={reel.video_url}
-                loop
-                playsInline
-                muted={isMuted}
-                onClick={togglePlayPause}
-                className="w-full h-full object-cover cursor-pointer"
-              />
+              {/* Video Element (Supports Direct MP4 & Zero-Storage YouTube Shorts Embeds) */}
+              {parseVideoUrl(reel.video_url).isYouTube ? (
+                <div className="w-full h-full relative bg-black flex items-center justify-center pointer-events-auto">
+                  <iframe
+                    src={parseVideoUrl(reel.video_url).embedUrl}
+                    className="w-full h-full border-0 pointer-events-auto"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                </div>
+              ) : (
+                <video
+                  ref={(el) => {
+                    videoRefs.current[idx] = el;
+                  }}
+                  src={reel.video_url}
+                  loop
+                  playsInline
+                  muted={isMuted}
+                  onClick={togglePlayPause}
+                  className="w-full h-full object-cover cursor-pointer"
+                />
+              )}
 
               {/* Pause/Play Center Overlay Icon */}
               {!isPlaying && (
@@ -321,32 +367,16 @@ export default function ReelsPage() {
                 {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
               </button>
 
-              {/* Top Reel Upload / Restriction Action */}
+              {/* Top Reel Upload / Link Action */}
               <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
-                <input
-                  ref={reelInputRef}
-                  type="file"
-                  accept="video/mp4,video/*"
-                  onChange={handleReelFileSelected}
-                  className="hidden"
-                />
                 <button
-                  onClick={handleReelUploadClick}
-                  className="p-2.5 rounded-full bg-black/50 backdrop-blur-md text-white hover:bg-black/70 transition-colors cursor-pointer"
-                  title={
-                    permissions.allow_reels_uploads
-                      ? 'Upload Reel Video'
-                      : 'Reel uploads temporarily paused'
-                  }
+                  onClick={() => setIsCreateReelOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md text-white hover:bg-neutral-800 transition-colors border border-white/20 text-xs font-semibold cursor-pointer"
+                  title="Add Reel / YouTube Link (Zero Storage)"
                 >
-                  <Camera className="w-5 h-5" />
+                  <Plus className="w-3.5 h-3.5 text-[#0095f6]" />
+                  <span>Add Reel</span>
                 </button>
-                {!permissions.allow_reels_uploads && (
-                  <span className="text-[10px] font-semibold bg-black/60 backdrop-blur-md text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full flex items-center gap-1">
-                    <Lock className="w-2.5 h-2.5" />
-                    Upload Paused
-                  </span>
-                )}
               </div>
 
               {/* Upload Restriction Notice Banner */}
@@ -581,6 +611,15 @@ export default function ReelsPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Create Reel Modal (Zero-Storage YouTube / Link Embed) */}
+      {isCreateReelOpen && (
+        <CreateModal
+          isOpen={isCreateReelOpen}
+          onClose={() => setIsCreateReelOpen(false)}
+          defaultMode="video_link"
+        />
       )}
     </div>
   );
