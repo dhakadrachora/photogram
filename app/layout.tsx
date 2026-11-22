@@ -85,6 +85,7 @@ export const metadata: Metadata = {
   verification: {
     google: 'google479d07a73cf8816c',
   },
+  manifest: '/manifest.json',
 };
 
 export const viewport: Viewport = {

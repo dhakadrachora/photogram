@@ -10,3 +10,8 @@ coverage/
 !.env.example
 .vercel
 scratch/
+*firebase*.json
+*serviceAccount*.json
+*credentials*.json
+*.pem
+*.key

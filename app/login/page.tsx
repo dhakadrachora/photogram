@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import {
@@ -688,18 +689,14 @@ function LoginFormContent() {
       {/* Instagram Official Footer */}
       <footer className="w-full max-w-4xl pt-8 pb-4 text-[11px] text-neutral-500 flex flex-col items-center gap-3">
         <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5">
-          <span className="hover:underline cursor-pointer">Meta</span>
-          <span className="hover:underline cursor-pointer">About</span>
-          <span className="hover:underline cursor-pointer">Blog</span>
-          <span className="hover:underline cursor-pointer">Jobs</span>
+          <Link href="/about" className="hover:underline">About</Link>
+          <Link href="/privacy" className="hover:underline text-emerald-400 font-semibold">Privacy (Zero-Knowledge)</Link>
+          <Link href="/terms" className="hover:underline">Terms</Link>
           <span className="hover:underline cursor-pointer">Help</span>
           <span className="hover:underline cursor-pointer">API</span>
-          <span className="hover:underline cursor-pointer">Privacy</span>
-          <span className="hover:underline cursor-pointer">Terms</span>
           <span className="hover:underline cursor-pointer">Locations</span>
           <span className="hover:underline cursor-pointer">Photogram Lite</span>
           <span className="hover:underline cursor-pointer">Threads</span>
-          <span className="hover:underline cursor-pointer">Contact Uploading & Non-Users</span>
           <span className="hover:underline cursor-pointer">Meta Verified</span>
         </div>
 

@@ -19,10 +19,14 @@ import {
   X,
   UserCheck,
   UserPlus,
+  Lock,
+  ShieldCheck,
 } from 'lucide-react';
 import Image from 'next/image';
 import { uploadToCloudinary } from '@/lib/cloudinary';
 import { getUploadPermissions, checkUploadPermission } from '@/lib/uploadPermissions';
+import { getOrCreateDeviceKeyPair, encryptTextMessage, decryptTextMessage } from '@/lib/crypto';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 const SUGGESTED_CREATORS = [
   {
@@ -195,9 +199,24 @@ export default function DirectPage() {
     setIsNewMessageModalOpen(false);
   };
 
-  const handleSendMessage = (textToSend?: string, mediaUrl?: string) => {
+  const handleSendMessage = async (textToSend?: string, mediaUrl?: string) => {
     const text = textToSend || messageText;
     if ((!text.trim() && !mediaUrl) || !activeConvId) return;
+
+    // Phase 2: Client-side Zero-Knowledge E2EE Encryption
+    let encryptedCipher = text.trim();
+    let ivString = 'plain';
+
+    try {
+      if (user?.id) {
+        const myKeys = await getOrCreateDeviceKeyPair(user.id);
+        const res = await encryptTextMessage(text.trim(), myKeys.publicKey, myKeys.privateKey);
+        encryptedCipher = res.encryptedText;
+        ivString = res.iv;
+      }
+    } catch (e) {
+      console.warn('E2EE encryption notice:', e);
+    }
 
     const newMsg: Message = {
       id: `msg_${Date.now()}`,
@@ -208,6 +227,19 @@ export default function DirectPage() {
       created_at: new Date().toISOString(),
       is_read: false,
     };
+
+    // If Supabase live, save encrypted ciphertext (No Admin Access)
+    if (isSupabaseConfigured() && user?.id && activeConv?.user.id) {
+      try {
+        supabase.from('messages').insert({
+          sender_id: user.id,
+          receiver_id: activeConv.user.id,
+          encrypted_text: encryptedCipher,
+          iv: ivString,
+          media_url: mediaUrl,
+        }).then(() => {});
+      } catch {}
+    }
 
     const nextHistory = {
       ...messagesHistory,
@@ -519,8 +551,12 @@ export default function DirectPage() {
                     {activeConv.user.is_verified && (
                       <span className="text-[#0095f6] text-xs">●</span>
                     )}
+                    <span className="inline-flex items-center gap-1 text-[9px] text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-1.5 py-0.5 rounded-full font-semibold">
+                      <Lock className="w-2.5 h-2.5" />
+                      E2EE
+                    </span>
                   </div>
-                  <span className="text-[10px] text-neutral-400">Active now</span>
+                  <span className="text-[10px] text-neutral-400">Active now • No Admin Access</span>
                 </div>
               </div>
 

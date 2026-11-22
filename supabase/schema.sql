@@ -172,26 +172,35 @@ CREATE POLICY "Users can toggle likes" ON public.likes FOR ALL USING (auth.uid()
 
 CREATE POLICY "Comments viewable by everyone" ON public.comments FOR SELECT USING (true);
 CREATE POLICY "Users can insert comments" ON public.comments FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can delete own comments" ON public.comments FOR DELETE USING (auth.uid() = user_id);
 
 -- 5. Saved Posts & Follows
 CREATE POLICY "Users can manage own saved posts" ON public.saved_posts FOR ALL USING (auth.uid() = user_id);
 CREATE POLICY "Follows viewable by everyone" ON public.follows FOR SELECT USING (true);
 CREATE POLICY "Users can manage own follows" ON public.follows FOR ALL USING (auth.uid() = follower_id);
 
--- 6. Messages (Strict Zero-Knowledge: Only sender and receiver have access)
+-- 6. Messages (Zero-Knowledge: Sender & Receiver only)
 CREATE POLICY "Only conversation participants can read messages" ON public.messages
   FOR SELECT USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
-
 CREATE POLICY "Users can send messages" ON public.messages
   FOR INSERT WITH CHECK (auth.uid() = sender_id);
+CREATE POLICY "Receiver can mark message read" ON public.messages
+  FOR UPDATE USING (auth.uid() = receiver_id);
 
--- 7. Notifications (Only targeted user can view notifications)
+-- 7. Notifications (Targeted user only)
 CREATE POLICY "Users can view own notifications" ON public.notifications
   FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can mark own notifications as read" ON public.notifications
   FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Actors can insert notifications" ON public.notifications
+CREATE POLICY "Authenticated users can create notifications" ON public.notifications
   FOR INSERT WITH CHECK (auth.uid() = actor_id);
+
+-- ============================================================
+-- DATA API PERMISSIONS (CRITICAL GRANTS FOR ANON & AUTHENTICATED)
+-- ============================================================
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
 
 -- ============================================================
 -- AUTOMATIC PROFILE CREATION TRIGGER (On Sign Up)
@@ -201,19 +210,19 @@ RETURNS trigger AS $$
 BEGIN
   INSERT INTO public.profiles (id, username, full_name, avatar_url)
   VALUES (
-    new.id,
-    COALESCE(new.raw_user_meta_data->>'username', split_part(new.email, '@', 1)),
-    COALESCE(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)),
-    COALESCE(new.raw_user_meta_data->>'avatar_url', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400')
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'username', 'user_' || substr(NEW.id::text, 1, 8)),
+    COALESCE(NEW.raw_user_meta_data->>'full_name', 'Photogram User'),
+    COALESCE(NEW.raw_user_meta_data->>'avatar_url', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400')
   );
-  RETURN new;
+  RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- ============================================================
 -- SUPABASE REALTIME REPLICATION (For Live DMs & Notifications)
