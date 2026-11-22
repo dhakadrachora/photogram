@@ -25,6 +25,7 @@ import {
 import Image from 'next/image';
 import { uploadToCloudinary } from '@/lib/cloudinary';
 import { REAL_SUGGESTIONS } from '@/components/feed/SuggestionsSidebar';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 export default function ProfilePage() {
   const { user, updateProfile } = useAuth();
@@ -38,6 +39,33 @@ export default function ProfilePage() {
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [isUploadingDp, setIsUploadingDp] = useState(false);
+  const [liveFollowersCount, setLiveFollowersCount] = useState<number>(user?.followers_count ?? 0);
+  const [liveFollowingCount, setLiveFollowingCount] = useState<number>(user?.following_count ?? 0);
+
+  useEffect(() => {
+    if (!user?.id || !isSupabaseConfigured() || user.id === 'usr_me') return;
+
+    const fetchFollowCounts = async () => {
+      try {
+        const { count: followers } = await supabase
+          .from('follows')
+          .select('*', { count: 'exact', head: true })
+          .eq('following_id', user.id);
+
+        const { count: following } = await supabase
+          .from('follows')
+          .select('*', { count: 'exact', head: true })
+          .eq('follower_id', user.id);
+
+        if (typeof followers === 'number') setLiveFollowersCount(followers);
+        if (typeof following === 'number') setLiveFollowingCount(following);
+      } catch (err) {
+        console.warn('Could not fetch live follow counts:', err);
+      }
+    };
+
+    fetchFollowCounts();
+  }, [user?.id]);
 
   // Filter ONLY posts that belong to the current logged-in user
   const userPosts = posts.filter(
@@ -187,7 +215,7 @@ export default function ProfilePage() {
             </div>
             <div>
               <span className="font-semibold text-white">
-                {(user?.followers_count ?? 0).toLocaleString()}
+                {liveFollowersCount.toLocaleString()}
               </span>{' '}
               <span className="text-neutral-400 text-xs">followers</span>
             </div>
@@ -197,7 +225,7 @@ export default function ProfilePage() {
               className="hover:opacity-80 cursor-pointer"
             >
               <span className="font-semibold text-white">
-                {(user?.following_count ?? 0).toLocaleString()}
+                {liveFollowingCount.toLocaleString()}
               </span>{' '}
               <span className="text-neutral-400 text-xs">following</span>
             </button>

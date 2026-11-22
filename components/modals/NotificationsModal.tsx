@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { X, Heart } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 interface NotificationItem {
   id: string;
@@ -26,16 +27,85 @@ export function NotificationsModal({ isOpen, onClose }: NotificationsModalProps)
 
   useEffect(() => {
     if (!user) return;
+
+    // Load live Supabase notifications
+    const fetchLiveNotifications = async () => {
+      if (!isSupabaseConfigured() || !user.id || user.id === 'usr_me') return;
+      try {
+        const { data, error } = await supabase
+          .from('notifications')
+          .select(`
+            id,
+            type,
+            created_at,
+            actor:profiles!notifications_actor_id_fkey (
+              username,
+              avatar_url
+            )
+          `)
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+        if (!error && data && data.length > 0) {
+          const liveItems: NotificationItem[] = data.map((n: any) => {
+            const actorName = n.actor?.username || 'Someone';
+            const actionText =
+              n.type === 'like'
+                ? 'liked your photo.'
+                : n.type === 'comment'
+                ? 'commented on your post.'
+                : 'started following you.';
+
+            return {
+              id: n.id,
+              user: actorName,
+              avatar: n.actor?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
+              action: actionText,
+              time: 'Just now',
+              isFollow: n.type === 'follow',
+            };
+          });
+          setNotifications(liveItems);
+          return;
+        }
+      } catch (e) {
+        console.warn('Could not fetch live notifications:', e);
+      }
+    };
+
+    fetchLiveNotifications();
+
+    // Cache fallback
     try {
       const userKey = user.id || user.username;
       const stored = localStorage.getItem(`photogram_notifications_${userKey}`);
       if (stored) {
         setNotifications(JSON.parse(stored));
-      } else {
-        setNotifications([]);
       }
-    } catch (e) {
-      setNotifications([]);
+    } catch (e) {}
+
+    // Realtime notifications listener
+    if (isSupabaseConfigured() && user.id && user.id !== 'usr_me') {
+      const channel = supabase
+        .channel(`user_notifications_${user.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => {
+            fetchLiveNotifications();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
   }, [user]);
 

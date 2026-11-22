@@ -123,6 +123,119 @@ export default function DirectPage() {
     }
   }, [user]);
 
+  // Live Supabase Realtime Messaging Listener (Zero-Knowledge DMs)
+  useEffect(() => {
+    if (!user?.id || !isSupabaseConfigured() || user.id === 'usr_me') return;
+
+    const fetchLiveMessages = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('messages')
+          .select(`
+            id,
+            sender_id,
+            receiver_id,
+            encrypted_text,
+            iv,
+            media_url,
+            is_read,
+            created_at
+          `)
+          .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+          .order('created_at', { ascending: true });
+
+        if (!error && data && data.length > 0) {
+          const myKeys = await getOrCreateDeviceKeyPair(user.id);
+          const newHistory: Record<string, Message[]> = {};
+
+          for (const row of data as any[]) {
+            let plainText = row.encrypted_text;
+            try {
+              plainText = await decryptTextMessage(
+                row.encrypted_text,
+                row.iv || 'plain',
+                myKeys.publicKey,
+                myKeys.privateKey
+              );
+            } catch {}
+
+            const otherUserId = row.sender_id === user.id ? row.receiver_id : row.sender_id;
+            const convId = `conv_${otherUserId}`;
+
+            const msg: Message = {
+              id: row.id,
+              sender_id: row.sender_id,
+              receiver_id: row.receiver_id,
+              text: plainText,
+              media_url: row.media_url,
+              created_at: row.created_at,
+              is_read: !!row.is_read,
+            };
+
+            if (!newHistory[convId]) newHistory[convId] = [];
+            newHistory[convId].push(msg);
+          }
+
+          if (Object.keys(newHistory).length > 0) {
+            setMessagesHistory((prev) => ({ ...prev, ...newHistory }));
+          }
+        }
+      } catch (err) {
+        console.warn('Could not fetch live Supabase messages:', err);
+      }
+    };
+
+    fetchLiveMessages();
+
+    const channel = supabase
+      .channel(`direct_dms_${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `receiver_id=eq.${user.id}`,
+        },
+        async (payload) => {
+          const newRow = payload.new as any;
+          if (!newRow) return;
+
+          let plainText = newRow.encrypted_text;
+          try {
+            const myKeys = await getOrCreateDeviceKeyPair(user.id);
+            plainText = await decryptTextMessage(
+              newRow.encrypted_text,
+              newRow.iv || 'plain',
+              myKeys.publicKey,
+              myKeys.privateKey
+            );
+          } catch {}
+
+          const incomingMsg: Message = {
+            id: newRow.id,
+            sender_id: newRow.sender_id,
+            receiver_id: newRow.receiver_id,
+            text: plainText,
+            media_url: newRow.media_url,
+            created_at: newRow.created_at,
+            is_read: false,
+          };
+
+          const convId = `conv_${newRow.sender_id}`;
+          setMessagesHistory((prev) => ({
+            ...prev,
+            [convId]: [...(prev[convId] || []), incomingMsg],
+          }));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
+
   // Persist conversations
   const persistConversations = (newConvs: Conversation[]) => {
     setConversations(newConvs);

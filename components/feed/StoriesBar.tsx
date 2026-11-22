@@ -8,6 +8,7 @@ import { Story } from '@/lib/types';
 import { StoryViewerModal } from '@/components/instagram/StoryViewerModal';
 import { uploadToCloudinary } from '@/lib/cloudinary';
 import { checkUploadPermission } from '@/lib/uploadPermissions';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 const CREATOR_STORIES: Story[] = [
   {
@@ -90,25 +91,74 @@ export function StoriesBar() {
   const [selectedStoryIndex, setSelectedStoryIndex] = useState<number | null>(null);
   const [isUploadingStory, setIsUploadingStory] = useState(false);
 
-  // Load user's active 24h story from storage
+  // Load user's active 24h story from Supabase and local cache
   useEffect(() => {
     if (!user) return;
-    try {
-      const userKey = user.id || user.username;
-      const raw = localStorage.getItem(`photogram_story_${userKey}`);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        // Check 24 hour expiration
-        if (new Date(parsed.expires_at).getTime() > Date.now()) {
-          setUserStory(parsed);
-        } else {
-          localStorage.removeItem(`photogram_story_${userKey}`);
-          setUserStory(null);
+
+    const loadLiveStories = async () => {
+      if (isSupabaseConfigured() && user.id && user.id !== 'usr_me') {
+        try {
+          const { data, error } = await supabase
+            .from('stories')
+            .select(`
+              id,
+              user_id,
+              media_url,
+              media_type,
+              caption,
+              created_at,
+              expires_at,
+              profiles (
+                id,
+                username,
+                full_name,
+                avatar_url,
+                is_verified
+              )
+            `)
+            .eq('user_id', user.id)
+            .gt('expires_at', new Date().toISOString())
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+          if (!error && data && data.length > 0) {
+            const row = data[0];
+            const liveStory: Story = {
+              id: row.id,
+              user_id: row.user_id,
+              user: (row.profiles as any) || user,
+              media_url: row.media_url,
+              caption: row.caption || '',
+              created_at: row.created_at,
+              expires_at: row.expires_at,
+            };
+            setUserStory(liveStory);
+            return;
+          }
+        } catch (e) {
+          console.warn('Could not fetch Supabase story:', e);
         }
       }
-    } catch {
-      setUserStory(null);
-    }
+
+      // Fallback to local storage if offline or pending
+      try {
+        const userKey = user.id || user.username;
+        const raw = localStorage.getItem(`photogram_story_${userKey}`);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (new Date(parsed.expires_at).getTime() > Date.now()) {
+            setUserStory(parsed);
+          } else {
+            localStorage.removeItem(`photogram_story_${userKey}`);
+            setUserStory(null);
+          }
+        }
+      } catch {
+        setUserStory(null);
+      }
+    };
+
+    loadLiveStories();
   }, [user]);
 
   // Handle uploading user's new 24h story (Photo or Video Stories permitted)
@@ -127,19 +177,40 @@ export function StoriesBar() {
     }
 
     setIsUploadingStory(true);
-    const reader = new FileReader();
-    reader.onload = async () => {
-      let mediaUrl = reader.result as string;
+    try {
+      let mediaUrl = '';
+      const res = await uploadToCloudinary(file, undefined, cat);
+      if (res?.secure_url) {
+        mediaUrl = res.secure_url;
+      }
 
-      try {
-        const res = await uploadToCloudinary(file, undefined, cat);
-        if (res?.secure_url) {
-          mediaUrl = res.secure_url;
+      if (!mediaUrl) {
+        throw new Error('Upload failed');
+      }
+
+      // Insert directly into Supabase 'stories' table
+      let storyId = `story_${Date.now()}`;
+      const expiresAt = new Date(Date.now() + 86400000).toISOString();
+
+      if (isSupabaseConfigured() && user.id && user.id !== 'usr_me') {
+        const { data: storyRow, error: storyErr } = await supabase
+          .from('stories')
+          .insert({
+            user_id: user.id,
+            media_url: mediaUrl,
+            media_type: isVid ? 'video' : 'image',
+            caption: isVid ? 'Visual video story ✨' : 'My 24-hour visual story ✨',
+          })
+          .select('id, created_at, expires_at')
+          .single();
+
+        if (!storyErr && storyRow) {
+          storyId = storyRow.id;
         }
-      } catch {}
+      }
 
       const newStory: Story = {
-        id: `story_${Date.now()}`,
+        id: storyId,
         user_id: user.id,
         user: {
           id: user.id,
@@ -151,16 +222,18 @@ export function StoriesBar() {
         media_url: mediaUrl,
         caption: isVid ? 'Visual video story ✨' : 'My 24-hour visual story ✨',
         created_at: new Date().toISOString(),
-        expires_at: new Date(Date.now() + 86400000).toISOString(), // 24 hours from now
+        expires_at: expiresAt,
       };
 
       setUserStory(newStory);
       const userKey = user.id || user.username;
       localStorage.setItem(`photogram_story_${userKey}`, JSON.stringify(newStory));
+    } catch (err) {
+      console.warn('Story upload error:', err);
+    } finally {
       setIsUploadingStory(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
-    };
-    reader.readAsDataURL(file);
+    }
   };
 
   const allActiveStories: Story[] = userStory ? [userStory, ...CREATOR_STORIES] : CREATOR_STORIES;

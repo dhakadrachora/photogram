@@ -175,14 +175,26 @@ export async function uploadToCloudinary(
   if (isSupabaseConfigured()) {
     try {
       if (onProgress) onProgress(20);
-      const fileExt = file.name.split('.').pop() || (isVideo ? 'mp4' : 'jpg');
+      const fileExt = file.name.split('.').pop()?.toLowerCase() || (isVideo ? 'mp4' : 'jpg');
       const cleanFileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
       const filePath = `${category || 'general'}/${cleanFileName}`;
+
+      // Ensure proper MIME type for Supabase Storage
+      let contentType = file.type;
+      if (!contentType || contentType === 'application/octet-stream') {
+        if (fileExt === 'png') contentType = 'image/png';
+        else if (fileExt === 'webp') contentType = 'image/webp';
+        else if (fileExt === 'gif') contentType = 'image/gif';
+        else if (fileExt === 'mp4') contentType = 'video/mp4';
+        else if (fileExt === 'webm') contentType = 'video/webm';
+        else contentType = 'image/jpeg';
+      }
 
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('media')
         .upload(filePath, file, {
           cacheControl: '3600',
+          contentType: contentType,
           upsert: false,
         });
 
