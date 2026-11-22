@@ -2,8 +2,10 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import { X, ChevronLeft, ChevronRight, Pause, Play, Heart, Send } from 'lucide-react';
+import Link from 'next/link';
+import { X, ChevronLeft, ChevronRight, Pause, Play, Heart, Send, Eye, BadgeCheck } from 'lucide-react';
 import { Story } from '@/lib/types';
+import { useAuth } from '@/context/AuthContext';
 
 export interface StoryViewerModalProps {
   isOpen: boolean;
@@ -18,17 +20,72 @@ export function StoryViewerModal({
   stories = [],
   initialIndex = 0,
 }: StoryViewerModalProps) {
+  const { user } = useAuth();
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [progress, setProgress] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [replyText, setReplyText] = useState('');
+  const [viewers, setViewers] = useState<Array<{
+    id: string;
+    username: string;
+    full_name: string;
+    avatar_url: string;
+    is_verified?: boolean;
+    viewed_at: string;
+  }>>([]);
+  const [showViewersDrawer, setShowViewersDrawer] = useState(false);
+
+  const currentStory = stories[currentIndex] || stories[0];
+  const isAuthor = Boolean(
+    user &&
+    currentStory &&
+    (user.id === currentStory.user_id ||
+     user.id === currentStory.user?.id ||
+     user.username?.toLowerCase() === currentStory.user?.username?.toLowerCase())
+  );
 
   useEffect(() => {
     setCurrentIndex(initialIndex);
     setProgress(0);
     setIsLiked(false);
+    setShowViewersDrawer(false);
   }, [initialIndex, isOpen]);
+
+  // Record story view when other users view, or load views for author
+  useEffect(() => {
+    if (!currentStory?.id) return;
+    const storyId = currentStory.id;
+    const storageKey = `photogram_story_views_${storyId}`;
+
+    let list: any[] = [];
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) list = JSON.parse(raw);
+    } catch {}
+
+    if (isAuthor) {
+      setViewers(list);
+    } else if (user) {
+      const alreadyRecorded = list.some(
+        (v) => v.username?.toLowerCase() === user.username.toLowerCase()
+      );
+      if (!alreadyRecorded) {
+        const record = {
+          id: user.id || user.username,
+          username: user.username,
+          full_name: user.full_name || user.username,
+          avatar_url: user.avatar_url || '',
+          is_verified: !!user.is_verified,
+          viewed_at: new Date().toISOString(),
+        };
+        const updated = [record, ...list];
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(updated));
+        } catch {}
+      }
+    }
+  }, [currentStory?.id, isAuthor, user]);
 
   const handleNext = useCallback(() => {
     if (currentIndex < stories.length - 1) {
@@ -81,8 +138,6 @@ export function StoryViewerModal({
   }, [isOpen, onClose, handleNext, handlePrev]);
 
   if (!isOpen || stories.length === 0) return null;
-
-  const currentStory = stories[currentIndex] || stories[0];
 
   return (
     <div
@@ -203,35 +258,126 @@ export function StoryViewerModal({
           />
         </div>
 
-        {/* Story Bottom Reply & Like Bar */}
-        <div className="absolute bottom-4 left-3 right-3 z-30 flex items-center gap-2">
-          <div className="flex-1 flex items-center bg-black/40 backdrop-blur-md border border-white/20 rounded-full px-4 py-2 text-xs">
-            <input
-              type="text"
-              placeholder={`Reply to ${currentStory.user?.username || 'story'}...`}
-              value={replyText}
-              onChange={(e) => setReplyText(e.target.value)}
-              className="w-full bg-transparent text-white placeholder-white/60 outline-none"
-            />
-            {replyText.trim() && (
-              <button
-                onClick={() => setReplyText('')}
-                className="text-xs font-semibold text-[#0095f6] ml-2"
-              >
-                <Send className="w-4 h-4" />
-              </button>
-            )}
+        {/* Story Bottom Bar: Author (Viewers Button) vs Viewer (Reply & Like) */}
+        {isAuthor ? (
+          <div className="absolute bottom-4 left-3 right-3 z-30 flex items-center justify-between">
+            <button
+              onClick={() => {
+                setIsPaused(true);
+                setShowViewersDrawer(true);
+              }}
+              className="flex items-center gap-2 px-4 py-2 rounded-full bg-black/60 backdrop-blur-md border border-white/20 text-white text-xs font-semibold hover:bg-black/80 transition-colors cursor-pointer"
+            >
+              <Eye className="w-4 h-4 text-[#0095f6]" />
+              <span>{viewers.length} {viewers.length === 1 ? 'Viewer' : 'Viewers'}</span>
+            </button>
+            <span className="text-[11px] text-white/70 font-medium">Your story</span>
           </div>
+        ) : (
+          <div className="absolute bottom-4 left-3 right-3 z-30 flex items-center gap-2">
+            <div className="flex-1 flex items-center bg-black/40 backdrop-blur-md border border-white/20 rounded-full px-4 py-2 text-xs">
+              <input
+                type="text"
+                placeholder={`Reply to ${currentStory.user?.username || 'story'}...`}
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                className="w-full bg-transparent text-white placeholder-white/60 outline-none"
+              />
+              {replyText.trim() && (
+                <button
+                  onClick={() => setReplyText('')}
+                  className="text-xs font-semibold text-[#0095f6] ml-2"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              )}
+            </div>
 
-          <button
-            onClick={() => setIsLiked((l) => !l)}
-            className="p-2.5 rounded-full bg-black/40 backdrop-blur-md border border-white/20 text-white hover:text-red-500 transition-colors"
+            <button
+              onClick={() => setIsLiked((l) => !l)}
+              className="p-2.5 rounded-full bg-black/40 backdrop-blur-md border border-white/20 text-white hover:text-red-500 transition-colors"
+            >
+              <Heart
+                className={`w-5 h-5 ${isLiked ? 'fill-red-500 text-red-500' : ''}`}
+              />
+            </button>
+          </div>
+        )}
+
+        {/* Slide-Up Viewers Sheet for Story Author */}
+        {isAuthor && showViewersDrawer && (
+          <div
+            className="absolute inset-x-0 bottom-0 max-h-[65%] bg-neutral-950/95 backdrop-blur-xl border-t border-neutral-800 rounded-t-3xl z-40 p-4 flex flex-col animate-in slide-in-from-bottom shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
           >
-            <Heart
-              className={`w-5 h-5 ${isLiked ? 'fill-red-500 text-red-500' : ''}`}
-            />
-          </button>
-        </div>
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
+              <div className="flex items-center gap-2">
+                <Eye className="w-4 h-4 text-[#0095f6]" />
+                <h4 className="font-bold text-sm text-white">
+                  Story Viewers ({viewers.length})
+                </h4>
+              </div>
+              <button
+                onClick={() => {
+                  setShowViewersDrawer(false);
+                  setIsPaused(false);
+                }}
+                className="p-1 rounded-full text-neutral-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto divide-y divide-neutral-900 py-2 space-y-1">
+              {viewers.length === 0 ? (
+                <div className="py-8 text-center text-xs text-neutral-400">
+                  <p className="font-semibold text-white">No views yet</p>
+                  <p className="text-[11px] text-neutral-500 mt-1">
+                    When someone views your story, their profile will appear here.
+                  </p>
+                </div>
+              ) : (
+                viewers.map((viewer) => (
+                  <Link
+                    key={viewer.username}
+                    href={`/profile/${viewer.username}`}
+                    onClick={() => onClose()}
+                    className="flex items-center justify-between py-2 px-1 hover:bg-neutral-900 rounded-xl transition-colors group cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="relative w-9 h-9 rounded-full overflow-hidden bg-neutral-800 shrink-0">
+                        {viewer.avatar_url ? (
+                          <Image
+                            src={viewer.avatar_url}
+                            alt={viewer.username}
+                            fill
+                            className="object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-neutral-800 text-white font-semibold text-xs">
+                            {viewer.username[0]?.toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1">
+                          <span className="font-semibold text-xs text-white group-hover:underline">
+                            {viewer.username}
+                          </span>
+                          {viewer.is_verified && (
+                            <BadgeCheck className="w-3.5 h-3.5 text-[#0095f6] fill-[#0095f6]" />
+                          )}
+                        </div>
+                        <p className="text-[10px] text-neutral-400">{viewer.full_name}</p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-neutral-500">Viewed</span>
+                  </Link>
+                ))
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Navigation Arrows for Desktop */}
         {currentIndex > 0 && (

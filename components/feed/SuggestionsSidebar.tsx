@@ -176,7 +176,7 @@ export function SuggestionsSidebar() {
               const isFollowed = !!followingMap[item.username];
               return (
                 <div key={item.id} className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+                  <Link href={`/profile/${item.username}`} className="flex items-center gap-3 group">
                     <div className="relative w-10 h-10 rounded-full overflow-hidden bg-neutral-800">
                       <Image
                         src={
@@ -190,7 +190,7 @@ export function SuggestionsSidebar() {
                     </div>
                     <div>
                       <div className="flex items-center gap-1">
-                        <h5 className="font-semibold text-xs text-white hover:underline cursor-pointer">
+                        <h5 className="font-semibold text-xs text-white group-hover:underline cursor-pointer">
                           {item.username}
                         </h5>
                         {item.is_verified && (
@@ -201,7 +201,7 @@ export function SuggestionsSidebar() {
                         {item.full_name || 'Photogram Creator'}
                       </p>
                     </div>
-                  </div>
+                  </Link>
 
                   <button
                     onClick={() => toggleFollow(item)}

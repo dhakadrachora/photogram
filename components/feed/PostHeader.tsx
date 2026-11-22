@@ -15,7 +15,7 @@ interface PostHeaderProps {
 export function PostHeader({ user, location, onOpenMenu }: PostHeaderProps) {
   return (
     <div className="flex items-center justify-between p-3">
-      <Link href="/profile" className="flex items-center gap-3 group">
+      <Link href={`/profile/${user.username}`} className="flex items-center gap-3 group">
         <div className="relative w-8 h-8 rounded-full p-[2px] bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888]">
           <div className="w-full h-full rounded-full overflow-hidden bg-black p-[1.5px]">
             <Image

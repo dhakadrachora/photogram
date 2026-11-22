@@ -42,8 +42,8 @@ export default function HomePage() {
         {/* Posts Stream */}
         <div className="w-full space-y-4">
           {posts.length > 0 ? (
-            posts.map((post) => (
-              <PostCard key={post.id} post={post} />
+            posts.map((post, idx) => (
+              <PostCard key={post.id} post={post} priority={idx < 2} />
             ))
           ) : (
             <div className="border border-neutral-800 rounded-2xl p-8 text-center text-neutral-400 bg-neutral-950">

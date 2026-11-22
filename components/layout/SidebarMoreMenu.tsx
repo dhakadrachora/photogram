@@ -54,7 +54,7 @@ export function SidebarMoreMenu({ isOpen, onClose }: SidebarMoreMenuProps) {
       <Link
         href="/admin"
         onClick={onClose}
-        className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-sky-400 hover:bg-sky-500/10 transition-colors"
+        className="hidden md:flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-sky-400 hover:bg-sky-500/10 transition-colors"
       >
         <Shield className="w-4 h-4" />
         <span>Admin Panel</span>

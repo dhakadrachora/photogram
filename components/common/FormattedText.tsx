@@ -39,7 +39,7 @@ export function FormattedText({ text, className = '' }: FormattedTextProps) {
           return (
             <Link
               key={index}
-              href={`/explore?q=${encodeURIComponent(handle)}`}
+              href={`/profile/${handle}`}
               className="text-[#0095f6] hover:underline font-semibold inline-block mx-[1px]"
               onClick={(e) => e.stopPropagation()}
             >

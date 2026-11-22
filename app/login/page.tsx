@@ -110,9 +110,7 @@ function LoginFormContent() {
       const res = await login(identifier, password);
       if (res.success) {
         setSuccessMsg('Logged in successfully! Redirecting...');
-        setTimeout(() => {
-          window.location.href = '/';
-        }, 300);
+        window.location.href = '/';
       } else {
         setError(res.error || 'Sorry, your password was incorrect. Please double-check your password.');
       }

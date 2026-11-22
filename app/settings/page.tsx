@@ -460,7 +460,7 @@ export default function SettingsPage() {
                   <span className="text-neutral-400">Database Engine</span>
                   <span className="font-semibold text-white">Supabase PostgreSQL</span>
                 </div>
-                <div className="flex items-center justify-between text-xs">
+                <div className="hidden md:flex items-center justify-between text-xs">
                   <span className="text-neutral-400">Admin Panel</span>
                   <Link href="/admin" className="font-semibold text-[#0095f6] hover:underline">
                     Access /admin →

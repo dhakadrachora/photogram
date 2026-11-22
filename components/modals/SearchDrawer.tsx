@@ -151,7 +151,7 @@ export function SearchDrawer({ isOpen, onClose }: SearchDrawerProps) {
                     {matchedUsers.map((acc) => (
                       <Link
                         key={acc.username}
-                        href="/profile"
+                        href={`/profile/${acc.username}`}
                         onClick={onClose}
                         className="flex items-center gap-3 py-2 px-2 rounded-xl hover:bg-neutral-900 transition-colors"
                       >

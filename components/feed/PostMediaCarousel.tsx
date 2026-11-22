@@ -11,6 +11,7 @@ interface PostMediaCarouselProps {
   onIndexChange: (idx: number) => void;
   showHeartPop: boolean;
   onDoubleTap: () => void;
+  priority?: boolean;
 }
 
 export function PostMediaCarousel({
@@ -19,6 +20,7 @@ export function PostMediaCarousel({
   onIndexChange,
   showHeartPop,
   onDoubleTap,
+  priority = false,
 }: PostMediaCarouselProps) {
   const current = media[activeIndex] || media[0];
 
@@ -32,7 +34,8 @@ export function PostMediaCarousel({
           src={current.media_url}
           alt="Post media"
           fill
-          priority={activeIndex === 0}
+          priority={priority || activeIndex === 0}
+          loading={priority || activeIndex === 0 ? 'eager' : 'lazy'}
           sizes="(max-width: 640px) 100vw, 470px"
           className="object-cover"
         />

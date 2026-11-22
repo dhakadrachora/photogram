@@ -28,43 +28,13 @@ import { getUploadPermissions, checkUploadPermission } from '@/lib/uploadPermiss
 import { getOrCreateDeviceKeyPair, encryptTextMessage, decryptTextMessage } from '@/lib/crypto';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
-const SUGGESTED_CREATORS = [
-  {
-    id: 'usr_kabir',
-    username: 'kabir.explores',
-    full_name: 'Kabir Mehta',
-    avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80',
-    is_verified: true,
-  },
-  {
-    id: 'usr_ananya',
-    username: 'ananya.lens',
-    full_name: 'Ananya Roy',
-    avatar_url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80',
-    is_verified: true,
-  },
-  {
-    id: 'usr_zoya',
-    username: 'zoya.spaces',
-    full_name: 'Zoya Khan',
-    avatar_url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=120&auto=format&fit=crop&q=80',
-    is_verified: true,
-  },
-  {
-    id: 'usr_rohan',
-    username: 'rohan.raw',
-    full_name: 'Rohan Sen',
-    avatar_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&auto=format&fit=crop&q=80',
-    is_verified: true,
-  },
-  {
-    id: 'usr_vikram',
-    username: 'vikram.aerials',
-    full_name: 'Vikram Aditya',
-    avatar_url: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=120&auto=format&fit=crop&q=80',
-    is_verified: true,
-  },
-];
+interface DirectContact {
+  id: string;
+  username: string;
+  full_name: string;
+  avatar_url: string;
+  is_verified?: boolean;
+}
 
 export default function DirectPage() {
   const { user } = useAuth();
@@ -75,12 +45,155 @@ export default function DirectPage() {
   const [messagesHistory, setMessagesHistory] = useState<Record<string, Message[]>>({});
   const [isNewMessageModalOpen, setIsNewMessageModalOpen] = useState(false);
   const [contactSearch, setContactSearch] = useState('');
+  const [realContacts, setRealContacts] = useState<DirectContact[]>([]);
   const [userNote, setUserNote] = useState<string>('');
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [noteInput, setNoteInput] = useState('');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatMediaInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch real registered profiles (Zero Fake Accounts)
+  useEffect(() => {
+    const fetchRealContacts = async () => {
+      const list: DirectContact[] = [];
+      try {
+        const raw = localStorage.getItem('photogram_registered_accounts');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          parsed.forEach((a: any) => {
+            if (a.username) {
+              list.push({
+                id: a.id || `usr_${a.username}`,
+                username: a.username,
+                full_name: a.full_name || a.username,
+                avatar_url: a.avatar_url || '',
+                is_verified: !!a.is_verified,
+              });
+            }
+          });
+        }
+      } catch {}
+
+      if (isSupabaseConfigured()) {
+        try {
+          const { data } = await supabase
+            .from('profiles')
+            .select('id, username, full_name, avatar_url, is_verified')
+            .limit(30);
+          if (data) {
+            data.forEach((p: any) => {
+              if (p.username) {
+                list.push({
+                  id: p.id,
+                  username: p.username,
+                  full_name: p.full_name || p.username,
+                  avatar_url: p.avatar_url || '',
+                  is_verified: !!p.is_verified,
+                });
+              }
+            });
+          }
+        } catch {}
+      }
+
+      const currentLower = user?.username?.toLowerCase();
+      const unique = list
+        .filter((c) => c.username && c.username.toLowerCase() !== currentLower)
+        .filter((v, idx, arr) => arr.findIndex((t) => t.username.toLowerCase() === v.username.toLowerCase()) === idx);
+
+      setRealContacts(unique);
+    };
+
+    fetchRealContacts();
+  }, [user?.username, isNewMessageModalOpen]);
+
+  // Direct Message Navigation: Auto-select/create conversation from URL (?user=...&username=...)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const targetUserId = params.get('user');
+    const targetUsername = params.get('username');
+
+    if (!targetUsername) return;
+
+    const existing = conversations.find(
+      (c) => c.user.username.toLowerCase() === targetUsername.toLowerCase()
+    );
+
+    if (existing) {
+      setActiveConvId(existing.id);
+    } else {
+      const convId = `conv_${targetUserId || targetUsername}`;
+      const initialMsg: Message = {
+        id: `msg_init_${Date.now()}`,
+        sender_id: user?.id || 'usr_me',
+        receiver_id: targetUserId || `usr_${targetUsername}`,
+        text: '👋',
+        created_at: new Date().toISOString(),
+        is_read: true,
+      };
+      const newConv: Conversation = {
+        id: convId,
+        user: {
+          id: targetUserId || `usr_${targetUsername}`,
+          username: targetUsername,
+          full_name: targetUsername,
+          avatar_url: '',
+          is_verified: false,
+          bio: '',
+          posts_count: 0,
+          followers_count: 0,
+          following_count: 0,
+        },
+        last_message: initialMsg,
+        unread_count: 0,
+      };
+
+      if (isSupabaseConfigured()) {
+        supabase
+          .from('profiles')
+          .select('id, username, full_name, avatar_url, is_verified, bio')
+          .eq('username', targetUsername)
+          .single()
+          .then(({ data }) => {
+            if (data) {
+              setConversations((prev) =>
+                prev.map((c) =>
+                  c.id === convId
+                    ? {
+                        ...c,
+                        user: {
+                          ...c.user,
+                          id: data.id,
+                          username: data.username,
+                          full_name: data.full_name || data.username,
+                          avatar_url: data.avatar_url || '',
+                          is_verified: !!data.is_verified,
+                          bio: data.bio || '',
+                        },
+                      }
+                    : c
+                )
+              );
+            }
+          });
+      }
+
+      setConversations((prev) => {
+        if (prev.some((c) => c.id === convId)) return prev;
+        const updated = [newConv, ...prev];
+        if (user) {
+          const userKey = user.id || user.username;
+          try {
+            localStorage.setItem(`photogram_conversations_${userKey}`, JSON.stringify(updated));
+          } catch {}
+        }
+        return updated;
+      });
+      setActiveConvId(convId);
+    }
+  }, [conversations, user]);
 
   // Load real conversations and messages history for the current user
   useEffect(() => {
@@ -265,7 +378,7 @@ export default function DirectPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activeMessages]);
 
-  const handleStartConversation = (targetUser: typeof SUGGESTED_CREATORS[0]) => {
+  const handleStartConversation = (targetUser: DirectContact) => {
     const existing = conversations.find((c) => c.user.username === targetUser.username);
     if (existing) {
       setActiveConvId(existing.id);
@@ -292,9 +405,9 @@ export default function DirectPage() {
         avatar_url: targetUser.avatar_url,
         is_verified: targetUser.is_verified,
         bio: '',
-        posts_count: 10,
-        followers_count: 5000,
-        following_count: 200,
+        posts_count: 0,
+        followers_count: 0,
+        following_count: 0,
       },
       last_message: initialMsg,
       unread_count: 0,
@@ -455,7 +568,7 @@ export default function DirectPage() {
       c.user.full_name?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const filteredContacts = SUGGESTED_CREATORS.filter(
+  const filteredContacts = realContacts.filter(
     (c) =>
       c.username.toLowerCase().includes(contactSearch.toLowerCase()) ||
       c.full_name.toLowerCase().includes(contactSearch.toLowerCase())
@@ -596,14 +709,16 @@ export default function DirectPage() {
                         {conv.user.username}
                       </span>
                       <span suppressHydrationWarning className="text-[10px] text-neutral-500">
-                        {new Date(conv.last_message.created_at).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                        {conv.last_message
+                          ? new Date(conv.last_message.created_at).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })
+                          : ''}
                       </span>
                     </div>
                     <p className="text-xs text-neutral-400 truncate mt-0.5">
-                      {conv.last_message.text}
+                      {conv.last_message?.text || 'Direct message thread'}
                     </p>
                   </div>
 
@@ -846,41 +961,54 @@ export default function DirectPage() {
             {/* Suggested Contacts List */}
             <div className="max-h-80 overflow-y-auto divide-y divide-neutral-800 p-2">
               <div className="px-3 py-2 text-[11px] font-semibold text-neutral-400 uppercase tracking-wider">
-                Suggested
+                Real Creators
               </div>
-              {filteredContacts.map((contact) => (
-                <div
-                  key={contact.id}
-                  onClick={() => handleStartConversation(contact)}
-                  className="flex items-center justify-between p-3 rounded-xl hover:bg-neutral-800 cursor-pointer transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="relative w-11 h-11 rounded-full overflow-hidden bg-neutral-800">
-                      <Image
-                        src={contact.avatar_url}
-                        alt={contact.username}
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1">
-                        <span className="font-semibold text-xs text-white">
-                          {contact.username}
-                        </span>
-                        {contact.is_verified && (
-                          <span className="text-[#0095f6] text-[10px]">●</span>
+              {filteredContacts.length === 0 ? (
+                <div className="py-8 px-4 text-center">
+                  <p className="text-xs text-neutral-300 font-semibold">No registered creators found</p>
+                  <p className="text-[11px] text-neutral-500 mt-1">Real creators will appear here as they register on Photogram.</p>
+                </div>
+              ) : (
+                filteredContacts.map((contact) => (
+                  <div
+                    key={contact.id}
+                    onClick={() => handleStartConversation(contact)}
+                    className="flex items-center justify-between p-3 rounded-xl hover:bg-neutral-800 cursor-pointer transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="relative w-11 h-11 rounded-full overflow-hidden bg-neutral-800 shrink-0">
+                        {contact.avatar_url ? (
+                          <Image
+                            src={contact.avatar_url}
+                            alt={contact.username}
+                            fill
+                            className="object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-neutral-800 text-white font-semibold text-xs">
+                            {contact.username[0]?.toUpperCase()}
+                          </div>
                         )}
                       </div>
-                      <p className="text-[11px] text-neutral-400">{contact.full_name}</p>
+                      <div>
+                        <div className="flex items-center gap-1">
+                          <span className="font-semibold text-xs text-white">
+                            {contact.username}
+                          </span>
+                          {contact.is_verified && (
+                            <span className="text-[#0095f6] text-[10px]">●</span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-neutral-400">{contact.full_name}</p>
+                      </div>
                     </div>
-                  </div>
 
-                  <button className="text-xs font-semibold text-[#0095f6] hover:text-sky-400">
-                    Chat
-                  </button>
-                </div>
-              ))}
+                    <button className="text-xs font-semibold text-[#0095f6] hover:text-sky-400">
+                      Chat
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

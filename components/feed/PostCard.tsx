@@ -14,9 +14,10 @@ import { EditPostModal } from '@/components/modals/EditPostModal';
 
 interface PostCardProps {
   post: Post;
+  priority?: boolean;
 }
 
-export function PostCard({ post }: PostCardProps) {
+export function PostCard({ post, priority = false }: PostCardProps) {
   const { toggleLike, addComment, toggleSave, deletePost } = usePosts();
   const { user, updateProfile } = useAuth();
   const [activeMediaIdx, setActiveMediaIdx] = useState(0);
@@ -106,6 +107,7 @@ export function PostCard({ post }: PostCardProps) {
         onIndexChange={setActiveMediaIdx}
         showHeartPop={showHeartPop}
         onDoubleTap={handleMediaDoubleTap}
+        priority={priority}
       />
 
       <PostActions
@@ -130,7 +132,7 @@ export function PostCard({ post }: PostCardProps) {
         )}
 
         <div className="leading-relaxed text-white dark:text-white light:text-black">
-          <Link href="/profile" className="font-semibold mr-1.5 hover:underline">
+          <Link href={`/profile/${post.user.username}`} className="font-semibold mr-1.5 hover:underline">
             {post.user.username}
           </Link>
           <FormattedText

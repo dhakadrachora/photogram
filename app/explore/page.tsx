@@ -206,17 +206,21 @@ export default function ExplorePage() {
             {/* Details side */}
             <div className="w-full md:w-2/5 p-4 flex flex-col justify-between">
               <div>
-                <div className="flex items-center gap-2 pb-3 border-b border-neutral-800">
+                <Link
+                  href={`/profile/${selectedPhoto.author}`}
+                  onClick={() => setSelectedPhoto(null)}
+                  className="flex items-center gap-2 pb-3 border-b border-neutral-800 group"
+                >
                   <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-yellow-500 to-pink-500 flex items-center justify-center text-xs font-bold text-white uppercase">
                     {selectedPhoto.author?.[0] || 'U'}
                   </div>
                   <div>
-                    <span className="font-semibold text-xs text-white">
+                    <span className="font-semibold text-xs text-white group-hover:underline">
                       {selectedPhoto.author}
                     </span>
-                    <p className="text-[10px] text-neutral-400">Original photo post</p>
+                    <p className="text-[10px] text-neutral-400">View profile</p>
                   </div>
-                </div>
+                </Link>
 
                 <div className="py-4 text-xs text-neutral-200 leading-relaxed border-b border-neutral-800 max-h-[200px] overflow-y-auto">
                   <span className="font-semibold text-white mr-1.5">

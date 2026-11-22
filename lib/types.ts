@@ -83,6 +83,6 @@ export interface Message {
 export interface Conversation {
   id: string;
   user: Profile;
-  last_message: Message;
+  last_message?: Message;
   unread_count: number;
 }

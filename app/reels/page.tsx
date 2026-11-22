@@ -474,16 +474,16 @@ export default function ReelsPage() {
               <div className="absolute left-4 right-18 bottom-4 z-20 text-white space-y-2 pointer-events-auto">
                 {/* Creator Avatar & Username */}
                 <div className="flex items-center gap-2.5">
-                  <div className="relative w-9 h-9 rounded-full overflow-hidden border border-white/40 shrink-0">
+                  <Link href={`/profile/${reel.user.username}`} className="relative w-9 h-9 rounded-full overflow-hidden border border-white/40 shrink-0">
                     <Image
                       src={reel.user.avatar_url}
                       alt={reel.user.username}
                       fill
                       className="object-cover"
                     />
-                  </div>
+                  </Link>
                   <Link
-                    href="/profile"
+                    href={`/profile/${reel.user.username}`}
                     className="font-semibold text-sm hover:underline flex items-center gap-1 drop-shadow"
                   >
                     <span>{reel.user.username}</span>

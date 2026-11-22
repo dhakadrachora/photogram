@@ -261,11 +261,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     accounts.push(newAccount);
     saveStoredAccounts(accounts);
 
-    // Save to Supabase (if online)
-    if (isSupabaseConfigured() && identifier.includes('@')) {
+    // Always ensure Supabase Auth registration
+    if (isSupabaseConfigured()) {
+      const authEmail = identifier.includes('@')
+        ? identifier
+        : `${cleanUsername}@photogramweb.online`;
+
       try {
         await supabase.auth.signUp({
-          email: identifier,
+          email: authEmail,
           password: pass,
           options: {
             data: {
@@ -301,42 +305,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: true };
   };
 
-  // 3. Log In (Authenticate ONLY against real registered accounts)
+  // 3. Log In (Seamless Auth with Email, Username, or Phone)
   const login = async (
     identifierRaw: string,
     pass: string
   ): Promise<{ success: boolean; error?: string }> => {
     setIsLoading(true);
     const identifier = identifierRaw.trim().toLowerCase();
-
-    // Check Supabase auth if configured and looks like email
-    if (isSupabaseConfigured() && identifier.includes('@')) {
-      try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: identifier,
-          password: pass,
-        });
-        if (!error && data?.user) {
-          await fetchSupabaseProfile(data.user.id);
-          setIsLoading(false);
-          return { success: true };
-        }
-      } catch (e) {}
-    }
-
-    // Authenticate against real stored accounts
     const accounts = getStoredAccounts();
+
+    // Find locally registered account if available
     const matched = accounts.find(
       (acc) =>
         acc.username.toLowerCase() === identifier ||
         acc.email.toLowerCase() === identifier
     );
 
+    // Resolve target email for Supabase Auth
+    let emailToAuth = identifier.includes('@') ? identifier : '';
+    if (!emailToAuth && matched?.email && matched.email.includes('@')) {
+      emailToAuth = matched.email;
+    }
+    if (!emailToAuth) {
+      emailToAuth = `${matched?.username || identifier}@photogramweb.online`;
+    }
+
+    // Try Supabase Auth first
+    if (isSupabaseConfigured() && emailToAuth) {
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: emailToAuth,
+          password: pass,
+        });
+
+        if (!error && data?.user) {
+          await fetchSupabaseProfile(data.user.id);
+          setIsLoading(false);
+          // Set persistent cookie
+          if (typeof document !== 'undefined') {
+            document.cookie = `photogram_session=${encodeURIComponent(
+              JSON.stringify({ id: data.user.id, email: emailToAuth })
+            )}; path=/; max-age=2592000; SameSite=Lax`;
+          }
+          return { success: true };
+        }
+      } catch (e) {
+        console.warn('Supabase auth login check note:', e);
+      }
+    }
+
+    // Fallback: Authenticate against stored accounts registry
     if (!matched) {
       setIsLoading(false);
       return {
         success: false,
-        error: "The username or email you entered doesn't belong to an account. Please check your username and try again.",
+        error: "The username, phone, or email you entered doesn't belong to an account. Please check your credentials.",
       };
     }
 
@@ -364,6 +387,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(profile);
     localStorage.setItem('photogram_active_session', JSON.stringify(profile));
     localStorage.setItem('insta_current_user', JSON.stringify(profile));
+    if (typeof document !== 'undefined') {
+      document.cookie = `photogram_session=${encodeURIComponent(
+        JSON.stringify({ id: profile.id, username: profile.username })
+      )}; path=/; max-age=2592000; SameSite=Lax`;
+    }
+
     setIsLoading(false);
     return { success: true };
   };

@@ -244,7 +244,25 @@ export default function AdminPage() {
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4 select-none">
-        <div className="w-full max-w-sm bg-neutral-950 border border-neutral-800 rounded-3xl p-8 text-center shadow-2xl">
+        {/* Mobile notice */}
+        <div className="md:hidden flex flex-col items-center justify-center p-6 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-neutral-900 border border-neutral-800 flex items-center justify-center text-neutral-400 mb-4">
+            <Shield className="w-7 h-7 text-neutral-400" />
+          </div>
+          <h2 className="text-lg font-bold text-white mb-2">Desktop Access Only</h2>
+          <p className="text-xs text-neutral-400 max-w-xs leading-relaxed mb-6">
+            The Photogram Admin Dashboard is restricted to desktop browsers for security and administrative integrity.
+          </p>
+          <Link
+            href="/"
+            className="px-5 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-semibold transition-colors"
+          >
+            Return to Home Feed
+          </Link>
+        </div>
+
+        {/* Desktop login container */}
+        <div className="hidden md:block w-full max-w-sm bg-neutral-950 border border-neutral-800 rounded-3xl p-8 text-center shadow-2xl">
           <div className="w-16 h-16 rounded-2xl bg-[#0095f6]/10 border border-[#0095f6]/30 flex items-center justify-center mx-auto mb-4 text-[#0095f6]">
             <Shield className="w-8 h-8" />
           </div>
@@ -295,8 +313,26 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-black text-white p-4 md:p-8 max-w-6xl mx-auto select-none">
-      {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-neutral-800">
+      {/* Mobile notice */}
+      <div className="md:hidden flex flex-col items-center justify-center min-h-[60vh] p-6 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-neutral-900 border border-neutral-800 flex items-center justify-center text-neutral-400 mb-4">
+          <Shield className="w-7 h-7 text-neutral-400" />
+        </div>
+        <h2 className="text-lg font-bold text-white mb-2">Desktop Access Only</h2>
+        <p className="text-xs text-neutral-400 max-w-xs leading-relaxed mb-6">
+          The Photogram Admin Dashboard requires a desktop workstation screen for multi-panel management.
+        </p>
+        <Link
+          href="/"
+          className="px-5 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-semibold transition-colors"
+        >
+          Return to Home Feed
+        </Link>
+      </div>
+
+      <div className="hidden md:block space-y-8">
+        {/* Top Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-neutral-800">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-[#0095f6]/10 border border-[#0095f6]/30 flex items-center justify-center text-[#0095f6]">
             <Shield className="w-5 h-5" />
@@ -705,6 +741,7 @@ export default function AdminPage() {
             </tbody>
           </table>
         </div>
+      </div>
       </div>
     </div>
   );
