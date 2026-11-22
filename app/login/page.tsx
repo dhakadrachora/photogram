@@ -1,213 +1,669 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { Zap, AlertCircle, Check } from 'lucide-react';
+import {
+  Lock,
+  CheckCircle2,
+  AlertCircle,
+  Eye,
+  EyeOff,
+  Zap,
+  ArrowLeft,
+  KeyRound,
+  ShieldCheck,
+} from 'lucide-react';
 import Image from 'next/image';
+import Link from 'next/link';
 
-export default function LoginPage() {
+type AuthMode = 'login' | 'signup' | 'forgot';
+
+function LoginFormContent() {
   const router = useRouter();
-  const { login, signup } = useAuth();
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [email, setEmail] = useState('');
+  const searchParams = useSearchParams();
+  const { login, signup, resetPassword, updatePassword } = useAuth();
+
+  const initialMode = (searchParams.get('mode') as AuthMode) || 'login';
+  const [mode, setMode] = useState<AuthMode>(initialMode);
+
+  // Form Fields
+  const [identifier, setIdentifier] = useState(''); // Email, Phone, or Username
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Reset Password Specific Fields
+  const [resetIdentifier, setResetIdentifier] = useState('');
+  const [resetSent, setResetSent] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+
+  // States
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  useEffect(() => {
+    const urlMode = searchParams.get('mode') as AuthMode;
+    if (urlMode && ['login', 'signup', 'forgot'].includes(urlMode)) {
+      setMode(urlMode);
+    }
+  }, [searchParams]);
+
+  // Clear messages when mode changes
+  const switchMode = (newMode: AuthMode) => {
+    setError(null);
+    setSuccessMsg(null);
+    setResetSent(false);
+    setMode(newMode);
+  };
+
+  // 1. Handle Login
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setLoading(true);
 
+    if (!identifier.trim() || !password) {
+      setError('Please enter your phone number, username, or email and password.');
+      return;
+    }
+
+    setLoading(true);
     try {
-      if (isSignUp) {
-        if (!email || !password || !username) {
-          setError('Please fill in all required fields.');
-          setLoading(false);
-          return;
-        }
-        const res = await signup(email, password, username, fullName);
-        if (res.success) {
-          setSuccessMsg('Account created successfully! Redirecting...');
-          setTimeout(() => router.push('/'), 1000);
-        } else {
-          setError(res.error || 'Failed to sign up.');
-        }
+      const res = await login(identifier, password);
+      if (res.success) {
+        setSuccessMsg('Logged in successfully! Redirecting...');
+        setTimeout(() => router.push('/'), 500);
       } else {
-        if (!email || !password) {
-          setError('Please enter your email/username and password.');
-          setLoading(false);
-          return;
-        }
-        const res = await login(email, password);
-        if (res.success) {
-          router.push('/');
-        } else {
-          setError(res.error || 'Failed to log in.');
-        }
+        setError(res.error || 'Sorry, your password was incorrect. Please double-check your password.');
       }
     } catch (err: any) {
-      setError(err?.message || 'An unexpected error occurred.');
+      setError(err?.message || 'Failed to log in. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
+  // 2. Handle Signup (New Account Creation)
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    if (!identifier.trim()) {
+      setError('Please provide a mobile number or email.');
+      return;
+    }
+    if (!password || password.length < 6) {
+      setError('Password must be at least 6 characters long.');
+      return;
+    }
+    if (!username.trim()) {
+      setError('Please choose a username.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await signup(identifier, password, username, fullName || username);
+      if (res.success) {
+        setSuccessMsg('Welcome to Photogram! Your account has been created.');
+        setTimeout(() => router.push('/'), 700);
+      } else {
+        setError(res.error || 'Could not create account. Please try a different username.');
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Failed to sign up.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 3. Handle Forgot Password Request
+  const handleResetRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    if (!resetIdentifier.trim()) {
+      setError('Please enter your email, phone, or username.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await resetPassword(resetIdentifier);
+      if (res.success) {
+        setResetSent(true);
+        setSuccessMsg(
+          `We sent an email to ${resetIdentifier} with a link to get back into your account.`
+        );
+      } else {
+        setError(res.error || 'No account found with that email or username.');
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Error sending login link.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 4. Handle Direct Password Reset / Update
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    if (!newPassword || newPassword.length < 6) {
+      setError('New password must be at least 6 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await updatePassword(newPassword);
+      if (res.success) {
+        setSuccessMsg('Your password has been reset successfully! Redirecting...');
+        setTimeout(() => router.push('/'), 800);
+      } else {
+        setError(res.error || 'Failed to update password.');
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Error updating password.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 5. 1-Click Instant Demo Login
   const handleInstantDemoLogin = async () => {
     setLoading(true);
-    await login('aryan.visuals@instagram.com', 'demo123456');
+    setError(null);
+    await login('kabir.explores@photogramweb.online', 'demo123456');
     router.push('/');
   };
 
+  // Validation helpers
+  const isIdentifierValid = identifier.trim().length >= 3;
+  const isUsernameValid = username.trim().length >= 3 && /^[a-zA-Z0-9._]+$/.test(username.trim());
+
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-4">
-      <div className="flex items-center justify-center gap-8 w-full max-w-4xl">
-        {/* Left Side: Mock Phone Preview (Desktop only) */}
-        <div className="hidden lg:block relative w-[380px] h-[580px] shrink-0">
-          <div className="w-full h-full rounded-[40px] border-4 border-neutral-800 bg-neutral-950 p-3 shadow-2xl relative overflow-hidden">
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 w-28 h-4 bg-neutral-800 rounded-full z-20" />
-            <div className="w-full h-full rounded-[32px] overflow-hidden relative">
-              <Image
-                src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80"
-                alt="Instagram Phone Demo"
-                fill
-                className="object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/30" />
-              <div className="absolute bottom-6 left-4 right-4 text-white">
-                <span className="text-xs font-semibold px-2.5 py-1 bg-[#0095f6] rounded-full">
-                  Fast Cloudinary HD Photos
-                </span>
-                <p className="text-sm font-bold mt-2">1:1 Photogram Web Experience</p>
-                <p className="text-[11px] text-neutral-300">
-                  Supabase Database • Cloudinary Media • Next.js App Router
-                </p>
+    <div className="min-h-screen bg-black text-white flex flex-col justify-between items-center px-4 py-8 select-none">
+      <div className="flex-1 flex items-center justify-center w-full">
+        <div className="flex items-center justify-center gap-8 w-full max-w-4xl">
+          {/* Left Side: Mock Phone Preview (Desktop only) */}
+          <div className="hidden lg:block relative w-[380px] h-[580px] shrink-0">
+            <div className="w-full h-full rounded-[44px] border-4 border-[#262626] bg-neutral-950 p-3 shadow-2xl relative overflow-hidden">
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 w-28 h-4 bg-[#262626] rounded-full z-20" />
+              <div className="w-full h-full rounded-[34px] overflow-hidden relative">
+                <Image
+                  src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80"
+                  alt="Photogram Phone Demo"
+                  fill
+                  priority
+                  className="object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/30" />
+                <div className="absolute bottom-6 left-4 right-4 text-white">
+                  <span className="text-[11px] font-semibold px-2.5 py-1 bg-[#0095f6] rounded-full shadow">
+                    Live on photogramweb.online
+                  </span>
+                  <p className="text-base font-bold mt-2.5">1:1 Photogram Web Experience</p>
+                  <p className="text-[11px] text-neutral-300 mt-0.5">
+                    Fast Cloudinary Photos • Supabase Realtime • Complete Auth
+                  </p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Right Side: Auth Form Card */}
-        <div className="w-full max-w-[350px] space-y-3">
-          {/* Main Card */}
-          <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-8 flex flex-col items-center">
-            {/* Photogram Script Heading */}
-            <h1 className="text-3xl font-bold tracking-tight text-white mb-6 font-serif italic">
-              Photogram
-            </h1>
-
-            {error && (
-              <div className="w-full bg-red-950/50 border border-red-800 text-red-300 text-xs p-2.5 rounded-lg mb-4 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
-                <span>{error}</span>
-              </div>
-            )}
-
-            {successMsg && (
-              <div className="w-full bg-green-950/50 border border-green-800 text-green-300 text-xs p-2.5 rounded-lg mb-4 flex items-center gap-2">
-                <Check className="w-4 h-4 shrink-0 text-green-400" />
-                <span>{successMsg}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="w-full space-y-2">
-              <input
-                type="text"
-                placeholder={isSignUp ? 'Mobile Number or Email' : 'Phone number, username, or email'}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-neutral-900 border border-neutral-800 text-xs text-white px-3 py-2.5 rounded-md outline-none focus:border-neutral-600 transition-colors"
-              />
-
-              {isSignUp && (
+          {/* Right Side: Auth Card Container */}
+          <div className="w-full max-w-[350px] space-y-2.5">
+            {/* Main Auth Box */}
+            <div className="bg-black border border-[#262626] rounded-sm px-10 py-9 flex flex-col items-center">
+              {/* MODE 1: LOGIN */}
+              {mode === 'login' && (
                 <>
-                  <input
-                    type="text"
-                    placeholder="Full Name"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className="w-full bg-neutral-900 border border-neutral-800 text-xs text-white px-3 py-2.5 rounded-md outline-none focus:border-neutral-600 transition-colors"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="w-full bg-neutral-900 border border-neutral-800 text-xs text-white px-3 py-2.5 rounded-md outline-none focus:border-neutral-600 transition-colors"
-                  />
+                  {/* Instagram-style Logo */}
+                  <h1 className="text-4xl font-normal tracking-tight text-white mb-8 font-serif italic select-none">
+                    Photogram
+                  </h1>
+
+                  {/* Feedback Messages */}
+                  {error && (
+                    <div className="w-full bg-red-950/40 border border-red-800 text-red-300 text-xs p-2.5 rounded-sm mb-3 flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+                      <span>{error}</span>
+                    </div>
+                  )}
+
+                  {successMsg && (
+                    <div className="w-full bg-green-950/40 border border-green-800 text-green-300 text-xs p-2.5 rounded-sm mb-3 flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 shrink-0 text-green-400" />
+                      <span>{successMsg}</span>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleLogin} className="w-full space-y-2">
+                    {/* Identifier */}
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Phone number, username, or email"
+                        value={identifier}
+                        onChange={(e) => setIdentifier(e.target.value)}
+                        className="w-full bg-[#121212] border border-[#262626] text-xs text-white px-2.5 py-2.5 rounded-sm outline-none focus:border-neutral-500 placeholder:text-neutral-500 transition-colors"
+                      />
+                    </div>
+
+                    {/* Password with Show/Hide toggle */}
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="Password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full bg-[#121212] border border-[#262626] text-xs text-white pl-2.5 pr-12 py-2.5 rounded-sm outline-none focus:border-neutral-500 placeholder:text-neutral-500 transition-colors"
+                      />
+                      {password.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-neutral-400 hover:text-white"
+                        >
+                          {showPassword ? 'Hide' : 'Show'}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Log in Button */}
+                    <button
+                      type="submit"
+                      disabled={loading || !identifier.trim() || !password}
+                      className="w-full py-2 bg-[#0095f6] hover:bg-[#1877f2] disabled:opacity-40 disabled:hover:bg-[#0095f6] text-white text-xs font-semibold rounded-lg transition-colors mt-2"
+                    >
+                      {loading ? 'Logging in...' : 'Log in'}
+                    </button>
+                  </form>
+
+                  {/* OR Divider */}
+                  <div className="w-full flex items-center my-4">
+                    <div className="flex-1 h-[1px] bg-[#262626]" />
+                    <span className="px-4 text-[12px] font-semibold text-neutral-500">OR</span>
+                    <div className="flex-1 h-[1px] bg-[#262626]" />
+                  </div>
+
+                  {/* Facebook / Google Social Login */}
+                  <button
+                    type="button"
+                    onClick={handleInstantDemoLogin}
+                    className="w-full flex items-center justify-center gap-2 text-xs font-semibold text-[#0095f6] hover:text-[#1877f2] transition-colors py-1.5"
+                  >
+                    <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                    </svg>
+                    <span>Log in with Facebook</span>
+                  </button>
+
+                  {/* 1-Click Demo Login Banner */}
+                  <button
+                    type="button"
+                    onClick={handleInstantDemoLogin}
+                    disabled={loading}
+                    className="w-full mt-3 py-1.5 px-3 bg-gradient-to-r from-amber-500 via-rose-500 to-purple-600 hover:opacity-95 text-white text-[11px] font-bold rounded-md shadow flex items-center justify-center gap-1.5 transition-all"
+                  >
+                    <Zap className="w-3.5 h-3.5 fill-white" />
+                    <span>⚡ Instant 1-Click Demo Login</span>
+                  </button>
+
+                  {/* Forgot Password Link */}
+                  <button
+                    type="button"
+                    onClick={() => switchMode('forgot')}
+                    className="mt-4 text-[12px] text-neutral-400 hover:text-white transition-colors"
+                  >
+                    Forgot password?
+                  </button>
                 </>
               )}
 
-              <input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-neutral-900 border border-neutral-800 text-xs text-white px-3 py-2.5 rounded-md outline-none focus:border-neutral-600 transition-colors"
-              />
+              {/* MODE 2: SIGN UP */}
+              {mode === 'signup' && (
+                <>
+                  <h1 className="text-4xl font-normal tracking-tight text-white mb-3 font-serif italic select-none">
+                    Photogram
+                  </h1>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-2 bg-[#0095f6] hover:bg-[#1877f2] disabled:opacity-50 text-white text-xs font-semibold rounded-lg transition-colors mt-2"
-              >
-                {loading ? 'Please wait...' : isSignUp ? 'Sign up' : 'Log in'}
-              </button>
-            </form>
+                  <p className="text-sm font-semibold text-neutral-400 text-center mb-4 leading-snug">
+                    Sign up to see photos and visual stories from your friends.
+                  </p>
 
-            {/* OR Divider */}
-            <div className="w-full flex items-center my-4">
-              <div className="flex-1 h-[1px] bg-neutral-800" />
-              <span className="px-4 text-[11px] font-semibold text-neutral-500 uppercase">
-                OR
-              </span>
-              <div className="flex-1 h-[1px] bg-neutral-800" />
+                  {/* Facebook Signup Button */}
+                  <button
+                    type="button"
+                    onClick={handleInstantDemoLogin}
+                    className="w-full py-1.5 bg-[#0095f6] hover:bg-[#1877f2] text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-2 mb-3"
+                  >
+                    <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24">
+                      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                    </svg>
+                    <span>Log in with Facebook</span>
+                  </button>
+
+                  {/* OR Divider */}
+                  <div className="w-full flex items-center mb-3">
+                    <div className="flex-1 h-[1px] bg-[#262626]" />
+                    <span className="px-4 text-[12px] font-semibold text-neutral-500">OR</span>
+                    <div className="flex-1 h-[1px] bg-[#262626]" />
+                  </div>
+
+                  {error && (
+                    <div className="w-full bg-red-950/40 border border-red-800 text-red-300 text-xs p-2.5 rounded-sm mb-3 flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+                      <span>{error}</span>
+                    </div>
+                  )}
+
+                  {successMsg && (
+                    <div className="w-full bg-green-950/40 border border-green-800 text-green-300 text-xs p-2.5 rounded-sm mb-3 flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 shrink-0 text-green-400" />
+                      <span>{successMsg}</span>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleSignup} className="w-full space-y-2">
+                    {/* Mobile or Email */}
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Mobile Number or Email"
+                        value={identifier}
+                        onChange={(e) => setIdentifier(e.target.value)}
+                        className="w-full bg-[#121212] border border-[#262626] text-xs text-white px-2.5 py-2.5 rounded-sm outline-none focus:border-neutral-500 placeholder:text-neutral-500"
+                      />
+                      {isIdentifierValid && (
+                        <CheckCircle2 className="w-4 h-4 text-neutral-500 absolute right-2.5 top-1/2 -translate-y-1/2" />
+                      )}
+                    </div>
+
+                    {/* Password */}
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="Password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full bg-[#121212] border border-[#262626] text-xs text-white pl-2.5 pr-12 py-2.5 rounded-sm outline-none focus:border-neutral-500 placeholder:text-neutral-500"
+                      />
+                      {password.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-neutral-400 hover:text-white"
+                        >
+                          {showPassword ? 'Hide' : 'Show'}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Full Name */}
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Full Name"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        className="w-full bg-[#121212] border border-[#262626] text-xs text-white px-2.5 py-2.5 rounded-sm outline-none focus:border-neutral-500 placeholder:text-neutral-500"
+                      />
+                    </div>
+
+                    {/* Username */}
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Username"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        className="w-full bg-[#121212] border border-[#262626] text-xs text-white px-2.5 py-2.5 rounded-sm outline-none focus:border-neutral-500 placeholder:text-neutral-500"
+                      />
+                      {isUsernameValid && (
+                        <CheckCircle2 className="w-4 h-4 text-neutral-500 absolute right-2.5 top-1/2 -translate-y-1/2" />
+                      )}
+                    </div>
+
+                    {/* Disclaimers */}
+                    <p className="text-[10px] text-neutral-500 text-center leading-relaxed pt-1">
+                      People who use our service may have uploaded your contact information to Photogram.{' '}
+                      <span className="text-neutral-400 hover:underline cursor-pointer">Learn More</span>
+                    </p>
+
+                    <p className="text-[10px] text-neutral-500 text-center leading-relaxed">
+                      By signing up, you agree to our{' '}
+                      <span className="text-neutral-400 hover:underline cursor-pointer">Terms</span>,{' '}
+                      <span className="text-neutral-400 hover:underline cursor-pointer">Privacy Policy</span> and{' '}
+                      <span className="text-neutral-400 hover:underline cursor-pointer">Cookies Policy</span>.
+                    </p>
+
+                    {/* Submit Button */}
+                    <button
+                      type="submit"
+                      disabled={loading || !identifier.trim() || !password || !username.trim()}
+                      className="w-full py-2 bg-[#0095f6] hover:bg-[#1877f2] disabled:opacity-40 disabled:hover:bg-[#0095f6] text-white text-xs font-semibold rounded-lg transition-colors mt-2"
+                    >
+                      {loading ? 'Creating account...' : 'Sign up'}
+                    </button>
+                  </form>
+                </>
+              )}
+
+              {/* MODE 3: FORGOT PASSWORD / TROUBLE LOGGING IN */}
+              {mode === 'forgot' && (
+                <>
+                  {/* Instagram Lock Icon Outline */}
+                  <div className="w-24 h-24 rounded-full border-2 border-white flex items-center justify-center mb-4">
+                    <Lock className="w-10 h-10 stroke-[1.4] text-white" />
+                  </div>
+
+                  <h2 className="text-base font-bold text-white mb-2">Trouble logging in?</h2>
+                  <p className="text-xs text-neutral-400 text-center mb-4 leading-relaxed">
+                    Enter your email, phone, or username and we&apos;ll send you a link to get back into your account.
+                  </p>
+
+                  {error && (
+                    <div className="w-full bg-red-950/40 border border-red-800 text-red-300 text-xs p-2.5 rounded-sm mb-3 flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+                      <span>{error}</span>
+                    </div>
+                  )}
+
+                  {successMsg && (
+                    <div className="w-full bg-green-950/40 border border-green-800 text-green-300 text-xs p-2.5 rounded-sm mb-3 flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 shrink-0 text-green-400" />
+                      <span>{successMsg}</span>
+                    </div>
+                  )}
+
+                  {!resetSent ? (
+                    <form onSubmit={handleResetRequest} className="w-full space-y-3">
+                      <input
+                        type="text"
+                        placeholder="Email, Phone, or Username"
+                        value={resetIdentifier}
+                        onChange={(e) => setResetIdentifier(e.target.value)}
+                        className="w-full bg-[#121212] border border-[#262626] text-xs text-white px-2.5 py-2.5 rounded-sm outline-none focus:border-neutral-500 placeholder:text-neutral-500"
+                      />
+
+                      <button
+                        type="submit"
+                        disabled={loading || !resetIdentifier.trim()}
+                        className="w-full py-2 bg-[#0095f6] hover:bg-[#1877f2] disabled:opacity-40 disabled:hover:bg-[#0095f6] text-white text-xs font-semibold rounded-lg transition-colors"
+                      >
+                        {loading ? 'Sending link...' : 'Send login link'}
+                      </button>
+                    </form>
+                  ) : (
+                    /* Inline Instant Password Reset Form */
+                    <form onSubmit={handleUpdatePassword} className="w-full space-y-2.5 mt-1 border-t border-[#262626] pt-3">
+                      <p className="text-xs font-semibold text-[#0095f6] flex items-center gap-1.5">
+                        <KeyRound className="w-3.5 h-3.5" />
+                        <span>Set New Password Immediately:</span>
+                      </p>
+
+                      <div className="relative">
+                        <input
+                          type={showNewPassword ? 'text' : 'password'}
+                          placeholder="New Password (min 6 chars)"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          className="w-full bg-[#121212] border border-[#262626] text-xs text-white px-2.5 py-2 rounded-sm outline-none focus:border-neutral-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white"
+                        >
+                          {showNewPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+
+                      <input
+                        type="password"
+                        placeholder="Confirm New Password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="w-full bg-[#121212] border border-[#262626] text-xs text-white px-2.5 py-2 rounded-sm outline-none focus:border-neutral-500"
+                      />
+
+                      <button
+                        type="submit"
+                        disabled={loading || !newPassword || newPassword !== confirmPassword}
+                        className="w-full py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90 disabled:opacity-40 text-white text-xs font-bold rounded-lg transition-all"
+                      >
+                        {loading ? 'Updating Password...' : 'Save Password & Log in'}
+                      </button>
+                    </form>
+                  )}
+
+                  {/* OR Divider */}
+                  <div className="w-full flex items-center my-4">
+                    <div className="flex-1 h-[1px] bg-[#262626]" />
+                    <span className="px-4 text-[12px] font-semibold text-neutral-500">OR</span>
+                    <div className="flex-1 h-[1px] bg-[#262626]" />
+                  </div>
+
+                  {/* Create New Account Link */}
+                  <button
+                    type="button"
+                    onClick={() => switchMode('signup')}
+                    className="text-xs font-semibold text-white hover:text-neutral-300 transition-colors"
+                  >
+                    Create new account
+                  </button>
+                </>
+              )}
             </div>
 
-            {/* Instant Demo Login Button */}
-            <button
-              type="button"
-              onClick={handleInstantDemoLogin}
-              disabled={loading}
-              className="w-full py-2 bg-gradient-to-r from-amber-500 via-rose-500 to-purple-600 hover:opacity-95 text-white text-xs font-bold rounded-lg shadow-lg flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
-            >
-              <Zap className="w-3.5 h-3.5 fill-white" />
-              <span>⚡ Instant Demo Login (1-Click)</span>
-            </button>
-          </div>
+            {/* Bottom Sub-Card (Toggles between modes) */}
+            <div className="bg-black border border-[#262626] rounded-sm py-5 text-center text-xs text-neutral-300">
+              {mode === 'login' && (
+                <p>
+                  Don&apos;t have an account?{' '}
+                  <button
+                    type="button"
+                    onClick={() => switchMode('signup')}
+                    className="font-semibold text-[#0095f6] hover:underline"
+                  >
+                    Sign up
+                  </button>
+                </p>
+              )}
 
-          {/* Toggle Login / Signup Card */}
-          <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-4 text-center text-xs text-neutral-300">
-            {isSignUp ? (
-              <p>
-                Have an account?{' '}
+              {mode === 'signup' && (
+                <p>
+                  Have an account?{' '}
+                  <button
+                    type="button"
+                    onClick={() => switchMode('login')}
+                    className="font-semibold text-[#0095f6] hover:underline"
+                  >
+                    Log in
+                  </button>
+                </p>
+              )}
+
+              {mode === 'forgot' && (
                 <button
                   type="button"
-                  onClick={() => setIsSignUp(false)}
-                  className="font-semibold text-[#0095f6] hover:underline"
+                  onClick={() => switchMode('login')}
+                  className="font-semibold text-neutral-300 hover:text-white flex items-center justify-center gap-1.5 mx-auto"
                 >
-                  Log in
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Back to login</span>
                 </button>
-              </p>
-            ) : (
-              <p>
-                Don&apos;t have an account?{' '}
-                <button
-                  type="button"
-                  onClick={() => setIsSignUp(true)}
-                  className="font-semibold text-[#0095f6] hover:underline"
-                >
-                  Sign up
-                </button>
-              </p>
-            )}
+              )}
+            </div>
+
+            {/* App Download Links Placeholder */}
+            <div className="pt-2 text-center text-xs text-neutral-400">
+              <p className="mb-2.5">Get the app.</p>
+              <div className="flex items-center justify-center gap-2">
+                <div className="px-3 py-1.5 rounded-md bg-[#121212] border border-[#262626] text-[11px] font-semibold text-white hover:bg-neutral-800 transition-colors cursor-pointer">
+                  Google Play
+                </div>
+                <div className="px-3 py-1.5 rounded-md bg-[#121212] border border-[#262626] text-[11px] font-semibold text-white hover:bg-neutral-800 transition-colors cursor-pointer">
+                  App Store
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Instagram Official Footer */}
+      <footer className="w-full max-w-4xl pt-8 pb-4 text-[11px] text-neutral-500 flex flex-col items-center gap-3">
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5">
+          <span className="hover:underline cursor-pointer">Meta</span>
+          <span className="hover:underline cursor-pointer">About</span>
+          <span className="hover:underline cursor-pointer">Blog</span>
+          <span className="hover:underline cursor-pointer">Jobs</span>
+          <span className="hover:underline cursor-pointer">Help</span>
+          <span className="hover:underline cursor-pointer">API</span>
+          <span className="hover:underline cursor-pointer">Privacy</span>
+          <span className="hover:underline cursor-pointer">Terms</span>
+          <span className="hover:underline cursor-pointer">Locations</span>
+          <span className="hover:underline cursor-pointer">Photogram Lite</span>
+          <span className="hover:underline cursor-pointer">Threads</span>
+          <span className="hover:underline cursor-pointer">Contact Uploading & Non-Users</span>
+          <span className="hover:underline cursor-pointer">Meta Verified</span>
+        </div>
+
+        <div className="flex items-center gap-4 text-neutral-500">
+          <select className="bg-transparent border-none text-[11px] outline-none cursor-pointer">
+            <option value="en" className="bg-neutral-900 text-white">English</option>
+            <option value="hi" className="bg-neutral-900 text-white">हिन्दी</option>
+            <option value="es" className="bg-neutral-900 text-white">Español</option>
+          </select>
+          <span>© 2026 Photogram from Meta</span>
+        </div>
+      </footer>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-black flex items-center justify-center text-neutral-500 text-sm">
+          Loading Photogram...
+        </div>
+      }
+    >
+      <LoginFormContent />
+    </Suspense>
   );
 }
