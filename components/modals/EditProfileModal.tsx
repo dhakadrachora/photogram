@@ -12,7 +12,7 @@ interface EditProfileModalProps {
 }
 
 export function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
-  const { user, updateProfile } = useAuth();
+  const { user, updateProfile, checkUsernameAvailability } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [username, setUsername] = useState(user?.username || '');
@@ -23,6 +23,7 @@ export function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [usernameError, setUsernameError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -59,17 +60,42 @@ export function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
     }
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    setUsernameError(null);
     setIsSaving(true);
-    updateProfile({
-      username: username.toLowerCase().trim(),
+
+    const cleanUser = username.toLowerCase().trim();
+    if (!cleanUser || cleanUser.length < 3) {
+      setIsSaving(false);
+      setUsernameError('Username must be at least 3 characters.');
+      return;
+    }
+
+    // Check if another user already owns this username
+    if (cleanUser !== user?.username?.toLowerCase()) {
+      const check = await checkUsernameAvailability(cleanUser, user?.id);
+      if (!check.available) {
+        setIsSaving(false);
+        setUsernameError(check.reason || 'This username is already taken. Please choose another.');
+        return;
+      }
+    }
+
+    const res = await updateProfile({
+      username: cleanUser,
       full_name: name.trim(),
       bio,
       website,
       avatar_url: avatarUrl,
     });
+
     setIsSaving(false);
+    if (!res.success) {
+      setUsernameError(res.error || 'Failed to update profile.');
+      return;
+    }
+
     setSaveSuccess(true);
     setTimeout(() => {
       setSaveSuccess(false);
@@ -164,10 +190,20 @@ export function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
             <input
               type="text"
               value={username}
-              onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/\s+/g, ''))}
+              onChange={(e) => {
+                setUsername(e.target.value.toLowerCase().replace(/\s+/g, ''));
+                if (usernameError) setUsernameError(null);
+              }}
               placeholder="username"
-              className="w-full px-3 py-2 bg-neutral-900 border border-neutral-700 rounded-lg text-xs text-white outline-none focus:border-[#0095f6]"
+              className={`w-full px-3 py-2 bg-neutral-900 border rounded-lg text-xs text-white outline-none ${
+                usernameError ? 'border-red-500 focus:border-red-400' : 'border-neutral-700 focus:border-[#0095f6]'
+              }`}
             />
+            {usernameError && (
+              <p className="text-[11px] text-red-400 font-medium mt-1">
+                {usernameError}
+              </p>
+            )}
           </div>
 
           {/* Bio Field */}

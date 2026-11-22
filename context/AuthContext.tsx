@@ -52,8 +52,8 @@ interface AuthContextType {
   logout: () => Promise<void>;
   resetPassword: (emailOrUsername: string) => Promise<{ success: boolean; message?: string; error?: string }>;
   updatePassword: (newPassword: string) => Promise<{ success: boolean; error?: string }>;
-  checkUsernameAvailability: (username: string) => Promise<{ available: boolean; reason?: string }>;
-  updateProfile: (updated: Partial<Profile>) => void;
+  checkUsernameAvailability: (username: string, excludeUserId?: string) => Promise<{ available: boolean; reason?: string }>;
+  updateProfile: (updated: Partial<Profile>) => Promise<{ success: boolean; error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -65,7 +65,7 @@ const AuthContext = createContext<AuthContextType>({
   resetPassword: async () => ({ success: true }),
   updatePassword: async () => ({ success: true }),
   checkUsernameAvailability: async () => ({ available: true }),
-  updateProfile: () => {},
+  updateProfile: async () => ({ success: true }),
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -153,7 +153,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   // 1. Real-time Unique Username Checker (Purely Real Accounts)
-  const checkUsernameAvailability = async (rawUsername: string): Promise<{ available: boolean; reason?: string }> => {
+  const checkUsernameAvailability = async (
+    rawUsername: string,
+    excludeUserId?: string
+  ): Promise<{ available: boolean; reason?: string }> => {
     const clean = rawUsername.trim().toLowerCase();
     if (!clean) {
       return { available: false, reason: 'Please enter a username.' };
@@ -172,19 +175,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Check against real registered accounts
     const accounts = getStoredAccounts();
-    const existsLocal = accounts.some((acc) => acc.username.toLowerCase() === clean);
+    const existsLocal = accounts.some(
+      (acc) =>
+        acc.username.toLowerCase() === clean &&
+        (!excludeUserId || acc.id !== excludeUserId)
+    );
     if (existsLocal) {
       return { available: false, reason: `Username @${clean} is already taken. Please try another.` };
     }
 
-    // Check Supabase if configured
+    // Check Supabase if configured (Case-Insensitive Unique Check)
     if (isSupabaseConfigured()) {
       try {
-        const { data } = await supabase
+        let query = supabase
           .from('profiles')
-          .select('username')
-          .eq('username', clean)
-          .maybeSingle();
+          .select('id, username')
+          .ilike('username', clean);
+
+        if (excludeUserId) {
+          query = query.neq('id', excludeUserId);
+        }
+
+        const { data } = await query.maybeSingle();
         if (data?.username) {
           return { available: false, reason: `Username @${clean} is already taken. Please try another.` };
         }
@@ -463,9 +475,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: true };
   };
 
-  // 7. Update Profile
-  const updateProfile = (updated: Partial<Profile>) => {
-    if (!user) return;
+  // 7. Update Profile (Strict Unique Username Guard)
+  const updateProfile = async (updated: Partial<Profile>): Promise<{ success: boolean; error?: string }> => {
+    if (!user) return { success: false, error: 'User is not logged in' };
+
+    // If username is being changed, ensure it's not taken by someone else
+    if (updated.username) {
+      const cleanNewUser = updated.username.toLowerCase().trim();
+      if (cleanNewUser !== user.username.toLowerCase()) {
+        const check = await checkUsernameAvailability(cleanNewUser, user.id);
+        if (!check.available) {
+          return { success: false, error: check.reason || `Username @${cleanNewUser} is already taken.` };
+        }
+        updated.username = cleanNewUser;
+      }
+    }
+
     const newProfile = { ...user, ...updated };
     setUser(newProfile);
     localStorage.setItem('photogram_active_session', JSON.stringify(newProfile));
@@ -479,9 +504,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       saveStoredAccounts(accounts);
     }
 
-    if (isSupabaseConfigured()) {
-      supabase.from('profiles').update(updated).eq('id', user.id).then(() => {}, () => {});
+    if (isSupabaseConfigured() && user.id && user.id !== 'usr_me') {
+      try {
+        const { error: sbErr } = await supabase
+          .from('profiles')
+          .update(updated)
+          .eq('id', user.id);
+
+        if (sbErr) {
+          if (sbErr.message.includes('unique') || sbErr.code === '23505') {
+            return { success: false, error: `Username @${updated.username} is already registered by another user.` };
+          }
+          console.warn('Supabase profile update warning:', sbErr);
+        }
+      } catch (err) {
+        console.warn('Supabase profile update error:', err);
+      }
     }
+
+    return { success: true };
   };
 
   return (
