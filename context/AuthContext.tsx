@@ -238,6 +238,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const chosenAvatar = REAL_AVATARS[Math.floor(Math.random() * REAL_AVATARS.length)];
+    // Early Creator Privilege: First 500 users get free verified badge & founding status
+    const isEarlyCreator = accounts.length < 500;
     const newAccount: StoredAccount = {
       id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       email: identifier,
@@ -245,11 +247,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       full_name: name.trim() || cleanUsername,
       password: pass,
       avatar_url: chosenAvatar,
-      bio: 'Photogram creator 📸✨',
+      bio: isEarlyCreator
+        ? `🎖️ Founding Member #${accounts.length + 1} • Early Creator 📸✨`
+        : 'Photogram creator 📸✨',
       posts_count: 0,
       followers_count: 0,
       following_count: 0,
-      is_verified: false,
+      is_verified: isEarlyCreator,
       created_at: new Date().toISOString(),
     };
 
@@ -268,6 +272,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               username: cleanUsername,
               full_name: newAccount.full_name,
               avatar_url: chosenAvatar,
+              is_verified: isEarlyCreator,
             },
           },
         });
@@ -286,7 +291,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       posts_count: 0,
       followers_count: 0,
       following_count: 0,
-      is_verified: false,
+      is_verified: isEarlyCreator,
     };
 
     setUser(profile);

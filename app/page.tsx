@@ -17,6 +17,28 @@ export default function HomePage() {
         {/* Horizontal Stories Tray */}
         <StoriesBar />
 
+        {/* Zero-Algorithm Chronological Feed Banner */}
+        <div className="w-full mb-3 px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-blue-950/40 via-neutral-900/60 to-purple-950/40 border border-blue-500/25 flex items-center justify-between text-xs select-none">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 font-bold shrink-0">
+              ⚡
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-white text-[11px]">
+                  Zero-Algorithm Chronological Feed
+                </span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/25 text-blue-300 font-bold uppercase tracking-wider">
+                  100% Reach
+                </span>
+              </div>
+              <p className="text-[10px] text-neutral-400 mt-0.5">
+                Every photo reaches 100% of your followers in real time. Zero suppression.
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Posts Stream */}
         <div className="w-full space-y-4">
           {posts.length > 0 ? (

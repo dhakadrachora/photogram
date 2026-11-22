@@ -34,17 +34,17 @@ interface ExtendedReel extends Reel {
 const SAMPLE_REELS: ExtendedReel[] = [
   {
     id: 'reel_1',
-    user_id: 'usr_kabir',
+    user_id: 'official_photogram',
     user: {
-      id: 'usr_kabir',
-      username: 'kabir.explores',
-      full_name: 'Kabir Mehta',
-      avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80',
+      id: 'official_photogram',
+      username: 'photogram.official',
+      full_name: 'Photogram Official',
+      avatar_url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=120&auto=format&fit=crop&q=80',
       is_verified: true,
     },
     video_url: 'https://assets.mixkit.co/videos/preview/mixkit-tree-branches-in-the-breeze-1188-large.mp4',
     caption: 'Autumn winds through the mountain valleys. Nature never rushes, yet everything gets done 🍂✨ #mountains #nature #cinematic #peace',
-    music_title: 'Original Audio • Kabir Mehta',
+    music_title: 'Original Audio • Photogram Official',
     likes_count: 48920,
     comments_count: 512,
     has_liked: false,
@@ -53,12 +53,12 @@ const SAMPLE_REELS: ExtendedReel[] = [
   },
   {
     id: 'reel_2',
-    user_id: 'usr_ananya',
+    user_id: 'official_visuals',
     user: {
-      id: 'usr_ananya',
-      username: 'ananya.lens',
-      full_name: 'Ananya Roy',
-      avatar_url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80',
+      id: 'official_visuals',
+      username: 'visuals.studio',
+      full_name: 'Visuals Studio',
+      avatar_url: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=120&auto=format&fit=crop&q=80',
       is_verified: true,
     },
     video_url: 'https://assets.mixkit.co/videos/preview/mixkit-waves-in-the-water-1164-large.mp4',
@@ -72,12 +72,12 @@ const SAMPLE_REELS: ExtendedReel[] = [
   },
   {
     id: 'reel_3',
-    user_id: 'usr_vikram',
+    user_id: 'official_tokyo',
     user: {
-      id: 'usr_vikram',
-      username: 'vikram.aerials',
-      full_name: 'Vikram Aditya',
-      avatar_url: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=120&auto=format&fit=crop&q=80',
+      id: 'official_tokyo',
+      username: 'tokyo.lens',
+      full_name: 'Tokyo Lens',
+      avatar_url: 'https://images.unsplash.com/photo-1503899036084-c55cdd92da26?w=120&auto=format&fit=crop&q=80',
       is_verified: true,
     },
     video_url: 'https://assets.mixkit.co/videos/preview/mixkit-aerial-view-of-city-traffic-at-night-11-large.mp4',
@@ -245,6 +245,14 @@ export default function ReelsPage() {
     }
   };
 
+  const handleShareWhatsApp = (reel: ExtendedReel) => {
+    if (typeof window === 'undefined') return;
+    const origin = window.location.origin;
+    const reelUrl = `${origin}/reels#${reel.id}`;
+    const text = `Watch this trending Reel by @${reel.user.username} on PHOTOGRAM! 🎥✨\n\n"${reel.caption.slice(0, 80)}"\n\n👉 Watch here: ${reelUrl}`;
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+  };
+
   const handleAddComment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!commentText.trim() || !activeCommentsReel) return;
@@ -395,6 +403,22 @@ export default function ReelsPage() {
                   </button>
                   <span className="text-[11px] font-semibold drop-shadow">
                     {copiedId === reel.id ? 'Copied' : 'Share'}
+                  </span>
+                </div>
+
+                {/* Direct WhatsApp Share Button */}
+                <div className="flex flex-col items-center gap-1">
+                  <button
+                    onClick={() => handleShareWhatsApp(reel)}
+                    className="p-2.5 rounded-full bg-[#25D366]/20 hover:bg-[#25D366]/40 backdrop-blur-md transition-all cursor-pointer text-[#25D366] active:scale-90"
+                    title="Share Reel on WhatsApp"
+                  >
+                    <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
+                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.456 5.711 1.457h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                    </svg>
+                  </button>
+                  <span className="text-[10px] font-bold text-[#25D366] drop-shadow">
+                    WhatsApp
                   </span>
                 </div>
 

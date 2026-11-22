@@ -1,9 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePosts } from '@/context/PostsContext';
 import { Search, Heart, MessageCircle, Copy, X } from 'lucide-react';
 import Image from 'next/image';
+import Link from 'next/link';
+import { FormattedText } from '@/components/common/FormattedText';
 
 const EXPLORE_TAGS = [
   'For you',
@@ -15,57 +17,6 @@ const EXPLORE_TAGS = [
   'Nature',
   'Street',
   'Technology',
-];
-
-const EXTRA_EXPLORE_PHOTOS = [
-  {
-    id: 'exp_1',
-    url: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=800&auto=format&fit=crop&q=80',
-    likes: 14210,
-    comments: 189,
-    author: 'zoya.spaces',
-    caption: 'Minimalist living pavilion with morning cedar light in Kyoto ✨',
-  },
-  {
-    id: 'exp_2',
-    url: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&auto=format&fit=crop&q=80',
-    likes: 28920,
-    comments: 342,
-    author: 'vikram.aerials',
-    caption: 'Crystal turquoise waters and coral reefs in the Maldives from 500ft 🏝️',
-  },
-  {
-    id: 'exp_3',
-    url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&auto=format&fit=crop&q=80',
-    likes: 32400,
-    comments: 510,
-    author: 'ananya.lens',
-    caption: 'Mediterranean summer golden hour overlooking Positano cliffs 🍋✨',
-  },
-  {
-    id: 'exp_4',
-    url: 'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=800&auto=format&fit=crop&q=80',
-    likes: 19730,
-    comments: 295,
-    author: 'rohan.raw',
-    caption: 'Tokyo rain reflections through the lanterns of Shinjuku 🌧️🏮',
-  },
-  {
-    id: 'exp_5',
-    url: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&auto=format&fit=crop&q=80',
-    likes: 25300,
-    comments: 420,
-    author: 'kabir.explores',
-    caption: 'Sunrise hitting the alpine peaks of the Swiss Alps 🏔️',
-  },
-  {
-    id: 'exp_6',
-    url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800&auto=format&fit=crop&q=80',
-    likes: 18120,
-    comments: 273,
-    author: 'kabir.explores',
-    caption: 'Dolomites jagged pinnacles rising through misty autumn clouds 🌲',
-  },
 ];
 
 export default function ExplorePage() {
@@ -80,23 +31,38 @@ export default function ExplorePage() {
     caption: string;
   } | null>(null);
 
-  const combinedPhotos = [
-    ...posts.flatMap((p) =>
-      p.media.map((m, idx) => ({
-        id: `${p.id}_${idx}`,
-        url: m.media_url,
-        likes: p.likes_count,
-        comments: p.comments_count,
-        author: p.user.username,
-        caption: p.caption,
-      }))
-    ),
-    ...EXTRA_EXPLORE_PHOTOS,
-  ];
+  // Read URL query parameter (?q=hashtag or username) on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const q = params.get('q');
+      if (q) {
+        setSearchQuery(q);
+      }
+    }
+  }, []);
+
+  // 100% Real Community Posts - Zero Mock Photos
+  const combinedPhotos = posts.flatMap((p) =>
+    p.media.map((m, idx) => ({
+      id: `${p.id}_${idx}`,
+      url: m.media_url,
+      likes: p.likes_count,
+      comments: p.comments_count,
+      author: p.user?.username || 'user',
+      caption: p.caption || '',
+    }))
+  );
 
   const filteredPhotos = combinedPhotos.filter((item) => {
+    // If tag is not 'For you', match against caption
+    if (activeTag !== 'For you') {
+      const tagMatch = item.caption.toLowerCase().includes(activeTag.toLowerCase());
+      if (!tagMatch && !searchQuery.trim()) return false;
+    }
+
     if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
+    const q = searchQuery.toLowerCase().replace(/^#/, '').replace(/^@/, '');
     return (
       item.author.toLowerCase().includes(q) ||
       item.caption.toLowerCase().includes(q)
@@ -104,13 +70,13 @@ export default function ExplorePage() {
   });
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-1 sm:px-4 py-4 md:py-8">
+    <div className="w-full max-w-5xl mx-auto px-1 sm:px-4 py-4 md:py-8 select-none">
       {/* Search Bar */}
       <div className="relative max-w-md mx-auto mb-4 px-2">
         <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
         <input
           type="text"
-          placeholder="Search accounts, tags, or places..."
+          placeholder="Search #hashtags, @creators, or photos..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full bg-neutral-900 border border-neutral-800 text-white text-xs pl-10 pr-9 py-2.5 rounded-xl outline-none focus:border-neutral-600 transition-colors"
@@ -130,7 +96,14 @@ export default function ExplorePage() {
         {EXPLORE_TAGS.map((tag) => (
           <button
             key={tag}
-            onClick={() => setActiveTag(tag)}
+            onClick={() => {
+              setActiveTag(tag);
+              if (tag !== 'For you') {
+                setSearchQuery(tag);
+              } else {
+                setSearchQuery('');
+              }
+            }}
             className={`text-xs px-4 py-1.5 rounded-lg whitespace-nowrap font-medium transition-all ${
               activeTag === tag
                 ? 'bg-white text-black font-semibold'
@@ -185,21 +158,37 @@ export default function ExplorePage() {
         })}
       </div>
 
-      {/* Empty Search Result */}
+      {/* Empty State */}
       {filteredPhotos.length === 0 && (
-        <div className="text-center py-20 text-neutral-400">
+        <div className="text-center py-20 px-4 bg-neutral-900/30 border border-neutral-800/60 rounded-2xl max-w-lg mx-auto my-8">
           <p className="text-sm font-semibold text-white">No photos found</p>
-          <p className="text-xs text-neutral-500 mt-1">Try searching for something else</p>
+          <p className="text-xs text-neutral-400 mt-1.5">
+            {searchQuery
+              ? `No results matching "${searchQuery}". Try another hashtag or tag.`
+              : 'Be the first creator to share an HD photo on Photogram!'}
+          </p>
+          <Link
+            href="/"
+            className="inline-block mt-4 text-xs font-semibold px-4 py-2 bg-[#0095f6] hover:bg-[#1877f2] text-white rounded-lg transition-colors"
+          >
+            Create First Post
+          </Link>
         </div>
       )}
 
       {/* Detail Preview Modal */}
       {selectedPhoto && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="relative w-full max-w-3xl bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col md:flex-row max-h-[85vh]">
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setSelectedPhoto(null)}
+        >
+          <div
+            className="relative w-full max-w-3xl bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col md:flex-row max-h-[85vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
               onClick={() => setSelectedPhoto(null)}
-              className="absolute top-3 right-3 z-20 p-1.5 rounded-full bg-black/60 text-white hover:bg-black/80"
+              className="absolute top-3 right-3 z-20 p-1.5 rounded-full bg-black/60 text-white hover:bg-black/80 cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -218,8 +207,8 @@ export default function ExplorePage() {
             <div className="w-full md:w-2/5 p-4 flex flex-col justify-between">
               <div>
                 <div className="flex items-center gap-2 pb-3 border-b border-neutral-800">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-yellow-500 to-pink-500 flex items-center justify-center text-xs font-bold text-white">
-                    {selectedPhoto.author[0].toUpperCase()}
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-yellow-500 to-pink-500 flex items-center justify-center text-xs font-bold text-white uppercase">
+                    {selectedPhoto.author?.[0] || 'U'}
                   </div>
                   <div>
                     <span className="font-semibold text-xs text-white">
@@ -229,9 +218,11 @@ export default function ExplorePage() {
                   </div>
                 </div>
 
-                <div className="py-4 text-xs text-neutral-200 leading-relaxed border-b border-neutral-800">
-                  <span className="font-semibold text-white mr-1.5">{selectedPhoto.author}</span>
-                  {selectedPhoto.caption}
+                <div className="py-4 text-xs text-neutral-200 leading-relaxed border-b border-neutral-800 max-h-[200px] overflow-y-auto">
+                  <span className="font-semibold text-white mr-1.5">
+                    {selectedPhoto.author}
+                  </span>
+                  <FormattedText text={selectedPhoto.caption} />
                 </div>
               </div>
 
@@ -242,7 +233,7 @@ export default function ExplorePage() {
                 </div>
                 <button
                   onClick={() => setSelectedPhoto(null)}
-                  className="w-full py-2 bg-[#0095f6] hover:bg-[#1877f2] text-white text-xs font-semibold rounded-lg transition-colors"
+                  className="w-full py-2 bg-[#0095f6] hover:bg-[#1877f2] text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer"
                 >
                   Close Preview
                 </button>

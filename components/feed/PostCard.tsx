@@ -8,7 +8,9 @@ import { useAuth } from '@/context/AuthContext';
 import { PostHeader } from './PostHeader';
 import { PostMediaCarousel } from './PostMediaCarousel';
 import { PostActions } from './PostActions';
-import { Check, Smile, Trash2, Flag, EyeOff, Copy, X } from 'lucide-react';
+import { Check, Smile, Trash2, Flag, EyeOff, Copy, X, Pencil } from 'lucide-react';
+import { FormattedText } from '@/components/common/FormattedText';
+import { EditPostModal } from '@/components/modals/EditPostModal';
 
 interface PostCardProps {
   post: Post;
@@ -26,6 +28,7 @@ export function PostCard({ post }: PostCardProps) {
   const [isCopied, setIsCopied] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   const isAuthor =
@@ -63,6 +66,23 @@ export function PostCard({ post }: PostCardProps) {
     }
   };
 
+  const handleShareWhatsApp = () => {
+    if (typeof window === 'undefined') return;
+    const origin = window.location.origin;
+    const postUrl = `${origin}/#${post.id}`;
+    const cleanSnippet = post.caption ? `"${post.caption.slice(0, 80)}${post.caption.length > 80 ? '...' : ''}"` : '';
+    const shareText = `Check out this photo by @${post.user.username} on PHOTOGRAM! 📸✨\n\n${cleanSnippet}\n\n👉 View on Photogram: ${postUrl}`;
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`, '_blank');
+  };
+
+  const handleShareTelegram = () => {
+    if (typeof window === 'undefined') return;
+    const origin = window.location.origin;
+    const postUrl = `${origin}/#${post.id}`;
+    const shareText = `Check out this photo by @${post.user.username} on PHOTOGRAM! 📸✨`;
+    window.open(`https://t.me/share/url?url=${encodeURIComponent(postUrl)}&text=${encodeURIComponent(shareText)}`, '_blank');
+  };
+
   const handleDeletePost = () => {
     deletePost(post.id);
     if (isAuthor && (user?.posts_count ?? 0) > 0) {
@@ -97,6 +117,7 @@ export function PostCard({ post }: PostCardProps) {
         onToggleSave={() => toggleSave(post.id)}
         onOpenComments={() => setShowAllComments((prev) => !prev)}
         onShare={handleShare}
+        onShareWhatsApp={handleShareWhatsApp}
       />
 
       {/* Caption & Comments */}
@@ -108,14 +129,15 @@ export function PostCard({ post }: PostCardProps) {
           </div>
         )}
 
-        <p className="leading-relaxed text-white dark:text-white light:text-black">
+        <div className="leading-relaxed text-white dark:text-white light:text-black">
           <Link href="/profile" className="font-semibold mr-1.5 hover:underline">
             {post.user.username}
           </Link>
-          <span className="text-neutral-200 dark:text-neutral-200 light:text-neutral-800">
-            {post.caption}
-          </span>
-        </p>
+          <FormattedText
+            text={post.caption}
+            className="text-neutral-200 dark:text-neutral-200 light:text-neutral-800"
+          />
+        </div>
 
         {commentsList.length > 0 && (
           <button
@@ -135,7 +157,7 @@ export function PostCard({ post }: PostCardProps) {
                 <span className="font-semibold text-white mr-1.5">
                   {user?.username || 'user'}
                 </span>
-                {c}
+                <FormattedText text={c} />
               </p>
             ))}
           </div>
@@ -196,13 +218,25 @@ export function PostCard({ post }: PostCardProps) {
             ) : (
               <>
                 {isAuthor ? (
-                  <button
-                    onClick={() => setShowDeleteConfirm(true)}
-                    className="w-full py-3.5 text-xs font-bold text-red-500 hover:bg-neutral-800 transition-colors cursor-pointer flex items-center justify-center gap-2"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    <span>Delete</span>
-                  </button>
+                  <>
+                    <button
+                      onClick={() => {
+                        setIsMenuOpen(false);
+                        setIsEditModalOpen(true);
+                      }}
+                      className="w-full py-3.5 text-xs font-bold text-[#0095f6] hover:bg-neutral-800 transition-colors cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <Pencil className="w-4 h-4" />
+                      <span>Edit Post</span>
+                    </button>
+                    <button
+                      onClick={() => setShowDeleteConfirm(true)}
+                      className="w-full py-3.5 text-xs font-bold text-red-500 hover:bg-neutral-800 transition-colors cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span>Delete</span>
+                    </button>
+                  </>
                 ) : (
                   <>
                     <button
@@ -230,6 +264,26 @@ export function PostCard({ post }: PostCardProps) {
 
                 <button
                   onClick={() => {
+                    handleShareWhatsApp();
+                    setIsMenuOpen(false);
+                  }}
+                  className="w-full py-3.5 text-xs font-semibold text-[#25D366] hover:bg-neutral-800 transition-colors cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <span>Share on WhatsApp</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    handleShareTelegram();
+                    setIsMenuOpen(false);
+                  }}
+                  className="w-full py-3.5 text-xs font-semibold text-[#229ED9] hover:bg-neutral-800 transition-colors cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <span>Share on Telegram</span>
+                </button>
+
+                <button
+                  onClick={() => {
                     handleShare();
                     setIsMenuOpen(false);
                   }}
@@ -248,6 +302,15 @@ export function PostCard({ post }: PostCardProps) {
             )}
           </div>
         </div>
+      )}
+
+      {/* Edit Post Modal (Author Only) */}
+      {isAuthor && isEditModalOpen && (
+        <EditPostModal
+          post={post}
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+        />
       )}
 
       {notice && (

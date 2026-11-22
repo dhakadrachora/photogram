@@ -4,8 +4,9 @@
  * Configurable system for toggling upload capabilities across the app.
  * By default:
  * - Image uploads are ENABLED (profile, single post, carousel, photo story, chat photo).
- * - Video stories are ENABLED (per explicit requirement).
- * - Video posts, Reels uploads, and Chat video attachments are DISABLED by default.
+ * - Video stories are ENABLED.
+ * - Reels uploads are ENABLED with a 15 MB limit per user request.
+ * - Video posts are ENABLED with a 15 MB limit.
  * - Every toggle can be reversed at any time via the Super Admin panel (/admin).
  */
 
@@ -28,11 +29,11 @@ export const DEFAULT_UPLOAD_PERMISSIONS: UploadPermissions = {
   allow_image_posts: true,
   allow_carousel_images: true,
   allow_photo_stories: true,
-  allow_video_stories: true, // IMPORTANT: Video stories remain enabled
-  allow_video_posts: false, // DISABLED by default (Temporary Restriction)
-  allow_reels_uploads: false, // DISABLED by default (Temporary Restriction)
+  allow_video_stories: true, // Video stories active
+  allow_video_posts: true, // Video posts active (15 MB limit)
+  allow_reels_uploads: true, // Reels uploads ACTIVE (15 MB limit)
   allow_chat_images: true,
-  allow_chat_videos: false, // DISABLED by default (Temporary Restriction)
+  allow_chat_videos: true,
 };
 
 const STORAGE_KEY = 'photogram_upload_permissions';
@@ -93,7 +94,7 @@ export function updateUploadPermission(
 }
 
 /**
- * Reset all permissions back to default temporary restrictions
+ * Reset all permissions back to default settings
  */
 export function resetUploadPermissions(): UploadPermissions {
   if (typeof window === 'undefined') return DEFAULT_UPLOAD_PERMISSIONS;
@@ -113,6 +114,7 @@ export function resetUploadPermissions(): UploadPermissions {
 
 /**
  * Validates if an upload is allowed based on category and file
+ * Enforces a strict 15 MB limit for video clips (Reels, stories, posts).
  */
 export function checkUploadPermission(
   category: UploadCategory,
@@ -126,20 +128,17 @@ export function checkUploadPermission(
       case 'allow_video_posts':
         return {
           allowed: false,
-          reason:
-            'Normal video post uploads are temporarily paused by admin settings. Photo and carousel uploads are active.',
+          reason: 'Video post uploads are currently paused in admin settings.',
         };
       case 'allow_reels_uploads':
         return {
           allowed: false,
-          reason:
-            'Reels video uploads are temporarily paused by admin settings. Existing reels remain playable.',
+          reason: 'Reels uploads are currently paused in admin settings.',
         };
       case 'allow_chat_videos':
         return {
           allowed: false,
-          reason:
-            'Video attachments in chat are currently paused. Image sharing is active.',
+          reason: 'Video attachments in chat are currently paused.',
         };
       case 'allow_image_posts':
         return { allowed: false, reason: 'Image post uploads are disabled.' };
@@ -158,22 +157,14 @@ export function checkUploadPermission(
     }
   }
 
-  // Also check if user submitted a video file to a category where videos are restricted
+  // Enforce 15 MB size limit on video uploads
   if (file && file.type.startsWith('video')) {
-    if (category === 'allow_image_posts' || category === 'allow_carousel_images') {
-      if (!permissions.allow_video_posts) {
-        return {
-          allowed: false,
-          reason:
-            'Video post uploads are temporarily disabled. Please upload photos instead.',
-        };
-      }
-    }
-    if (category === 'allow_chat_images' && !permissions.allow_chat_videos) {
+    const MAX_VIDEO_BYTES = 15 * 1024 * 1024; // 15 MB Limit
+    if (file.size > MAX_VIDEO_BYTES) {
+      const mbSize = (file.size / (1024 * 1024)).toFixed(1);
       return {
         allowed: false,
-        reason:
-          'Video sharing in chat is temporarily paused. Please send photos only.',
+        reason: `Video size (${mbSize} MB) exceeds the 15 MB limit. Please select a video under 15 MB for smooth mobile playback.`,
       };
     }
   }

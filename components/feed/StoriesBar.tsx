@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import { Plus, Camera, X } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { Story } from '@/lib/types';
 import { StoryViewerModal } from '@/components/instagram/StoryViewerModal';
@@ -10,137 +10,87 @@ import { uploadToCloudinary } from '@/lib/cloudinary';
 import { checkUploadPermission } from '@/lib/uploadPermissions';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
-const CREATOR_STORIES: Story[] = [
-  {
-    id: 'story_kabir',
-    user_id: 'usr_kabir',
-    user: {
-      id: 'usr_kabir',
-      username: 'kabir.explores',
-      full_name: 'Kabir Mehta',
-      avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80',
-      is_verified: true,
-    },
-    media_url: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1080&auto=format&fit=crop&q=85',
-    caption: 'Sunrise hitting the peak in the Swiss Alps 🏔️✨',
-    created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
-  },
-  {
-    id: 'story_ananya',
-    user_id: 'usr_ananya',
-    user: {
-      id: 'usr_ananya',
-      username: 'ananya.lens',
-      full_name: 'Ananya Roy',
-      avatar_url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80',
-      is_verified: true,
-    },
-    media_url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1080&auto=format&fit=crop&q=85',
-    caption: 'Mediterranean summer golden hour overlooking cliffs 🍋🌊',
-    created_at: new Date(Date.now() - 3600000 * 4).toISOString(),
-  },
-  {
-    id: 'story_zoya',
-    user_id: 'usr_zoya',
-    user: {
-      id: 'usr_zoya',
-      username: 'zoya.spaces',
-      full_name: 'Zoya Khan',
-      avatar_url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=120&auto=format&fit=crop&q=80',
-      is_verified: true,
-    },
-    media_url: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=1080&auto=format&fit=crop&q=85',
-    caption: 'Minimalist living pavilion in Kyoto 📐✨',
-    created_at: new Date(Date.now() - 3600000 * 6).toISOString(),
-  },
-  {
-    id: 'story_rohan',
-    user_id: 'usr_rohan',
-    user: {
-      id: 'usr_rohan',
-      username: 'rohan.raw',
-      full_name: 'Rohan Sen',
-      avatar_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&auto=format&fit=crop&q=80',
-      is_verified: true,
-    },
-    media_url: 'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=1080&auto=format&fit=crop&q=85',
-    caption: 'Tokyo rain reflections through Shinjuku alleys 🏮🌧️',
-    created_at: new Date(Date.now() - 3600000 * 8).toISOString(),
-  },
-  {
-    id: 'story_vikram',
-    user_id: 'usr_vikram',
-    user: {
-      id: 'usr_vikram',
-      username: 'vikram.aerials',
-      full_name: 'Vikram Aditya',
-      avatar_url: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=120&auto=format&fit=crop&q=80',
-      is_verified: true,
-    },
-    media_url: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1080&auto=format&fit=crop&q=85',
-    caption: 'Crystal turquoise waters from 500ft 🏝️🚁',
-    created_at: new Date(Date.now() - 3600000 * 10).toISOString(),
-  },
-];
-
 export function StoriesBar() {
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [userStory, setUserStory] = useState<Story | null>(null);
+  const [communityStories, setCommunityStories] = useState<Story[]>([]);
   const [selectedStoryIndex, setSelectedStoryIndex] = useState<number | null>(null);
   const [isUploadingStory, setIsUploadingStory] = useState(false);
 
-  // Load user's active 24h story from Supabase and local cache
-  useEffect(() => {
-    if (!user) return;
+  // Load real active 24h stories from Supabase
+  const loadLiveStories = useCallback(async () => {
+    if (!isSupabaseConfigured()) {
+      return;
+    }
 
-    const loadLiveStories = async () => {
-      if (isSupabaseConfigured() && user.id && user.id !== 'usr_me') {
-        try {
-          const { data, error } = await supabase
-            .from('stories')
-            .select(`
-              id,
-              user_id,
-              media_url,
-              media_type,
-              caption,
-              created_at,
-              expires_at,
-              profiles (
-                id,
-                username,
-                full_name,
-                avatar_url,
-                is_verified
-              )
-            `)
-            .eq('user_id', user.id)
-            .gt('expires_at', new Date().toISOString())
-            .order('created_at', { ascending: false })
-            .limit(1);
+    try {
+      const nowIso = new Date().toISOString();
+      const { data, error } = await supabase
+        .from('stories')
+        .select(`
+          id,
+          user_id,
+          media_url,
+          media_type,
+          caption,
+          created_at,
+          expires_at,
+          profiles (
+            id,
+            username,
+            full_name,
+            avatar_url,
+            is_verified
+          )
+        `)
+        .gt('expires_at', nowIso)
+        .order('created_at', { ascending: false });
 
-          if (!error && data && data.length > 0) {
-            const row = data[0];
-            const liveStory: Story = {
-              id: row.id,
-              user_id: row.user_id,
-              user: (row.profiles as any) || user,
-              media_url: row.media_url,
-              caption: row.caption || '',
-              created_at: row.created_at,
-              expires_at: row.expires_at,
-            };
-            setUserStory(liveStory);
-            return;
+      if (!error && data) {
+        let currentUserStory: Story | null = null;
+        const otherStoriesList: Story[] = [];
+
+        data.forEach((row: any) => {
+          const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+          const storyItem: Story = {
+            id: row.id,
+            user_id: row.user_id,
+            user: profile || {
+              id: row.user_id,
+              username: 'user',
+              full_name: '',
+              avatar_url: '',
+              is_verified: false,
+            },
+            media_url: row.media_url,
+            caption: row.caption || '',
+            created_at: row.created_at,
+            expires_at: row.expires_at,
+          };
+
+          if (user?.id && row.user_id === user.id) {
+            if (!currentUserStory) {
+              currentUserStory = storyItem;
+            }
+          } else {
+            otherStoriesList.push(storyItem);
           }
-        } catch (e) {
-          console.warn('Could not fetch Supabase story:', e);
-        }
-      }
+        });
 
-      // Fallback to local storage if offline or pending
+        if (currentUserStory) {
+          setUserStory(currentUserStory);
+        }
+        setCommunityStories(otherStoriesList);
+        return;
+      }
+    } catch (e) {
+      console.warn('Could not fetch Supabase stories:', e);
+    }
+
+    // Fallback to local storage for current user if offline
+    if (user) {
       try {
         const userKey = user.id || user.username;
         const raw = localStorage.getItem(`photogram_story_${userKey}`);
@@ -156,12 +106,32 @@ export function StoriesBar() {
       } catch {
         setUserStory(null);
       }
-    };
-
-    loadLiveStories();
+    }
   }, [user]);
 
-  // Handle uploading user's new 24h story (Photo or Video Stories permitted)
+  useEffect(() => {
+    loadLiveStories();
+
+    // Supabase Realtime subscription for live stories
+    if (isSupabaseConfigured()) {
+      const channel = supabase
+        .channel('stories_live_feed')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'stories' },
+          () => {
+            loadLiveStories();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [loadLiveStories]);
+
+  // Handle uploading user's new 24h story
   const handleStoryFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
@@ -236,7 +206,9 @@ export function StoriesBar() {
     }
   };
 
-  const allActiveStories: Story[] = userStory ? [userStory, ...CREATOR_STORIES] : CREATOR_STORIES;
+  const allActiveStories: Story[] = userStory
+    ? [userStory, ...communityStories]
+    : communityStories;
 
   const handleOpenStory = (index: number) => {
     setSelectedStoryIndex(index);
@@ -307,8 +279,8 @@ export function StoriesBar() {
           </span>
         </div>
 
-        {/* Creator Stories */}
-        {CREATOR_STORIES.map((story, idx) => {
+        {/* Real Community Stories (100% Real Users) */}
+        {communityStories.map((story, idx) => {
           const adjustedIdx = userStory ? idx + 1 : idx;
           return (
             <div
@@ -319,7 +291,10 @@ export function StoriesBar() {
               <div className="relative w-16 h-16 rounded-full p-[2.5px] bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] group-hover:scale-105 transition-transform">
                 <div className="w-full h-full rounded-full overflow-hidden bg-black p-0.5 relative">
                   <Image
-                    src={story.user.avatar_url}
+                    src={
+                      story.user.avatar_url ||
+                      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'
+                    }
                     alt={story.user.username}
                     fill
                     className="object-cover rounded-full"

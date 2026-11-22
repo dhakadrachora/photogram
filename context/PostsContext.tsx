@@ -12,17 +12,19 @@ interface PostsContextType {
   addComment: (postId: string, text: string) => void;
   toggleSave: (postId: string) => void;
   createPost: (newPost: Omit<Post, 'id' | 'likes_count' | 'comments_count' | 'created_at'>) => void;
+  updatePost: (postId: string, data: { caption?: string; location?: string }) => Promise<{ success: boolean; error?: string }>;
   deletePost: (postId: string) => void;
   refreshPosts: () => void;
 }
 
 const PostsContext = createContext<PostsContextType>({
-  posts: MOCK_POSTS,
+  posts: [],
   savedPosts: [],
   toggleLike: () => {},
   addComment: () => {},
   toggleSave: () => {},
   createPost: () => {},
+  updatePost: async () => ({ success: true }),
   deletePost: () => {},
   refreshPosts: () => {},
 });
@@ -40,7 +42,8 @@ const getActiveUser = () => {
 };
 
 export function PostsProvider({ children }: { children: React.ReactNode }) {
-  const [posts, setPosts] = useState<Post[]>(MOCK_POSTS);
+  // Pure Real Posts - No Fake Accounts
+  const [posts, setPosts] = useState<Post[]>([]);
 
   // Fetch real posts from Supabase PostgreSQL tables
   const fetchPostsFromSupabase = useCallback(async () => {
@@ -360,6 +363,50 @@ export function PostsProvider({ children }: { children: React.ReactNode }) {
     savePostsToStorage([fallbackPost, ...posts]);
   };
 
+  const updatePost = async (
+    postId: string,
+    data: { caption?: string; location?: string }
+  ): Promise<{ success: boolean; error?: string }> => {
+    const activeUser = getActiveUser();
+    const userId = activeUser?.id;
+
+    // Optimistically update local posts state
+    const updated = posts.map((p) => {
+      if (p.id === postId) {
+        return {
+          ...p,
+          caption: data.caption !== undefined ? data.caption : p.caption,
+          location: data.location !== undefined ? data.location : p.location,
+        };
+      }
+      return p;
+    });
+    savePostsToStorage(updated);
+
+    // Sync with Supabase (Security: user can only edit their own post)
+    if (isSupabaseConfigured() && userId && userId !== 'usr_me') {
+      try {
+        const { error: sbErr } = await supabase
+          .from('posts')
+          .update({
+            caption: data.caption,
+            location: data.location,
+          })
+          .eq('id', postId)
+          .eq('user_id', userId);
+
+        if (sbErr) {
+          console.warn('Supabase post update warning:', sbErr);
+          return { success: false, error: sbErr.message };
+        }
+      } catch (err: any) {
+        return { success: false, error: err?.message || 'Update failed' };
+      }
+    }
+
+    return { success: true };
+  };
+
   const deletePost = async (postId: string) => {
     const updated = posts.filter((p) => p.id !== postId);
     savePostsToStorage(updated);
@@ -384,6 +431,7 @@ export function PostsProvider({ children }: { children: React.ReactNode }) {
         addComment,
         toggleSave,
         createPost,
+        updatePost,
         deletePost,
         refreshPosts: fetchPostsFromSupabase,
       }}
