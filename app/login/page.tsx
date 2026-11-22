@@ -110,7 +110,9 @@ function LoginFormContent() {
       const res = await login(identifier, password);
       if (res.success) {
         setSuccessMsg('Logged in successfully! Redirecting...');
-        setTimeout(() => router.push('/'), 400);
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 300);
       } else {
         setError(res.error || 'Sorry, your password was incorrect. Please double-check your password.');
       }
@@ -151,7 +153,9 @@ function LoginFormContent() {
       const res = await signup(identifier, password, cleanUsername, fullName || cleanUsername);
       if (res.success) {
         setSuccessMsg(`Account created for @${cleanUsername}! Redirecting to Photogram...`);
-        setTimeout(() => router.push('/'), 500);
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 400);
       } else {
         setError(res.error || 'Could not create account. Please try a different username.');
       }
@@ -224,8 +228,10 @@ function LoginFormContent() {
   const handleInstantDemoLogin = async () => {
     setLoading(true);
     setError(null);
-    await login('aryan.visuals', 'demo123456');
-    router.push('/');
+    const res = await login('aryan.visuals', 'demo123456');
+    if (res.success) {
+      window.location.href = '/';
+    }
   };
 
   const isIdentifierValid = identifier.trim().length >= 3;
