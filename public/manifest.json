@@ -1,12 +1,14 @@
 {
   "name": "Photogram • Photos & Visual Stories",
   "short_name": "Photogram",
-  "description": "A fast, responsive visual social media web app built with Next.js, Cloudinary and Supabase.",
+  "description": "Fast, modern, visual social media web app. Share HD photos, 24-hour visual stories, explore trending creators, and chat with friends in real-time.",
   "start_url": "/",
+  "id": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#000000",
-  "orientation": "portrait-primary",
+  "orientation": "portrait",
   "icons": [
     {
       "src": "/icon-192.png",
@@ -25,6 +27,24 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    }
+  ],
+  "categories": ["social", "photo", "lifestyle"],
+  "shortcuts": [
+    {
+      "name": "Explore",
+      "url": "/explore",
+      "description": "Explore trending photos and creators"
+    },
+    {
+      "name": "Direct Messages",
+      "url": "/direct",
+      "description": "Open private chats"
+    },
+    {
+      "name": "Reels",
+      "url": "/reels",
+      "description": "Watch full-screen video reels"
     }
   ]
 }
