@@ -8,15 +8,15 @@ import { useAuth } from '@/context/AuthContext';
 import { PostHeader } from './PostHeader';
 import { PostMediaCarousel } from './PostMediaCarousel';
 import { PostActions } from './PostActions';
-import { Check, Smile } from 'lucide-react';
+import { Check, Smile, Trash2, Flag, EyeOff, Copy, X } from 'lucide-react';
 
 interface PostCardProps {
   post: Post;
 }
 
 export function PostCard({ post }: PostCardProps) {
-  const { toggleLike, addComment, toggleSave } = usePosts();
-  const { user } = useAuth();
+  const { toggleLike, addComment, toggleSave, deletePost } = usePosts();
+  const { user, updateProfile } = useAuth();
   const [activeMediaIdx, setActiveMediaIdx] = useState(0);
   const [commentText, setCommentText] = useState('');
   const [commentsList, setCommentsList] = useState<string[]>([]);
@@ -24,6 +24,15 @@ export function PostCard({ post }: PostCardProps) {
   const [lastTap, setLastTap] = useState(0);
   const [showAllComments, setShowAllComments] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const isAuthor =
+    (Boolean(user?.username) &&
+      Boolean(post.user?.username) &&
+      user!.username.toLowerCase() === post.user.username.toLowerCase()) ||
+    (Boolean(user?.id) && Boolean(post.user_id) && user!.id === post.user_id);
 
   const handleMediaDoubleTap = () => {
     const now = Date.now();
@@ -54,9 +63,22 @@ export function PostCard({ post }: PostCardProps) {
     }
   };
 
+  const handleDeletePost = () => {
+    deletePost(post.id);
+    if (isAuthor && (user?.posts_count ?? 0) > 0) {
+      updateProfile({ posts_count: Math.max(0, (user?.posts_count ?? 1) - 1) });
+    }
+    setIsMenuOpen(false);
+    setShowDeleteConfirm(false);
+  };
+
   return (
-    <article className="w-full bg-[#000000] dark:bg-[#000000] light:bg-[#ffffff] border-y md:border md:rounded-xl border-[#262626] dark:border-[#262626] light:border-[#dbdbdb] pb-3 transition-colors">
-      <PostHeader user={post.user} location={post.location} />
+    <article className="w-full bg-[#000000] dark:bg-[#000000] light:bg-[#ffffff] border-y md:border md:rounded-xl border-[#262626] dark:border-[#262626] light:border-[#dbdbdb] pb-3 transition-colors relative">
+      <PostHeader
+        user={post.user}
+        location={post.location}
+        onOpenMenu={() => setIsMenuOpen(true)}
+      />
 
       <PostMediaCarousel
         media={post.media}
@@ -136,6 +158,103 @@ export function PostCard({ post }: PostCardProps) {
           )}
         </form>
       </div>
+
+      {/* Instagram Post Action Menu Modal */}
+      {isMenuOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-in fade-in select-none"
+          onClick={() => {
+            setIsMenuOpen(false);
+            setShowDeleteConfirm(false);
+          }}
+        >
+          <div
+            className="w-full max-w-xs bg-[#262626] border border-neutral-800 rounded-2xl overflow-hidden shadow-2xl text-center divide-y divide-neutral-700/60"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {showDeleteConfirm ? (
+              <div className="p-5 space-y-3">
+                <h4 className="font-bold text-sm text-white">Delete Post?</h4>
+                <p className="text-xs text-neutral-400">
+                  Are you sure you want to delete this post? This cannot be undone.
+                </p>
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={() => setShowDeleteConfirm(false)}
+                    className="flex-1 py-2 text-xs font-semibold text-white bg-neutral-700 hover:bg-neutral-600 rounded-xl cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleDeletePost}
+                    className="flex-1 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl cursor-pointer"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {isAuthor ? (
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="w-full py-3.5 text-xs font-bold text-red-500 hover:bg-neutral-800 transition-colors cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>Delete</span>
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => {
+                        setNotice('Post reported to moderators.');
+                        setIsMenuOpen(false);
+                        setTimeout(() => setNotice(null), 3000);
+                      }}
+                      className="w-full py-3.5 text-xs font-bold text-red-500 hover:bg-neutral-800 transition-colors cursor-pointer"
+                    >
+                      Report
+                    </button>
+                    <button
+                      onClick={() => {
+                        setNotice('Post marked as Not Interested.');
+                        setIsMenuOpen(false);
+                        setTimeout(() => setNotice(null), 3000);
+                      }}
+                      className="w-full py-3.5 text-xs text-neutral-300 hover:bg-neutral-800 transition-colors cursor-pointer"
+                    >
+                      Not Interested
+                    </button>
+                  </>
+                )}
+
+                <button
+                  onClick={() => {
+                    handleShare();
+                    setIsMenuOpen(false);
+                  }}
+                  className="w-full py-3.5 text-xs text-neutral-300 hover:bg-neutral-800 transition-colors cursor-pointer"
+                >
+                  Copy link
+                </button>
+
+                <button
+                  onClick={() => setIsMenuOpen(false)}
+                  className="w-full py-3.5 text-xs text-neutral-400 hover:bg-neutral-800 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {notice && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-neutral-900 border border-neutral-700 text-white text-xs px-3 py-1.5 rounded-full shadow-lg z-20 animate-in fade-in">
+          {notice}
+        </div>
+      )}
     </article>
   );
 }

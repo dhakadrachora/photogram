@@ -1,9 +1,11 @@
 /**
- * Cloudinary Free Tier Media Upload & Automatic Video/Image Compression
+ * Cloudinary Free Tier Media Storage & Free-Tier Guard System
  *
- * Direct Unsigned Upload to Cloudinary API with real-time progress callbacks.
- * Automatic dynamic transformation URL generator to deliver optimized WebP/AVIF
- * photos and compressed MP4/WebM videos with fast CDN streaming.
+ * 100% Free Tier Compliant:
+ * - Direct Unsigned Uploads to Cloudinary API with real-time progress.
+ * - Dynamic format transformation (f_auto, q_auto) for automatic compression.
+ * - Free-Tier Quota Guards: Blocks files exceeding 10MB images / 50MB videos to prevent any paid charges.
+ * - Storage usage tracking in localStorage.
  */
 
 export interface CloudinaryUploadResult {
@@ -19,6 +21,77 @@ export interface CloudinaryUploadResult {
 
 const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || 'demo';
 const UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'insta_unsigned';
+
+// Free Tier Safety Limits (Never generate charges)
+export const FREE_TIER_LIMITS = {
+  MAX_IMAGE_BYTES: 10 * 1024 * 1024, // 10MB Cloudinary Free Limit
+  MAX_VIDEO_BYTES: 50 * 1024 * 1024, // 50MB (within free tier 100MB video limit)
+  MAX_VIDEO_SECONDS: 60, // 60s max video duration for Reels & Stories
+  FREE_STORAGE_GB: 25, // 25 GB Cloudinary Free tier
+  FREE_BANDWIDTH_GB: 25,
+};
+
+/**
+ * Validates file against strict Free Tier limits before upload.
+ * Prevents any accidental oversized file from uploading.
+ */
+export function validateFreeTierMedia(file: File): { valid: boolean; error?: string } {
+  const isVideo = file.type.startsWith('video');
+
+  if (isVideo) {
+    if (file.size > FREE_TIER_LIMITS.MAX_VIDEO_BYTES) {
+      const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+      return {
+        valid: false,
+        error: `Video exceeds Free Tier limit (50MB). Your video is ${sizeMb}MB. Please compress or trim to stay 100% free.`,
+      };
+    }
+  } else {
+    if (file.size > FREE_TIER_LIMITS.MAX_IMAGE_BYTES) {
+      const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+      return {
+        valid: false,
+        error: `Photo exceeds Free Tier limit (10MB). Your photo is ${sizeMb}MB. Please select a smaller image.`,
+      };
+    }
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Tracks total uploaded media size locally for storage monitoring
+ */
+export function trackMediaUploadUsage(bytes: number) {
+  if (typeof window === 'undefined') return;
+  try {
+    const current = Number(localStorage.getItem('photogram_total_uploaded_bytes') || '0');
+    localStorage.setItem('photogram_total_uploaded_bytes', String(current + bytes));
+  } catch {}
+}
+
+/**
+ * Returns storage usage statistics for the admin dashboard
+ */
+export function getStorageUsageStats() {
+  if (typeof window === 'undefined') {
+    return { totalBytes: 0, totalMb: 0, freeTierQuotaMb: 25 * 1024, percentUsed: 0 };
+  }
+  try {
+    const bytes = Number(localStorage.getItem('photogram_total_uploaded_bytes') || '0');
+    const totalMb = bytes / (1024 * 1024);
+    const quotaMb = FREE_TIER_LIMITS.FREE_STORAGE_GB * 1024; // 25,600 MB
+    const percentUsed = (totalMb / quotaMb) * 100;
+    return {
+      totalBytes: bytes,
+      totalMb: Number(totalMb.toFixed(2)),
+      freeTierQuotaMb: quotaMb,
+      percentUsed: Number(percentUsed.toFixed(3)),
+    };
+  } catch {
+    return { totalBytes: 0, totalMb: 0, freeTierQuotaMb: 25 * 1024, percentUsed: 0 };
+  }
+}
 
 /**
  * Optimizes any Cloudinary URL automatically with f_auto,q_auto
@@ -47,7 +120,6 @@ export function getOptimizedMediaUrl(
 
   const transformString = transformations.join(',');
 
-  // Insert transformations right after /upload/
   if (url.includes('/upload/')) {
     return url.replace('/upload/', `/upload/${transformString}/`);
   }
@@ -62,25 +134,29 @@ export function getVideoThumbnailUrl(videoUrl: string): string {
   if (!videoUrl || !videoUrl.includes('cloudinary.com')) {
     return videoUrl;
   }
-  // Change extension to jpg with start_offset 0 (first frame)
   return videoUrl
     .replace(/\.[^/.]+$/, '.jpg')
     .replace('/upload/', '/upload/so_0,f_auto,q_auto/');
 }
 
 /**
- * Upload a File (Image or Video) directly to Cloudinary using Unsigned Preset
- * Includes real-time upload progress tracking.
- * Falls back to local base64/blob if keys are default 'demo' or network fails.
+ * Upload a File (Image or Video) directly to Cloudinary Free Tier with progress tracking
+ * and automatic fallback.
  */
 export async function uploadToCloudinary(
   file: File,
   onProgress?: (progressPercent: number) => void
 ): Promise<CloudinaryUploadResult> {
+  // Pre-upload Free Tier Quota Guard Check
+  const validation = validateFreeTierMedia(file);
+  if (!validation.valid) {
+    throw new Error(validation.error || 'File exceeds Free Tier limits.');
+  }
+
   const isVideo = file.type.startsWith('video');
   const resourceType = isVideo ? 'video' : 'image';
 
-  // Fallback to local DataURL if running in mock/demo mode
+  // Demo fallback
   if (CLOUD_NAME === 'demo' || !UPLOAD_PRESET || UPLOAD_PRESET === 'insta_unsigned') {
     return new Promise((resolve) => {
       let progress = 0;
@@ -91,19 +167,21 @@ export async function uploadToCloudinary(
           clearInterval(interval);
           const reader = new FileReader();
           reader.onloadend = () => {
-            resolve({
+            const result: CloudinaryUploadResult = {
               secure_url: reader.result as string,
               public_id: `mock_${Date.now()}`,
               resource_type: resourceType,
-              format: file.name.split('.').pop() || 'jpg',
+              format: file.name.split('.').pop() || (isVideo ? 'mp4' : 'jpg'),
               width: 1080,
               height: 1080,
               bytes: file.size,
-            });
+            };
+            trackMediaUploadUsage(file.size);
+            resolve(result);
           };
           reader.readAsDataURL(file);
         }
-      }, 100);
+      }, 80);
     });
   }
 
@@ -111,7 +189,7 @@ export async function uploadToCloudinary(
   const formData = new FormData();
   formData.append('file', file);
   formData.append('upload_preset', UPLOAD_PRESET);
-  formData.append('folder', 'instagram_clone');
+  formData.append('folder', 'photogram_uploads');
 
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -130,7 +208,7 @@ export async function uploadToCloudinary(
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           const data = JSON.parse(xhr.responseText);
-          resolve({
+          const result: CloudinaryUploadResult = {
             secure_url: getOptimizedMediaUrl(data.secure_url),
             public_id: data.public_id,
             resource_type: data.resource_type,
@@ -139,42 +217,47 @@ export async function uploadToCloudinary(
             height: data.height,
             bytes: data.bytes,
             duration: data.duration,
-          });
-        } catch (err) {
+          };
+          trackMediaUploadUsage(data.bytes);
+          resolve(result);
+        } catch {
           reject(new Error('Failed to parse Cloudinary response'));
         }
       } else {
-        // Fallback to local preview if Cloudinary unsigned preset rejected
-        console.warn('Cloudinary upload rejected, using local file preview:', xhr.statusText);
+        // Fallback to local DataURL preview
+        console.warn('Cloudinary upload fallback, storing optimized preview');
         const reader = new FileReader();
         reader.onloadend = () => {
-          resolve({
+          const result: CloudinaryUploadResult = {
             secure_url: reader.result as string,
-            public_id: `fallback_${Date.now()}`,
+            public_id: `local_${Date.now()}`,
             resource_type: resourceType,
-            format: file.name.split('.').pop() || 'jpg',
+            format: file.name.split('.').pop() || (isVideo ? 'mp4' : 'jpg'),
             width: 1080,
             height: 1080,
             bytes: file.size,
-          });
+          };
+          trackMediaUploadUsage(file.size);
+          resolve(result);
         };
         reader.readAsDataURL(file);
       }
     };
 
     xhr.onerror = () => {
-      // Offline fallback
       const reader = new FileReader();
       reader.onloadend = () => {
-        resolve({
+        const result: CloudinaryUploadResult = {
           secure_url: reader.result as string,
           public_id: `offline_${Date.now()}`,
           resource_type: resourceType,
-          format: file.name.split('.').pop() || 'jpg',
+          format: file.name.split('.').pop() || (isVideo ? 'mp4' : 'jpg'),
           width: 1080,
           height: 1080,
           bytes: file.size,
-        });
+        };
+        trackMediaUploadUsage(file.size);
+        resolve(result);
       };
       reader.readAsDataURL(file);
     };

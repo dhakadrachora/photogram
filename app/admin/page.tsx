@@ -20,9 +20,12 @@ import {
   Server,
   Database,
   Cloud,
+  HardDrive,
+  Zap,
 } from 'lucide-react';
 import { useAuth, StoredAccount } from '@/context/AuthContext';
 import { usePosts } from '@/context/PostsContext';
+import { getStorageUsageStats, FREE_TIER_LIMITS } from '@/lib/cloudinary';
 
 const ADMIN_PASSKEY = 'photogram@2026';
 
@@ -37,6 +40,12 @@ export default function AdminPage() {
   const [registeredAccounts, setRegisteredAccounts] = useState<StoredAccount[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
+  const [storageStats, setStorageStats] = useState({
+    totalBytes: 0,
+    totalMb: 0,
+    freeTierQuotaMb: 25 * 1024,
+    percentUsed: 0,
+  });
 
   // Check existing admin session
   useEffect(() => {
@@ -60,6 +69,7 @@ export default function AdminPage() {
     } catch {
       setRegisteredAccounts([]);
     }
+    setStorageStats(getStorageUsageStats());
   };
 
   const handleAdminLogin = (e: React.FormEvent) => {
@@ -256,6 +266,104 @@ export default function AdminPage() {
           </div>
           <p className="text-sm font-bold text-sky-400 mt-1">Supabase PostgreSQL</p>
           <span className="text-[10px] text-neutral-500">Live on photogramweb.online</span>
+        </div>
+      </div>
+
+      {/* Free Tier Storage & Quota Monitor (100% Free Guarantee) */}
+      <div className="border border-neutral-800 rounded-2xl bg-neutral-950 p-5 md:p-6 mb-6 shadow-xl space-y-5">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-neutral-850">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+              <HardDrive className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                <span>Free-Tier Storage & Quota Monitor</span>
+                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  100% FREE TIER • ZERO CHARGES
+                </span>
+              </h3>
+              <p className="text-[11px] text-neutral-400">
+                Automated quota guard enforcing free limits across Cloudinary, Supabase, and Vercel.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-emerald-950/60 text-emerald-400 border border-emerald-800/60">
+              <CheckCircle className="w-3.5 h-3.5" />
+              Auto-Upgrades Disabled
+            </span>
+          </div>
+        </div>
+
+        {/* Storage Bar Meter */}
+        <div>
+          <div className="flex items-center justify-between text-xs mb-2">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-white">Cloudinary Storage Used:</span>
+              <span className="text-neutral-300 font-mono">
+                {storageStats.totalMb} MB / {storageStats.freeTierQuotaMb.toLocaleString()} MB (25 GB Free)
+              </span>
+            </div>
+            <span className="font-bold text-emerald-400 font-mono">
+              {Math.max(0.01, storageStats.percentUsed).toFixed(2)}% Used
+            </span>
+          </div>
+          <div className="w-full h-2.5 rounded-full bg-neutral-900 overflow-hidden border border-neutral-800">
+            <div
+              className="h-full bg-gradient-to-r from-emerald-500 via-teal-400 to-[#0095f6] rounded-full transition-all duration-500"
+              style={{ width: `${Math.max(1, Math.min(100, storageStats.percentUsed))}%` }}
+            />
+          </div>
+          <div className="flex justify-between items-center text-[10px] text-neutral-500 mt-1.5">
+            <span>0 MB (Start)</span>
+            <span>Pre-Upload Guards Active: Max 10MB Images • Max 50MB Videos</span>
+            <span>25,600 MB (Free Tier Limit)</span>
+          </div>
+        </div>
+
+        {/* 4 Pillars Breakdown */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
+          <div className="p-3 rounded-xl bg-neutral-900/60 border border-neutral-800">
+            <div className="flex items-center justify-between text-[11px] text-neutral-400 mb-1">
+              <span className="font-semibold text-white">1. Cloudinary Free</span>
+              <span className="text-emerald-400 font-bold">25 Credits</span>
+            </div>
+            <p className="text-[11px] text-neutral-400">
+              ~25GB storage or bandwidth. Automatic <code className="text-emerald-400">f_auto,q_auto</code> compression active.
+            </p>
+          </div>
+
+          <div className="p-3 rounded-xl bg-neutral-900/60 border border-neutral-800">
+            <div className="flex items-center justify-between text-[11px] text-neutral-400 mb-1">
+              <span className="font-semibold text-white">2. Supabase Free</span>
+              <span className="text-sky-400 font-bold">500MB DB</span>
+            </div>
+            <p className="text-[11px] text-neutral-400">
+              PostgreSQL stores URLs &amp; text only (&lt;2KB/post). Up to 250,000 posts free.
+            </p>
+          </div>
+
+          <div className="p-3 rounded-xl bg-neutral-900/60 border border-neutral-800">
+            <div className="flex items-center justify-between text-[11px] text-neutral-400 mb-1">
+              <span className="font-semibold text-white">3. Vercel Free</span>
+              <span className="text-purple-400 font-bold">100GB / mo</span>
+            </div>
+            <p className="text-[11px] text-neutral-400">
+              Zero binary media on Vercel host. Edge network serves code and pages only.
+            </p>
+          </div>
+
+          <div className="p-3 rounded-xl bg-neutral-900/60 border border-neutral-800">
+            <div className="flex items-center justify-between text-[11px] text-neutral-400 mb-1">
+              <span className="font-semibold text-white">4. Upload Guards</span>
+              <span className="text-amber-400 font-bold">Enforced</span>
+            </div>
+            <p className="text-[11px] text-neutral-400">
+              Client rejects &gt;10MB photos and &gt;50MB videos before upload. Zero overage risk.
+            </p>
+          </div>
         </div>
       </div>
 

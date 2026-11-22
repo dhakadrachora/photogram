@@ -21,6 +21,7 @@ import {
   UserPlus,
 } from 'lucide-react';
 import Image from 'next/image';
+import { uploadToCloudinary } from '@/lib/cloudinary';
 
 const SUGGESTED_CREATORS = [
   {
@@ -74,6 +75,7 @@ export default function DirectPage() {
   const [noteInput, setNoteInput] = useState('');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatMediaInputRef = useRef<HTMLInputElement>(null);
 
   // Load real conversations and messages history for the current user
   useEffect(() => {
@@ -192,15 +194,16 @@ export default function DirectPage() {
     setIsNewMessageModalOpen(false);
   };
 
-  const handleSendMessage = (textToSend?: string) => {
+  const handleSendMessage = (textToSend?: string, mediaUrl?: string) => {
     const text = textToSend || messageText;
-    if (!text.trim() || !activeConvId) return;
+    if ((!text.trim() && !mediaUrl) || !activeConvId) return;
 
     const newMsg: Message = {
       id: `msg_${Date.now()}`,
       sender_id: user?.id || 'usr_me',
       receiver_id: activeConv?.user.id || '',
       text: text.trim(),
+      media_url: mediaUrl,
       created_at: new Date().toISOString(),
       is_read: false,
     };
@@ -271,6 +274,20 @@ export default function DirectPage() {
 
   const handleSendHeart = () => {
     handleSendMessage('❤️');
+  };
+
+  const handleSendChatPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeConvId) return;
+
+    try {
+      const res = await uploadToCloudinary(file);
+      if (res?.secure_url) {
+        handleSendMessage('📷 Photo', res.secure_url);
+      }
+    } catch (err) {
+      console.error('Chat media upload error:', err);
+    }
   };
 
   const filteredConversations = conversations.filter(
@@ -531,13 +548,23 @@ export default function DirectPage() {
                     className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
                   >
                     <div
-                      className={`max-w-[75%] px-3.5 py-2 rounded-2xl text-xs leading-relaxed ${
+                      className={`max-w-[75%] rounded-2xl overflow-hidden text-xs leading-relaxed ${
                         isMe
                           ? 'bg-[#0095f6] text-white rounded-br-xs'
                           : 'bg-neutral-800 text-neutral-100 rounded-bl-xs'
                       }`}
                     >
-                      {msg.text}
+                      {msg.media_url && (
+                        <div className="relative w-52 h-52 overflow-hidden bg-neutral-900">
+                          <Image
+                            src={msg.media_url}
+                            alt="Chat photo"
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                      )}
+                      {msg.text && <p className="px-3.5 py-2">{msg.text}</p>}
                     </div>
                     <span suppressHydrationWarning className="text-[9px] text-neutral-500 mt-1 px-1">
                       {new Date(msg.created_at).toLocaleTimeString([], {
@@ -574,13 +601,24 @@ export default function DirectPage() {
                   </button>
                 ) : (
                   <div className="flex items-center gap-2 text-neutral-400">
-                    <button className="hover:text-white cursor-pointer">
+                    <input
+                      ref={chatMediaInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleSendChatPhoto}
+                      className="hidden"
+                    />
+                    <button className="hover:text-white cursor-pointer" title="Record Voice">
                       <Mic className="w-5 h-5" />
                     </button>
-                    <button className="hover:text-white cursor-pointer">
+                    <button
+                      onClick={() => chatMediaInputRef.current?.click()}
+                      className="hover:text-white cursor-pointer"
+                      title="Send Photo"
+                    >
                       <ImageIcon className="w-5 h-5" />
                     </button>
-                    <button onClick={handleSendHeart} className="hover:text-red-500 cursor-pointer">
+                    <button onClick={handleSendHeart} className="hover:text-red-500 cursor-pointer" title="Send Heart">
                       <Heart className="w-5 h-5 fill-none text-white hover:fill-red-500 hover:text-red-500" />
                     </button>
                   </div>

@@ -11,6 +11,7 @@ interface PostsContextType {
   addComment: (postId: string, text: string) => void;
   toggleSave: (postId: string) => void;
   createPost: (newPost: Omit<Post, 'id' | 'likes_count' | 'comments_count' | 'created_at'>) => void;
+  deletePost: (postId: string) => void;
 }
 
 const PostsContext = createContext<PostsContextType>({
@@ -20,6 +21,7 @@ const PostsContext = createContext<PostsContextType>({
   addComment: () => {},
   toggleSave: () => {},
   createPost: () => {},
+  deletePost: () => {},
 });
 
 const getActiveUser = () => {
@@ -121,6 +123,11 @@ export function PostsProvider({ children }: { children: React.ReactNode }) {
     savePostsToStorage([post, ...posts]);
   };
 
+  const deletePost = (postId: string) => {
+    const updated = posts.filter((p) => p.id !== postId);
+    savePostsToStorage(updated);
+  };
+
   const savedPosts = posts.filter((p) => p.has_saved);
 
   return (
@@ -132,6 +139,7 @@ export function PostsProvider({ children }: { children: React.ReactNode }) {
         addComment,
         toggleSave,
         createPost,
+        deletePost,
       }}
     >
       {children}
