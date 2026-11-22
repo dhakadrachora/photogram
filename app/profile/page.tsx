@@ -20,6 +20,7 @@ import {
   UserPlus,
   X,
   Film,
+  QrCode,
 } from 'lucide-react';
 import Image from 'next/image';
 import { uploadToCloudinary } from '@/lib/cloudinary';
@@ -34,6 +35,7 @@ export default function ProfilePage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isFollowingModalOpen, setIsFollowingModalOpen] = useState(false);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [isUploadingDp, setIsUploadingDp] = useState(false);
 
@@ -158,6 +160,14 @@ export default function ProfilePage() {
             >
               {copiedLink ? <Check className="w-3.5 h-3.5 text-green-400" /> : null}
               <span>{copiedLink ? 'Copied' : 'Share profile'}</span>
+            </button>
+
+            <button
+              onClick={() => setIsQrModalOpen(true)}
+              className="p-1.5 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg transition-colors flex items-center justify-center cursor-pointer"
+              title="QR Code"
+            >
+              <QrCode className="w-4 h-4" />
             </button>
 
             <Link
@@ -318,6 +328,93 @@ export default function ProfilePage() {
           >
             Share your first photo
           </button>
+        </div>
+      )}
+
+      {/* QR Profile Code Modal */}
+      {isQrModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in select-none"
+          onClick={() => setIsQrModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-3xl p-6 shadow-2xl text-white relative overflow-hidden bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setIsQrModalOpen(false)}
+              className="absolute top-4 right-4 p-1.5 rounded-full bg-black/40 hover:bg-black/60 text-white cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Inner White QR Card */}
+            <div className="bg-white rounded-2xl p-6 text-black flex flex-col items-center shadow-xl mt-4">
+              <div className="relative w-16 h-16 rounded-full overflow-hidden border-2 border-white shadow-md mb-2 bg-neutral-900">
+                <Image
+                  src={user?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
+                  alt={user?.username || 'User'}
+                  fill
+                  className="object-cover"
+                />
+              </div>
+
+              <h4 className="font-bold text-base text-neutral-900">@{user?.username}</h4>
+              <p className="text-xs text-neutral-500 mb-5">{user?.full_name}</p>
+
+              {/* Stylized QR Code Representation */}
+              <div className="w-44 h-44 border-4 border-black rounded-2xl p-3 flex flex-col justify-between bg-white relative">
+                {/* 4 Corner Position Anchors */}
+                <div className="flex justify-between">
+                  <div className="w-10 h-10 border-4 border-black rounded-lg flex items-center justify-center p-1">
+                    <div className="w-full h-full bg-black rounded-xs" />
+                  </div>
+                  <div className="w-10 h-10 border-4 border-black rounded-lg flex items-center justify-center p-1">
+                    <div className="w-full h-full bg-black rounded-xs" />
+                  </div>
+                </div>
+
+                {/* Center Brand Icon */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="w-10 h-10 rounded-xl overflow-hidden ring-2 ring-white shadow">
+                    <Image src="/app-logo.png" alt="Logo" width={40} height={40} className="object-cover" />
+                  </div>
+                </div>
+
+                <div className="flex justify-between">
+                  <div className="w-10 h-10 border-4 border-black rounded-lg flex items-center justify-center p-1">
+                    <div className="w-full h-full bg-black rounded-xs" />
+                  </div>
+                  {/* Subtle matrix dots */}
+                  <div className="grid grid-cols-3 gap-1 w-9 h-9 p-0.5">
+                    <div className="bg-black rounded-xs" />
+                    <div className="bg-black rounded-xs" />
+                    <div className="bg-transparent" />
+                    <div className="bg-transparent" />
+                    <div className="bg-black rounded-xs" />
+                    <div className="bg-black rounded-xs" />
+                    <div className="bg-black rounded-xs" />
+                    <div className="bg-transparent" />
+                    <div className="bg-black rounded-xs" />
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-neutral-500 text-center mt-4">
+                Scan to follow @{user?.username} on Photogram
+              </p>
+            </div>
+
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={handleShareProfile}
+                className="w-full py-2.5 rounded-xl bg-black/60 hover:bg-black/80 text-white text-xs font-semibold backdrop-blur-md transition-colors cursor-pointer text-center flex items-center justify-center gap-1.5"
+              >
+                {copiedLink ? <Check className="w-4 h-4 text-green-400" /> : <LinkIcon className="w-4 h-4" />}
+                <span>{copiedLink ? 'Link Copied!' : 'Copy Profile Link'}</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
