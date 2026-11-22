@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { AlertCircle, RefreshCw, Home } from 'lucide-react';
 import Link from 'next/link';
+import { RefreshCw, Home } from 'lucide-react';
 
 export default function Error({
   error,
@@ -12,39 +12,32 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error('App Runtime Error:', error);
+    console.error('Instagram App Error:', error);
   }, [error]);
 
   return (
-    <div className="min-h-screen bg-[#05070D] text-white flex items-center justify-center p-4">
-      <div className="max-w-md w-full p-8 rounded-3xl bg-[#0B1220] border border-cyan-500/20 text-center space-y-4 shadow-2xl">
-        <div className="w-16 h-16 rounded-2xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center mx-auto border border-cyan-500/20 text-3xl">
-          😅
-        </div>
-
-        <h2 className="text-xl sm:text-2xl font-black text-white font-hindi">
-          कुछ गड़बड़ हो गई सा 😅
+    <div className="min-h-screen bg-black text-white flex items-center justify-center p-4">
+      <div className="max-w-md w-full p-8 rounded-2xl bg-neutral-900 border border-neutral-800 text-center space-y-4 shadow-2xl">
+        <h2 className="text-xl font-bold text-white">
+          Something went wrong
         </h2>
-
-        <p className="text-xs sm:text-sm text-slate-300 font-hindi">
-          कृपया थोड़ी देर बाद फिर कोशिश करें।
+        <p className="text-xs text-neutral-400">
+          An unexpected error occurred. Please try reloading the page.
         </p>
-
         <div className="flex items-center justify-center gap-3 pt-2">
           <button
             onClick={() => reset()}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs transition-transform active:scale-95 cursor-pointer shadow-lg shadow-cyan-500/20"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#0095f6] hover:bg-[#1877f2] text-white font-semibold text-xs transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
-            <span>पुनः प्रयास करें (Retry)</span>
+            <span>Try Again</span>
           </button>
-
           <Link
             href="/"
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-xs transition-colors border border-white/10"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-white font-semibold text-xs transition-colors border border-neutral-700"
           >
             <Home className="w-4 h-4" />
-            <span>होम पेज</span>
+            <span>Go Home</span>
           </Link>
         </div>
       </div>

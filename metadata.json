@@ -1,6 +1,6 @@
 {
-  "name": "DHOTI AALE - ढोटी की अपनी डिजिटल पहचान",
-  "description": "राजस्थान का पहला डिजिटल गाँव समुदाय | Rajasthan's Digital Village Community.",
+  "name": "Instagram Web",
+  "description": "A responsive 1:1 Instagram Web application built with Next.js, Cloudinary, and Supabase.",
   "requestFramePermissions": ["microphone"],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": []
 }

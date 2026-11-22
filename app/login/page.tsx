@@ -1,51 +1,22 @@
 'use client';
 
 import React, { useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import {
-  Lock,
-  Mail,
-  User as UserIcon,
-  Phone,
-  Eye,
-  EyeOff,
-  Sparkles,
-  ArrowRight,
-  ShieldCheck,
-  CheckCircle2,
-  AlertCircle,
-  Loader2,
-} from 'lucide-react';
-import { AppShell } from '@/components/app/AppShell';
-import { useAuth } from '@/components/providers/AuthProvider';
-
-const AVATARS = [
-  'https://api.dicebear.com/7.x/bottts/svg?seed=dhoti-king',
-  'https://api.dicebear.com/7.x/bottts/svg?seed=dhakad-warrior',
-  'https://api.dicebear.com/7.x/bottts/svg?seed=kisan-veer',
-  'https://api.dicebear.com/7.x/bottts/svg?seed=desi-bot',
-];
+import { useAuth } from '@/context/AuthContext';
+import { Zap, AlertCircle, Check } from 'lucide-react';
+import Image from 'next/image';
 
 export default function LoginPage() {
-  const { currentUser, login, signup, loginWithGoogle } = useAuth();
   const router = useRouter();
-
-  const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const { login, signup } = useAuth();
+  const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [avatar, setAvatar] = useState(AVATARS[0]);
-  const [showPassword, setShowPassword] = useState(false);
+  const [fullName, setFullName] = useState('');
+  const [username, setUsername] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // If already logged in, redirect to profile
-  if (currentUser) {
-    router.push('/profile');
-    return null;
-  }
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,250 +24,190 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      if (mode === 'login') {
-        const res = await login(email, password);
-        if (!res.success) {
-          setError(res.error || 'लॉगिन विफल रहा। कृपया सही विवरण दर्ज करें।');
+      if (isSignUp) {
+        if (!email || !password || !username) {
+          setError('Please fill in all required fields.');
+          setLoading(false);
           return;
         }
-        router.push('/');
+        const res = await signup(email, password, username, fullName);
+        if (res.success) {
+          setSuccessMsg('Account created successfully! Redirecting...');
+          setTimeout(() => router.push('/'), 1000);
+        } else {
+          setError(res.error || 'Failed to sign up.');
+        }
       } else {
-        if (!name.trim()) {
-          setError('कृपया अपना नाम दर्ज करें।');
+        if (!email || !password) {
+          setError('Please enter your email/username and password.');
+          setLoading(false);
           return;
         }
-        const res = await signup(email, password, name, phone, avatar);
-        if (!res.success) {
-          setError(res.error || 'पंजीकरण विफल रहा।');
-          return;
+        const res = await login(email, password);
+        if (res.success) {
+          router.push('/');
+        } else {
+          setError(res.error || 'Failed to log in.');
         }
-        router.push('/');
       }
     } catch (err: any) {
-      setError(err?.message || 'समस्या आई।');
+      setError(err?.message || 'An unexpected error occurred.');
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <AppShell hideBottomNav>
-      <div className="max-w-md mx-auto my-6 sm:my-10">
-        <div className="rounded-3xl bg-[#0B1220] border border-white/10 p-6 sm:p-8 shadow-2xl relative overflow-hidden">
-          {/* Ambient Glow */}
-          <div className="absolute top-0 right-0 w-60 h-60 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+  const handleInstantDemoLogin = async () => {
+    setLoading(true);
+    await login('aryan.visuals@instagram.com', 'demo123456');
+    router.push('/');
+  };
 
-          {/* Logo & Heading */}
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-500 via-blue-600 to-indigo-600 p-[1.5px] shadow-xl shadow-cyan-500/20 mb-3">
-              <div className="w-full h-full bg-[#070B14] rounded-[14px] flex items-center justify-center">
-                <span className="font-hindi-head text-cyan-400 text-2xl font-black">
-                  ढो
+  return (
+    <div className="min-h-screen bg-black flex items-center justify-center p-4">
+      <div className="flex items-center justify-center gap-8 w-full max-w-4xl">
+        {/* Left Side: Mock Phone Preview (Desktop only) */}
+        <div className="hidden lg:block relative w-[380px] h-[580px] shrink-0">
+          <div className="w-full h-full rounded-[40px] border-4 border-neutral-800 bg-neutral-950 p-3 shadow-2xl relative overflow-hidden">
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 w-28 h-4 bg-neutral-800 rounded-full z-20" />
+            <div className="w-full h-full rounded-[32px] overflow-hidden relative">
+              <Image
+                src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80"
+                alt="Instagram Phone Demo"
+                fill
+                className="object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/30" />
+              <div className="absolute bottom-6 left-4 right-4 text-white">
+                <span className="text-xs font-semibold px-2.5 py-1 bg-[#0095f6] rounded-full">
+                  Fast Cloudinary HD Photos
                 </span>
+                <p className="text-sm font-bold mt-2">1:1 Photogram Web Experience</p>
+                <p className="text-[11px] text-neutral-300">
+                  Supabase Database • Cloudinary Media • Next.js App Router
+                </p>
               </div>
             </div>
+          </div>
+        </div>
 
-            <h1 className="text-2xl font-black text-white font-hindi">
-              DHOTI <span className="text-cyan-400">AALE</span>
+        {/* Right Side: Auth Form Card */}
+        <div className="w-full max-w-[350px] space-y-3">
+          {/* Main Card */}
+          <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-8 flex flex-col items-center">
+            {/* Photogram Script Heading */}
+            <h1 className="text-3xl font-bold tracking-tight text-white mb-6 font-serif italic">
+              Photogram
             </h1>
 
-            <p className="text-xs text-slate-400 font-hindi mt-1">
-              "ढोटी गांव की खबरें, लोग, जानकारी और गतिविधियां एक जगह।"
-            </p>
-          </div>
-
-          {/* Mode Switcher */}
-          <div className="flex rounded-xl bg-[#070B14] p-1 border border-white/5 mb-6">
-            <button
-              onClick={() => {
-                setMode('login');
-                setError(null);
-              }}
-              className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
-                mode === 'login'
-                  ? 'bg-cyan-500 text-slate-950 shadow-md'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              लॉगिन (Login)
-            </button>
-            <button
-              onClick={() => {
-                setMode('signup');
-                setError(null);
-              }}
-              className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
-                mode === 'signup'
-                  ? 'bg-cyan-500 text-slate-950 shadow-md'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              नया खाता बनाएं (Sign Up)
-            </button>
-          </div>
-
-          {error && (
-            <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {mode === 'signup' && (
-              <>
-                <div>
-                  <label className="text-xs font-semibold text-slate-300 block mb-1">
-                    आपका पूरा नाम:
-                  </label>
-                  <div className="relative">
-                    <UserIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input
-                      type="text"
-                      required
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="उदा. रोहित धाकड़"
-                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#0D1726] border border-white/10 text-white text-sm focus:outline-none focus:border-cyan-400"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-slate-300 block mb-1">
-                    मोबाइल नंबर (वैकल्पिक):
-                  </label>
-                  <div className="relative">
-                    <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input
-                      type="tel"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="9876543210"
-                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#0D1726] border border-white/10 text-white text-sm focus:outline-none focus:border-cyan-400"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-slate-300 block mb-1.5">
-                    अवतार चुनें:
-                  </label>
-                  <div className="flex gap-2">
-                    {AVATARS.map((av, idx) => (
-                      <button
-                        type="button"
-                        key={idx}
-                        onClick={() => setAvatar(av)}
-                        className={`w-10 h-10 rounded-full overflow-hidden border-2 transition-all ${
-                          avatar === av ? 'border-cyan-400 scale-105' : 'border-white/10 opacity-70'
-                        }`}
-                      >
-                        <img src={av} alt="Avatar" className="w-full h-full" />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </>
+            {error && (
+              <div className="w-full bg-red-950/50 border border-red-800 text-red-300 text-xs p-2.5 rounded-lg mb-4 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+                <span>{error}</span>
+              </div>
             )}
 
-            <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">
-                ईमेल (Email ID):
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@gmail.com"
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#0D1726] border border-white/10 text-white text-sm focus:outline-none focus:border-cyan-400"
-                />
+            {successMsg && (
+              <div className="w-full bg-green-950/50 border border-green-800 text-green-300 text-xs p-2.5 rounded-lg mb-4 flex items-center gap-2">
+                <Check className="w-4 h-4 shrink-0 text-green-400" />
+                <span>{successMsg}</span>
               </div>
-            </div>
+            )}
 
-            <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">
-                पासवर्ड (Password):
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="कम से कम 6 अक्षर..."
-                  className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-[#0D1726] border border-white/10 text-white text-sm focus:outline-none focus:border-cyan-400"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
+            <form onSubmit={handleSubmit} className="w-full space-y-2">
+              <input
+                type="text"
+                placeholder={isSignUp ? 'Mobile Number or Email' : 'Phone number, username, or email'}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full bg-neutral-900 border border-neutral-800 text-xs text-white px-3 py-2.5 rounded-md outline-none focus:border-neutral-600 transition-colors"
+              />
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-sm shadow-lg shadow-cyan-500/25 active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer mt-2"
-            >
-              {loading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
+              {isSignUp && (
                 <>
-                  <span>{mode === 'login' ? 'लॉगिन करें' : 'खाता बनाएं'}</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <input
+                    type="text"
+                    placeholder="Full Name"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="w-full bg-neutral-900 border border-neutral-800 text-xs text-white px-3 py-2.5 rounded-md outline-none focus:border-neutral-600 transition-colors"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className="w-full bg-neutral-900 border border-neutral-800 text-xs text-white px-3 py-2.5 rounded-md outline-none focus:border-neutral-600 transition-colors"
+                  />
                 </>
               )}
-            </button>
-          </form>
 
-          {/* Google Sign-in Divider */}
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-white/10" />
-            </div>
-            <div className="relative flex justify-center text-[10px] uppercase">
-              <span className="bg-[#0B1220] px-3 text-slate-400 font-semibold">
-                या (OR)
+              <input
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full bg-neutral-900 border border-neutral-800 text-xs text-white px-3 py-2.5 rounded-md outline-none focus:border-neutral-600 transition-colors"
+              />
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-2 bg-[#0095f6] hover:bg-[#1877f2] disabled:opacity-50 text-white text-xs font-semibold rounded-lg transition-colors mt-2"
+              >
+                {loading ? 'Please wait...' : isSignUp ? 'Sign up' : 'Log in'}
+              </button>
+            </form>
+
+            {/* OR Divider */}
+            <div className="w-full flex items-center my-4">
+              <div className="flex-1 h-[1px] bg-neutral-800" />
+              <span className="px-4 text-[11px] font-semibold text-neutral-500 uppercase">
+                OR
               </span>
+              <div className="flex-1 h-[1px] bg-neutral-800" />
             </div>
+
+            {/* Instant Demo Login Button */}
+            <button
+              type="button"
+              onClick={handleInstantDemoLogin}
+              disabled={loading}
+              className="w-full py-2 bg-gradient-to-r from-amber-500 via-rose-500 to-purple-600 hover:opacity-95 text-white text-xs font-bold rounded-lg shadow-lg flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
+            >
+              <Zap className="w-3.5 h-3.5 fill-white" />
+              <span>⚡ Instant Demo Login (1-Click)</span>
+            </button>
           </div>
 
-          {/* Continue with Google */}
-          <button
-            onClick={loginWithGoogle}
-            className="w-full py-3 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs shadow-md transition-all active:scale-98 flex items-center justify-center gap-2.5 cursor-pointer"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24">
-              <path
-                fill="#4285F4"
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-              />
-              <path
-                fill="#EA4335"
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-              />
-            </svg>
-            <span>Google के साथ आगे बढ़ें</span>
-          </button>
+          {/* Toggle Login / Signup Card */}
+          <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-4 text-center text-xs text-neutral-300">
+            {isSignUp ? (
+              <p>
+                Have an account?{' '}
+                <button
+                  type="button"
+                  onClick={() => setIsSignUp(false)}
+                  className="font-semibold text-[#0095f6] hover:underline"
+                >
+                  Log in
+                </button>
+              </p>
+            ) : (
+              <p>
+                Don&apos;t have an account?{' '}
+                <button
+                  type="button"
+                  onClick={() => setIsSignUp(true)}
+                  className="font-semibold text-[#0095f6] hover:underline"
+                >
+                  Sign up
+                </button>
+              </p>
+            )}
+          </div>
         </div>
       </div>
-    </AppShell>
+    </div>
   );
 }

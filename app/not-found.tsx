@@ -1,25 +1,19 @@
 import React from 'react';
 import Link from 'next/link';
-import { Home } from 'lucide-react';
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-[#05070D] text-white">
-      <div className="max-w-md w-full p-8 rounded-3xl bg-[#0B1220] border border-white/10 text-center space-y-4 shadow-2xl">
-        <div className="w-16 h-16 rounded-2xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center mx-auto text-3xl">
-          🔍
-        </div>
-        <h2 className="text-2xl font-bold font-hindi">पेज नहीं मिला (404)</h2>
-        <p className="text-xs text-slate-400 font-hindi">
-          माफ़ कीजिए सा, यह पेज मौजूद नहीं है या हटा दिया गया है।
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-black text-white text-center">
+      <div className="max-w-md w-full space-y-4">
+        <h2 className="text-xl md:text-2xl font-bold tracking-tight text-white">
+          Sorry, this page isn&apos;t available.
+        </h2>
+        <p className="text-xs md:text-sm text-neutral-400 leading-relaxed">
+          The link you followed may be broken, or the page may have been removed.{' '}
+          <Link href="/" className="text-[#0095f6] hover:underline font-medium">
+            Go back to Instagram.
+          </Link>
         </p>
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-xl font-bold text-xs transition-all active:scale-95 shadow-md shadow-cyan-500/20"
-        >
-          <Home className="w-4 h-4" />
-          <span>होम पेज पर लौटें</span>
-        </Link>
       </div>
     </div>
   );

@@ -9,18 +9,18 @@ export default function GlobalError({
   reset: () => void;
 }) {
   return (
-    <html lang="hi">
-      <body className="bg-stone-950 text-white min-h-screen flex items-center justify-center p-4">
-        <div className="max-w-md w-full p-8 rounded-3xl bg-slate-900 border border-amber-500/30 text-center space-y-4 shadow-2xl">
-          <h2 className="text-xl font-black text-amber-400">DHOTI AALE</h2>
-          <p className="text-xs text-slate-300">
-            एप्लिकेशन लोड करने में समस्या आई। कृपया पुनः प्रयास करें।
+    <html lang="en" className="dark">
+      <body className="bg-black text-white min-h-screen flex items-center justify-center p-4">
+        <div className="max-w-md w-full p-8 rounded-2xl bg-neutral-900 border border-neutral-800 text-center space-y-4 shadow-2xl">
+          <h1 className="text-2xl font-bold italic font-serif text-white">Instagram</h1>
+          <p className="text-xs text-neutral-400">
+            A critical error occurred while loading Instagram.
           </p>
           <button
             onClick={() => reset()}
-            className="px-6 py-2.5 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md cursor-pointer transition-transform active:scale-95"
+            className="px-6 py-2.5 rounded-lg bg-[#0095f6] hover:bg-[#1877f2] text-white font-semibold text-xs shadow-md transition-colors"
           >
-            ऐप पुनः लोड करें
+            Reload Instagram
           </button>
         </div>
       </body>
